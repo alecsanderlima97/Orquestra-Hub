@@ -7,6 +7,9 @@ import { TextField } from "@/components/ui/TextField";
 import { AccountsPayableTable } from "@/features/accounts-payable/components/AccountsPayableTable";
 import { listAccountsPayable, markAccountAsPaid } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
+import { LoginScreen } from "@/features/auth/components/LoginScreen";
+import { listenAuth, logoutUser } from "@/features/auth/services/authService";
+import type { AppUser } from "@/features/auth/types/authTypes";
 import { SummaryCard } from "@/features/dashboard/components/SummaryCard";
 import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes";
 import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
@@ -34,6 +37,8 @@ function addMonths(date: string, months: number) {
 }
 
 export function OrquestraHubApp() {
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(!firebaseReady);
   const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers);
   const [purchaseList, setPurchaseList] = useState<Purchase[]>(purchases);
   const [accountList, setAccountList] = useState<AccountPayable[]>(accountsPayable);
@@ -47,6 +52,14 @@ export function OrquestraHubApp() {
     supplier: "Mister Multimarcas",
     total: "R$ 15.000,00",
   });
+
+  useEffect(() => {
+    const unsubscribe = listenAuth((currentUser) => {
+      setUser(currentUser);
+      setAuthChecked(true);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (!firebaseReady) return;
@@ -123,8 +136,23 @@ export function OrquestraHubApp() {
     setAccountList((current) => current.map((account) => (account.id === id ? { ...account, status: "Pago" } : account)));
   }
 
+  async function handleLogout() {
+    await logoutUser();
+    setUser(null);
+  }
+
+  if (!authChecked) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 text-sm font-medium text-slate-600">
+        Carregando acesso...
+      </main>
+    );
+  }
+
+  if (!user) return <LoginScreen onLogin={setUser} />;
+
   return (
-    <AppShell>
+    <AppShell onLogout={handleLogout} user={user}>
       <div className="space-y-8 px-5 py-6 sm:px-8">
         <Section description="Visao rapida do mes e dos pagamentos." id="dashboard" title="Dashboard">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
