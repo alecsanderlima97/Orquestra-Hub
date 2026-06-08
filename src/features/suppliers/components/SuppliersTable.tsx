@@ -1,0 +1,34 @@
+import type { Supplier } from "../types/supplierTypes";
+
+export function SuppliersTable({ suppliers }: { suppliers: Supplier[] }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <table className="w-full min-w-[760px] text-left text-sm">
+        <thead className="bg-slate-50 text-slate-600">
+          <tr>
+            <th className="px-5 py-3 font-medium">Fornecedor</th>
+            <th className="px-5 py-3 font-medium">CNPJ</th>
+            <th className="px-5 py-3 font-medium">Telefone</th>
+            <th className="px-5 py-3 font-medium">Em aberto</th>
+            <th className="px-5 py-3 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {suppliers.map((supplier) => (
+            <tr key={supplier.id}>
+              <td className="px-5 py-4 font-medium text-slate-950">{supplier.name}</td>
+              <td className="px-5 py-4 text-slate-700">{supplier.document}</td>
+              <td className="px-5 py-4 text-slate-700">{supplier.phone}</td>
+              <td className="px-5 py-4 font-medium text-slate-950">{supplier.openAmount}</td>
+              <td className="px-5 py-4">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  {supplier.status}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

@@ -1,0 +1,20 @@
+import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
+import { db, firebaseReady } from "@/lib/firebase/config";
+import { tenantCollectionPath } from "@/lib/firebase/paths";
+import type { Supplier } from "../types/supplierTypes";
+
+const collectionName = "suppliers";
+
+export async function listSuppliers(tenantId: string): Promise<Supplier[]> {
+  if (!firebaseReady || !db) return [];
+  const snapshot = await getDocs(query(collection(db, tenantCollectionPath(tenantId, collectionName)), orderBy("name")));
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Supplier);
+}
+
+export async function createSupplier(tenantId: string, supplier: Omit<Supplier, "id">) {
+  if (!firebaseReady || !db) return null;
+  return addDoc(collection(db, tenantCollectionPath(tenantId, collectionName)), {
+    ...supplier,
+    createdAt: serverTimestamp(),
+  });
+}
