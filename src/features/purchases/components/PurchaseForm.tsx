@@ -1,4 +1,5 @@
 import { TextField } from "@/components/ui/TextField";
+import { formatBRL, toTitleCaseBR } from "@/lib/formatters/br";
 
 export type PurchaseFormState = {
   dueDate: string;
@@ -22,10 +23,10 @@ export function PurchaseForm({
   return (
     <form className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <TextField label="Fornecedor" onChange={(event) => onChange({ ...form, supplier: event.target.value })} placeholder="Nome Do Fornecedor" value={form.supplier} />
-        <TextField label="Loja" onChange={(event) => onChange({ ...form, store: event.target.value })} placeholder="Loja De Baixo" value={form.store} />
-        <TextField label="Numero da nota" onChange={(event) => onChange({ ...form, invoiceNumber: event.target.value })} placeholder="NF 0000" value={form.invoiceNumber} />
-        <TextField label="Valor total" onChange={(event) => onChange({ ...form, total: event.target.value })} placeholder="R$ 0,00" value={form.total} />
+        <TextField label="Fornecedor" onBlur={() => onChange({ ...form, supplier: toTitleCaseBR(form.supplier) })} onChange={(event) => onChange({ ...form, supplier: event.target.value })} placeholder="Nome do Fornecedor" value={form.supplier} />
+        <TextField label="Loja" onBlur={() => onChange({ ...form, store: toTitleCaseBR(form.store) })} onChange={(event) => onChange({ ...form, store: event.target.value })} placeholder="Loja de Baixo" value={form.store} />
+        <TextField label="Número da nota" onChange={(event) => onChange({ ...form, invoiceNumber: event.target.value.toLocaleUpperCase("pt-BR") })} placeholder="NF 0000" value={form.invoiceNumber} />
+        <TextField label="Valor total" onBlur={() => onChange({ ...form, total: formatBRL(form.total) })} onChange={(event) => onChange({ ...form, total: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.total} />
         <TextField label="Data da compra" onChange={(event) => onChange({ ...form, issueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.issueDate} />
         <TextField label="Parcelas" onChange={(event) => onChange({ ...form, installments: event.target.value })} placeholder="3" type="number" value={form.installments} />
         <TextField label="Primeiro vencimento" onChange={(event) => onChange({ ...form, dueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.dueDate} />

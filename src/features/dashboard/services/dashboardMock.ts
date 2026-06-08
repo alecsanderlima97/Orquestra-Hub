@@ -30,21 +30,21 @@ export const financialSummary: FinancialSummary[] = [
 export const upcomingPayments: UpcomingPayment[] = [
   {
     supplier: "Mister Multimarcas",
-    store: "Loja de baixo",
+    store: "Loja de Baixo",
     dueDate: "10/06/2026",
     amount: "R$ 5.000,00",
     status: "Aberto",
   },
   {
     supplier: "Mister Conceito",
-    store: "Loja de cima",
+    store: "Loja de Cima",
     dueDate: "08/06/2026",
     amount: "R$ 2.800,00",
     status: "Vence hoje",
   },
   {
     supplier: "Fornecedor Moda Sul",
-    store: "Loja de baixo",
+    store: "Loja de Baixo",
     dueDate: "05/06/2026",
     amount: "R$ 3.200,00",
     status: "Atrasado",

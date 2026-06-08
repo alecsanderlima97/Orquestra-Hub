@@ -26,12 +26,13 @@ import { createSupplier, listSuppliers } from "@/features/suppliers/services/sup
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
 import { accountsPayable, purchases, stores, suppliers } from "@/lib/data/mockData";
 import { firebaseReady } from "@/lib/firebase/config";
+import { formatCnpj, formatPhone, parseBRL, toTitleCaseBR } from "@/lib/formatters/br";
 import { defaultTenantId } from "@/lib/tenant/tenant";
 
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 
 function parseMoney(value: string) {
-  return Number(value.replace(/\D/g, "")) / 100;
+  return parseBRL(value);
 }
 
 function addMonths(date: string, months: number) {
@@ -59,7 +60,7 @@ export function OrquestraHubApp() {
     installments: "3",
     invoiceNumber: "NF 1003",
     issueDate: "2026-06-08",
-    store: "Loja de baixo",
+        store: "Loja de Baixo",
     supplier: "Mister Multimarcas",
     total: "R$ 15.000,00",
   });
@@ -95,7 +96,7 @@ export function OrquestraHubApp() {
     () => [
       { helper: "Boletos ainda em aberto", label: "A pagar", tone: "warning", value: money.format(openTotal) },
       { helper: "Baixas confirmadas", label: "Pago", tone: "success", value: money.format(paidTotal) },
-      { helper: "Exigem atencao", label: "Vencidos", tone: "danger", value: money.format(overdueTotal) },
+      { helper: "Exigem atenção", label: "Vencidos", tone: "danger", value: money.format(overdueTotal) },
       { helper: "Com cadastro ativo", label: "Fornecedores", tone: "neutral", value: String(supplierList.length) },
     ],
     [openTotal, overdueTotal, paidTotal, supplierList.length],
@@ -104,10 +105,10 @@ export function OrquestraHubApp() {
   async function addSupplier() {
     if (!supplierForm.name.trim()) return;
     const newSupplier: Omit<Supplier, "id"> = {
-      document: supplierForm.document || "00.000.000/0000-00",
-      name: supplierForm.name.trim(),
+      document: formatCnpj(supplierForm.document || "00000000000000"),
+      name: toTitleCaseBR(supplierForm.name.trim()),
       openAmount: "R$ 0,00",
-      phone: supplierForm.phone || "(00) 00000-0000",
+      phone: formatPhone(supplierForm.phone || "00000000000"),
       status: "Ativo",
     };
     if (firebaseReady) await createSupplier(defaultTenantId, newSupplier);
@@ -119,9 +120,9 @@ export function OrquestraHubApp() {
     if (!storeForm.name.trim()) return;
     const newStore: Omit<Store, "id"> = {
       balance: storeForm.balance || "R$ 0,00",
-      manager: storeForm.manager || "Sem responsavel",
+      manager: toTitleCaseBR(storeForm.manager || "Sem Responsável"),
       monthlyGoal: storeForm.monthlyGoal || "R$ 0,00",
-      name: storeForm.name.trim(),
+      name: toTitleCaseBR(storeForm.name.trim()),
     };
     if (firebaseReady) await createStore(defaultTenantId, newStore);
     setStoreList((current) => [{ id: crypto.randomUUID(), ...newStore }, ...current]);
@@ -137,8 +138,8 @@ export function OrquestraHubApp() {
       installments,
       invoiceNumber: purchaseForm.invoiceNumber,
       issueDate: new Date(purchaseForm.issueDate).toLocaleDateString("pt-BR"),
-      store: purchaseForm.store,
-      supplier: purchaseForm.supplier,
+      store: toTitleCaseBR(purchaseForm.store),
+      supplier: toTitleCaseBR(purchaseForm.supplier),
       total: money.format(total),
     };
     const newAccounts: Omit<AccountPayable, "id">[] = Array.from({ length: installments }, (_, index) => ({
@@ -146,8 +147,8 @@ export function OrquestraHubApp() {
       dueDate: addMonths(purchaseForm.dueDate, index),
       installment: `${index + 1}/${installments}`,
       status: "Aberto" as const,
-      store: purchaseForm.store,
-      supplier: purchaseForm.supplier,
+      store: toTitleCaseBR(purchaseForm.store),
+      supplier: toTitleCaseBR(purchaseForm.supplier),
     }));
     if (firebaseReady) await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts);
     setPurchaseList((current) => [{ id: purchaseId, ...newPurchase }, ...current]);
@@ -195,9 +196,9 @@ export function OrquestraHubApp() {
 
         <Section description="Cadastro central de fornecedores." id="fornecedores" title="Fornecedores">
           <div className="mb-4 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
-            <TextField label="Nome" onChange={(event) => setSupplierForm((form) => ({ ...form, name: event.target.value }))} placeholder="Nome Do Fornecedor" value={supplierForm.name} />
-            <TextField label="CNPJ" onChange={(event) => setSupplierForm((form) => ({ ...form, document: event.target.value }))} placeholder="00.000.000/0000-00" value={supplierForm.document} />
-            <TextField label="Telefone" onChange={(event) => setSupplierForm((form) => ({ ...form, phone: event.target.value }))} placeholder="(00) 00000-0000" value={supplierForm.phone} />
+            <TextField label="Nome" onBlur={() => setSupplierForm((form) => ({ ...form, name: toTitleCaseBR(form.name) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, name: event.target.value }))} placeholder="Nome do Fornecedor" value={supplierForm.name} />
+            <TextField label="CNPJ" onChange={(event) => setSupplierForm((form) => ({ ...form, document: formatCnpj(event.target.value) }))} placeholder="00.000.000/0000-00" value={supplierForm.document} />
+            <TextField label="Telefone" onChange={(event) => setSupplierForm((form) => ({ ...form, phone: formatPhone(event.target.value) }))} placeholder="(00) 00000-0000" value={supplierForm.phone} />
             <button className="mt-7 h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={addSupplier} type="button">
               Salvar fornecedor
             </button>
@@ -217,10 +218,10 @@ export function OrquestraHubApp() {
           </div>
         </Section>
 
-        <Section description="Resumo simples para decisao." id="relatorios" title="Relatorios">
+        <Section description="Resumo simples para decisão." id="relatorios" title="Relatórios">
           <div className="grid gap-4 md:grid-cols-3">
             <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Compras lancadas</p>
+              <p className="text-sm text-slate-500">Compras lançadas</p>
               <strong className="mt-2 block text-xl">{purchaseList.length}</strong>
             </article>
             <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
