@@ -5,5 +5,7 @@ export type AccountPayable = {
   dueDate: string;
   amount: string;
   installment: string;
+  paidAt?: string;
+  receiptName?: string;
   status: "Aberto" | "Pago" | "Atrasado";
 };

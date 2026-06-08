@@ -14,19 +14,27 @@ export function SuppliersTable({ suppliers }: { suppliers: Supplier[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {suppliers.map((supplier) => (
-            <tr key={supplier.id}>
-              <td className="px-5 py-4 font-medium text-slate-950">{supplier.name}</td>
-              <td className="px-5 py-4 text-slate-700">{supplier.document}</td>
-              <td className="px-5 py-4 text-slate-700">{supplier.phone}</td>
-              <td className="px-5 py-4 font-medium text-slate-950">{supplier.openAmount}</td>
-              <td className="px-5 py-4">
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                  {supplier.status}
-                </span>
+          {suppliers.length ? (
+            suppliers.map((supplier) => (
+              <tr key={supplier.id}>
+                <td className="px-5 py-4 font-medium text-slate-950">{supplier.name}</td>
+                <td className="px-5 py-4 text-slate-700">{supplier.document}</td>
+                <td className="px-5 py-4 text-slate-700">{supplier.phone}</td>
+                <td className="px-5 py-4 font-medium text-slate-950">{supplier.openAmount}</td>
+                <td className="px-5 py-4">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {supplier.status}
+                  </span>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td className="px-5 py-8 text-center text-slate-500" colSpan={5}>
+                Nenhum fornecedor encontrado.
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>

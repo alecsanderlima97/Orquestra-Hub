@@ -11,15 +11,16 @@ import {
   Truck,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import type { AppUser } from "@/features/auth/types/authTypes";
 
 const navigation = [
-  { label: "Dashboard", icon: LayoutDashboard },
-  { label: "Lojas", icon: Store },
-  { label: "Fornecedores", icon: Truck },
-  { label: "Compras", icon: FileText },
-  { label: "Contas a pagar", icon: CreditCard },
-  { label: "Relatórios", icon: BarChart3 },
+  { description: "Visão geral dos indicadores e próximos vencimentos.", id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { description: "Cadastro e consulta das unidades da empresa.", id: "lojas", label: "Lojas", icon: Store },
+  { description: "Cadastro, busca e consulta dos fornecedores.", id: "fornecedores", label: "Fornecedores", icon: Truck },
+  { description: "Lançamento de notas e geração de parcelas.", id: "compras", label: "Compras", icon: FileText },
+  { description: "Controle de boletos, baixas, filtros e comprovantes.", id: "contas-a-pagar", label: "Contas a pagar", icon: CreditCard },
+  { description: "Resumo financeiro por loja, fornecedor e operação.", id: "relatorios", label: "Relatórios", icon: BarChart3 },
 ];
 
 export function AppShell({
@@ -31,6 +32,27 @@ export function AppShell({
   onLogout?: () => void;
   user?: AppUser | null;
 }) {
+  const [activeSection, setActiveSection] = useState(navigation[0].id);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target.id) setActiveSection(visible.target.id);
+      },
+      { rootMargin: "-20% 0px -55% 0px", threshold: [0.15, 0.35, 0.6] },
+    );
+
+    navigation.forEach((item) => {
+      const section = document.getElementById(item.id);
+      if (section) observer.observe(section);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white px-5 py-6 lg:block">
@@ -44,16 +66,28 @@ export function AppShell({
           </div>
         </div>
         <nav className="mt-8 space-y-1">
-          {navigation.map(({ label, icon: Icon }) => (
-            <a
-              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950"
-              href={`#${label.toLowerCase().replaceAll(" ", "-")}`}
-              key={label}
-            >
-              <Icon size={18} />
-              {label}
-            </a>
-          ))}
+          {navigation.map(({ description, id, label, icon: Icon }) => {
+            const isActive = activeSection === id;
+            return (
+              <a
+                className={`group relative flex items-center gap-3 rounded-md border px-3 py-2.5 text-sm font-medium transition ${
+                  isActive
+                    ? "border-amber-200 bg-amber-50 text-amber-950 shadow-sm shadow-amber-100"
+                    : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-950"
+                }`}
+                href={`#${id}`}
+                key={id}
+                title={description}
+              >
+                <span className={`absolute left-0 top-2 h-6 w-1 rounded-r-full ${isActive ? "bg-amber-400" : "bg-transparent"}`} />
+                <Icon size={18} />
+                {label}
+                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden w-64 -translate-y-1/2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium leading-5 text-slate-700 shadow-lg group-hover:block">
+                  {description}
+                </span>
+              </a>
+            );
+          })}
         </nav>
       </aside>
 
@@ -61,7 +95,7 @@ export function AppShell({
         <header className="border-b border-slate-200 bg-white px-5 py-5 sm:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Hub SaaS modular para pequenos negocios</p>
+              <p className="text-sm font-medium text-slate-500">Hub SaaS modular para pequenos negócios</p>
               <h2 className="mt-1 text-2xl font-semibold">Controle financeiro</h2>
             </div>
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -71,12 +105,21 @@ export function AppShell({
                   <span>{user.role}</span>
                 </div>
               ) : null}
-              <button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 md:w-auto">
+              <a
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 md:w-auto"
+                href="#compras"
+                title="Ir para o lançamento de uma nova compra e gerar parcelas."
+              >
                 <Plus size={18} />
                 Nova compra
-              </button>
+              </a>
               {onLogout ? (
-                <button className="rounded-md border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onLogout} type="button">
+                <button
+                  className="rounded-md border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  onClick={onLogout}
+                  title="Encerrar a sessão atual do sistema."
+                  type="button"
+                >
                   Sair
                 </button>
               ) : null}

@@ -2,20 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
+import { FormAlert } from "@/components/ui/FormAlert";
 import { Section } from "@/components/ui/Section";
 import { TextField } from "@/components/ui/TextField";
+import { AccountsPayableFilters } from "@/features/accounts-payable/components/AccountsPayableFilters";
+import type { AccountFilters } from "@/features/accounts-payable/components/AccountsPayableFilters";
+import { AccountsPayableExport } from "@/features/accounts-payable/components/AccountsPayableExport";
+import { AccountsPayableSummary } from "@/features/accounts-payable/components/AccountsPayableSummary";
+import type { AccountsPayableSummaryItem } from "@/features/accounts-payable/components/AccountsPayableSummary";
 import { AccountsPayableTable } from "@/features/accounts-payable/components/AccountsPayableTable";
+import { PaymentConfirmModal } from "@/features/accounts-payable/components/PaymentConfirmModal";
 import { listAccountsPayable, markAccountAsPaid } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
 import { listenAuth, logoutUser } from "@/features/auth/services/authService";
 import type { AppUser } from "@/features/auth/types/authTypes";
+import { PaymentsTable } from "@/features/dashboard/components/PaymentsTable";
 import { SummaryCard } from "@/features/dashboard/components/SummaryCard";
 import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes";
 import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
 import type { PurchaseFormState } from "@/features/purchases/components/PurchaseForm";
+import { PurchasesTable } from "@/features/purchases/components/PurchasesTable";
 import { createPurchaseWithAccounts } from "@/features/purchases/services/purchaseService";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
+import { FinancialReports } from "@/features/reports/components/FinancialReports";
 import { StoreForm } from "@/features/stores/components/StoreForm";
 import type { StoreFormState } from "@/features/stores/components/StoreForm";
 import { StoresPanel } from "@/features/stores/components/StoresPanel";
@@ -26,7 +36,7 @@ import { createSupplier, listSuppliers } from "@/features/suppliers/services/sup
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
 import { accountsPayable, purchases, stores, suppliers } from "@/lib/data/mockData";
 import { firebaseReady } from "@/lib/firebase/config";
-import { formatCnpj, formatPhone, parseBRL, toTitleCaseBR } from "@/lib/formatters/br";
+import { compareDateBR, formatCnpj, formatPhone, nowDateTimeBR, parseBRL, toTitleCaseBR } from "@/lib/formatters/br";
 import { defaultTenantId } from "@/lib/tenant/tenant";
 
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
@@ -48,6 +58,12 @@ export function OrquestraHubApp() {
   const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers);
   const [purchaseList, setPurchaseList] = useState<Purchase[]>(purchases);
   const [accountList, setAccountList] = useState<AccountPayable[]>(accountsPayable);
+  const [accountFilters, setAccountFilters] = useState<AccountFilters>({ status: "Todos", store: "Todas", supplier: "Todos" });
+  const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
+  const [paymentDateTime, setPaymentDateTime] = useState("");
+  const [formErrors, setFormErrors] = useState({ purchase: "", store: "", supplier: "" });
+  const [purchaseSearch, setPurchaseSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierForm, setSupplierForm] = useState({ document: "", name: "", phone: "" });
   const [storeForm, setStoreForm] = useState<StoreFormState>({
     balance: "R$ 0,00",
@@ -60,7 +76,7 @@ export function OrquestraHubApp() {
     installments: "3",
     invoiceNumber: "NF 1003",
     issueDate: "2026-06-08",
-        store: "Loja de Baixo",
+    store: "Loja de Baixo",
     supplier: "Mister Multimarcas",
     total: "R$ 15.000,00",
   });
@@ -91,6 +107,30 @@ export function OrquestraHubApp() {
   const openTotal = accountList.filter((item) => item.status !== "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const paidTotal = accountList.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const overdueTotal = accountList.filter((item) => item.status === "Atrasado").reduce((total, item) => total + parseMoney(item.amount), 0);
+  const filteredAccounts = accountList
+    .filter((account) => {
+      const statusMatch = accountFilters.status === "Todos" || account.status === accountFilters.status;
+      const storeMatch = accountFilters.store === "Todas" || account.store === accountFilters.store;
+      const supplierMatch = accountFilters.supplier === "Todos" || account.supplier === accountFilters.supplier;
+      return statusMatch && storeMatch && supplierMatch;
+    })
+    .toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate));
+  const filteredOpenTotal = filteredAccounts.filter((item) => item.status === "Aberto").reduce((total, item) => total + parseMoney(item.amount), 0);
+  const filteredPaidTotal = filteredAccounts.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
+  const filteredOverdueTotal = filteredAccounts.filter((item) => item.status === "Atrasado").reduce((total, item) => total + parseMoney(item.amount), 0);
+  const filteredTotal = filteredAccounts.reduce((total, item) => total + parseMoney(item.amount), 0);
+  const filteredSuppliers = supplierList.filter((supplier) => {
+    const search = supplierSearch.toLocaleLowerCase("pt-BR").trim();
+    if (!search) return true;
+    return [supplier.name, supplier.document, supplier.phone].some((value) => value.toLocaleLowerCase("pt-BR").includes(search));
+  });
+  const filteredPurchases = purchaseList.filter((purchase) => {
+    const search = purchaseSearch.toLocaleLowerCase("pt-BR").trim();
+    if (!search) return true;
+    return [purchase.invoiceNumber, purchase.supplier, purchase.store, purchase.issueDate].some((value) =>
+      value.toLocaleLowerCase("pt-BR").includes(search),
+    );
+  });
 
   const summary = useMemo<FinancialSummary[]>(
     () => [
@@ -101,9 +141,25 @@ export function OrquestraHubApp() {
     ],
     [openTotal, overdueTotal, paidTotal, supplierList.length],
   );
+  const accountSummary = useMemo<AccountsPayableSummaryItem[]>(
+    () => [
+      { helper: "Resultado da busca atual", label: "Total filtrado", value: money.format(filteredTotal) },
+      { helper: `${filteredAccounts.length} boleto(s)`, label: "Quantidade", value: String(filteredAccounts.length) },
+      { helper: "Ainda pendente", label: "Em aberto", value: money.format(filteredOpenTotal) },
+      { helper: `Pago: ${money.format(filteredPaidTotal)}`, label: "Atrasado", value: money.format(filteredOverdueTotal) },
+    ],
+    [filteredAccounts.length, filteredOpenTotal, filteredOverdueTotal, filteredPaidTotal, filteredTotal],
+  );
 
   async function addSupplier() {
-    if (!supplierForm.name.trim()) return;
+    if (!supplierForm.name.trim()) {
+      setFormErrors((errors) => ({ ...errors, supplier: "Informe o nome do fornecedor." }));
+      return;
+    }
+    if (supplierForm.document && formatCnpj(supplierForm.document).length < 18) {
+      setFormErrors((errors) => ({ ...errors, supplier: "Informe um CNPJ completo no formato 00.000.000/0000-00." }));
+      return;
+    }
     const newSupplier: Omit<Supplier, "id"> = {
       document: formatCnpj(supplierForm.document || "00000000000000"),
       name: toTitleCaseBR(supplierForm.name.trim()),
@@ -113,11 +169,20 @@ export function OrquestraHubApp() {
     };
     if (firebaseReady) await createSupplier(defaultTenantId, newSupplier);
     setSupplierList((current) => [{ id: crypto.randomUUID(), ...newSupplier }, ...current]);
+    setPurchaseForm((form) => ({ ...form, supplier: newSupplier.name }));
     setSupplierForm({ document: "", name: "", phone: "" });
+    setFormErrors((errors) => ({ ...errors, supplier: "" }));
   }
 
   async function addStore() {
-    if (!storeForm.name.trim()) return;
+    if (!storeForm.name.trim()) {
+      setFormErrors((errors) => ({ ...errors, store: "Informe o nome da loja." }));
+      return;
+    }
+    if (parseMoney(storeForm.monthlyGoal) <= 0) {
+      setFormErrors((errors) => ({ ...errors, store: "Informe uma meta mensal maior que R$ 0,00." }));
+      return;
+    }
     const newStore: Omit<Store, "id"> = {
       balance: storeForm.balance || "R$ 0,00",
       manager: toTitleCaseBR(storeForm.manager || "Sem Responsável"),
@@ -126,12 +191,38 @@ export function OrquestraHubApp() {
     };
     if (firebaseReady) await createStore(defaultTenantId, newStore);
     setStoreList((current) => [{ id: crypto.randomUUID(), ...newStore }, ...current]);
+    setPurchaseForm((form) => ({ ...form, store: newStore.name }));
     setStoreForm({ balance: "R$ 0,00", manager: "", monthlyGoal: "R$ 0,00", name: "" });
+    setFormErrors((errors) => ({ ...errors, store: "" }));
   }
 
   async function addPurchase() {
     const installments = Math.max(Number(purchaseForm.installments), 1);
     const total = parseMoney(purchaseForm.total);
+    if (!purchaseForm.supplier || !supplierList.some((supplier) => supplier.name === purchaseForm.supplier)) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Selecione um fornecedor cadastrado." }));
+      return;
+    }
+    if (!purchaseForm.store || !storeList.some((store) => store.name === purchaseForm.store)) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Selecione uma loja cadastrada." }));
+      return;
+    }
+    if (!purchaseForm.invoiceNumber.trim()) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Informe o número da nota." }));
+      return;
+    }
+    if (total <= 0) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Informe um valor total maior que R$ 0,00." }));
+      return;
+    }
+    if (!purchaseForm.issueDate || !purchaseForm.dueDate) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Informe a data da compra e o primeiro vencimento." }));
+      return;
+    }
+    if (installments <= 0) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Informe pelo menos uma parcela." }));
+      return;
+    }
     const installmentAmount = total / installments;
     const purchaseId = crypto.randomUUID();
     const newPurchase: Omit<Purchase, "id"> = {
@@ -156,11 +247,52 @@ export function OrquestraHubApp() {
       ...newAccounts.map((account, index) => ({ id: `${purchaseId}-${index + 1}`, ...account })),
       ...current,
     ]);
+    setFormErrors((errors) => ({ ...errors, purchase: "" }));
   }
 
-  async function handleMarkPaid(id: string) {
-    if (firebaseReady) await markAccountAsPaid(defaultTenantId, id);
-    setAccountList((current) => current.map((account) => (account.id === id ? { ...account, status: "Pago" } : account)));
+  function requestMarkPaid(id: string) {
+    const account = accountList.find((item) => item.id === id);
+    if (!account || account.status === "Pago") return;
+    setPaymentToConfirm(account);
+    setPaymentDateTime(nowDateTimeBR());
+  }
+
+  async function confirmMarkPaid() {
+    if (!paymentToConfirm) return;
+    if (firebaseReady) await markAccountAsPaid(defaultTenantId, paymentToConfirm.id);
+    setAccountList((current) =>
+      current.map((account) =>
+        account.id === paymentToConfirm.id ? { ...account, paidAt: paymentDateTime, status: "Pago" } : account,
+      ),
+    );
+    setPaymentToConfirm(null);
+    setPaymentDateTime("");
+  }
+
+  function handleReceiptSelected(id: string, fileName: string) {
+    setAccountList((current) => current.map((account) => (account.id === id ? { ...account, receiptName: fileName } : account)));
+  }
+
+  function exportFilteredAccounts() {
+    const header = ["Fornecedor", "Loja", "Parcela", "Vencimento", "Valor", "Status", "Pago em", "Comprovante"];
+    const rows = filteredAccounts.map((account) => [
+      account.supplier,
+      account.store,
+      account.installment,
+      account.dueDate,
+      account.amount,
+      account.status,
+      account.paidAt || "",
+      account.receiptName || "",
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\n");
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "contas-a-pagar-orquestra-hub.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleLogout() {
@@ -187,10 +319,13 @@ export function OrquestraHubApp() {
               <SummaryCard item={item} key={item.label} />
             ))}
           </div>
+          <div className="mt-6">
+            <PaymentsTable accounts={accountList.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate))} />
+          </div>
         </Section>
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
-          <StoreForm form={storeForm} onChange={setStoreForm} onSubmit={addStore} />
+          <StoreForm error={formErrors.store} form={storeForm} onChange={setStoreForm} onSubmit={addStore} />
           <StoresPanel stores={storeList} />
         </Section>
 
@@ -199,42 +334,81 @@ export function OrquestraHubApp() {
             <TextField label="Nome" onBlur={() => setSupplierForm((form) => ({ ...form, name: toTitleCaseBR(form.name) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, name: event.target.value }))} placeholder="Nome do Fornecedor" value={supplierForm.name} />
             <TextField label="CNPJ" onChange={(event) => setSupplierForm((form) => ({ ...form, document: formatCnpj(event.target.value) }))} placeholder="00.000.000/0000-00" value={supplierForm.document} />
             <TextField label="Telefone" onChange={(event) => setSupplierForm((form) => ({ ...form, phone: formatPhone(event.target.value) }))} placeholder="(00) 00000-0000" value={supplierForm.phone} />
-            <button className="mt-7 h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={addSupplier} type="button">
+            <button
+              className="mt-7 h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+              onClick={addSupplier}
+              title="Cadastrar este fornecedor para lançar compras e controlar boletos."
+              type="button"
+            >
               Salvar fornecedor
             </button>
+            <div className="md:col-span-4">
+              <FormAlert message={formErrors.supplier} />
+            </div>
+          </div>
+          <div className="mb-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <TextField
+              label="Buscar fornecedor"
+              onChange={(event) => setSupplierSearch(event.target.value)}
+              placeholder="Nome, CNPJ ou telefone"
+              value={supplierSearch}
+            />
           </div>
           <div className="overflow-x-auto">
-            <SuppliersTable suppliers={supplierList} />
+            <SuppliersTable suppliers={filteredSuppliers} />
           </div>
         </Section>
 
         <Section description="Lance a nota e gere parcelas automaticamente." id="compras" title="Compras e notas">
-          <PurchaseForm form={purchaseForm} onChange={setPurchaseForm} onSubmit={addPurchase} />
+          <PurchaseForm
+            form={purchaseForm}
+            onChange={setPurchaseForm}
+            onSubmit={addPurchase}
+            error={formErrors.purchase}
+            storeOptions={storeList.map((store) => store.name)}
+            supplierOptions={supplierList.map((supplier) => supplier.name)}
+          />
+          <div className="my-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <TextField
+              label="Buscar nota"
+              onChange={(event) => setPurchaseSearch(event.target.value)}
+              placeholder="NF, fornecedor, loja ou data"
+              value={purchaseSearch}
+            />
+          </div>
+          <div className="overflow-x-auto">
+            <PurchasesTable purchases={filteredPurchases} />
+          </div>
         </Section>
 
         <Section description="Controle vencimento, baixa e status." id="contas-a-pagar" title="Contas a pagar">
+          <AccountsPayableFilters
+            filters={accountFilters}
+            onChange={setAccountFilters}
+            storeOptions={storeList.map((store) => store.name)}
+            supplierOptions={supplierList.map((supplier) => supplier.name)}
+          />
+          <AccountsPayableSummary items={accountSummary} />
+          <AccountsPayableExport onExport={exportFilteredAccounts} />
           <div className="overflow-x-auto">
-            <AccountsPayableTable accounts={accountList} onMarkPaid={handleMarkPaid} />
+            <AccountsPayableTable
+              accounts={filteredAccounts}
+              onMarkPaid={requestMarkPaid}
+              onReceiptSelected={handleReceiptSelected}
+            />
           </div>
         </Section>
 
-        <Section description="Resumo simples para decisão." id="relatorios" title="Relatórios">
-          <div className="grid gap-4 md:grid-cols-3">
-            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Compras lançadas</p>
-              <strong className="mt-2 block text-xl">{purchaseList.length}</strong>
-            </article>
-            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Saldo em aberto</p>
-              <strong className="mt-2 block text-xl">{money.format(openTotal)}</strong>
-            </article>
-            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Total pago</p>
-              <strong className="mt-2 block text-xl">{money.format(paidTotal)}</strong>
-            </article>
-          </div>
+        <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">
+          <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
       </div>
+      <PaymentConfirmModal
+        account={paymentToConfirm}
+        onCancel={() => setPaymentToConfirm(null)}
+        onConfirm={confirmMarkPaid}
+        paidAt={paymentDateTime}
+      />
     </AppShell>
   );
 }

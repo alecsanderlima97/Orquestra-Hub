@@ -12,6 +12,15 @@ export const brDateFormatter = new Intl.DateTimeFormat("pt-BR", {
   year: "numeric",
 });
 
+export const brDateTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  month: "2-digit",
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+});
+
 export function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -58,4 +67,22 @@ export function formatDateBR(value: string) {
   if (!value) return "";
   const [year, month, day] = value.split("-").map(Number);
   return brDateFormatter.format(new Date(year, month - 1, day));
+}
+
+export function parseDateBR(value: string) {
+  const [day, month, year] = value.split("/").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function todaySaoPaulo() {
+  const [day, month, year] = brDateFormatter.format(new Date()).split("/").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function compareDateBR(a: string, b: string) {
+  return parseDateBR(a).getTime() - parseDateBR(b).getTime();
+}
+
+export function nowDateTimeBR() {
+  return brDateTimeFormatter.format(new Date());
 }
