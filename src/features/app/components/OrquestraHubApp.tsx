@@ -16,7 +16,11 @@ import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
 import type { PurchaseFormState } from "@/features/purchases/components/PurchaseForm";
 import { createPurchaseWithAccounts } from "@/features/purchases/services/purchaseService";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
+import { StoreForm } from "@/features/stores/components/StoreForm";
+import type { StoreFormState } from "@/features/stores/components/StoreForm";
 import { StoresPanel } from "@/features/stores/components/StoresPanel";
+import { createStore, listStores } from "@/features/stores/services/storeService";
+import type { Store } from "@/features/stores/types/storeTypes";
 import { SuppliersTable } from "@/features/suppliers/components/SuppliersTable";
 import { createSupplier, listSuppliers } from "@/features/suppliers/services/supplierService";
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
@@ -39,10 +43,17 @@ function addMonths(date: string, months: number) {
 export function OrquestraHubApp() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [authChecked, setAuthChecked] = useState(!firebaseReady);
+  const [storeList, setStoreList] = useState<Store[]>(stores);
   const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers);
   const [purchaseList, setPurchaseList] = useState<Purchase[]>(purchases);
   const [accountList, setAccountList] = useState<AccountPayable[]>(accountsPayable);
   const [supplierForm, setSupplierForm] = useState({ document: "", name: "", phone: "" });
+  const [storeForm, setStoreForm] = useState<StoreFormState>({
+    balance: "R$ 0,00",
+    manager: "",
+    monthlyGoal: "R$ 0,00",
+    name: "",
+  });
   const [purchaseForm, setPurchaseForm] = useState<PurchaseFormState>({
     dueDate: "2026-06-10",
     installments: "3",
@@ -64,10 +75,12 @@ export function OrquestraHubApp() {
   useEffect(() => {
     if (!firebaseReady) return;
     async function loadFirebaseData() {
-      const [firebaseSuppliers, firebaseAccounts] = await Promise.all([
+      const [firebaseStores, firebaseSuppliers, firebaseAccounts] = await Promise.all([
+        listStores(defaultTenantId),
         listSuppliers(defaultTenantId),
         listAccountsPayable(defaultTenantId),
       ]);
+      if (firebaseStores.length) setStoreList(firebaseStores);
       if (firebaseSuppliers.length) setSupplierList(firebaseSuppliers);
       if (firebaseAccounts.length) setAccountList(firebaseAccounts);
     }
@@ -100,6 +113,19 @@ export function OrquestraHubApp() {
     if (firebaseReady) await createSupplier(defaultTenantId, newSupplier);
     setSupplierList((current) => [{ id: crypto.randomUUID(), ...newSupplier }, ...current]);
     setSupplierForm({ document: "", name: "", phone: "" });
+  }
+
+  async function addStore() {
+    if (!storeForm.name.trim()) return;
+    const newStore: Omit<Store, "id"> = {
+      balance: storeForm.balance || "R$ 0,00",
+      manager: storeForm.manager || "Sem responsavel",
+      monthlyGoal: storeForm.monthlyGoal || "R$ 0,00",
+      name: storeForm.name.trim(),
+    };
+    if (firebaseReady) await createStore(defaultTenantId, newStore);
+    setStoreList((current) => [{ id: crypto.randomUUID(), ...newStore }, ...current]);
+    setStoreForm({ balance: "R$ 0,00", manager: "", monthlyGoal: "R$ 0,00", name: "" });
   }
 
   async function addPurchase() {
@@ -163,7 +189,8 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
-          <StoresPanel stores={stores} />
+          <StoreForm form={storeForm} onChange={setStoreForm} onSubmit={addStore} />
+          <StoresPanel stores={storeList} />
         </Section>
 
         <Section description="Cadastro central de fornecedores." id="fornecedores" title="Fornecedores">
