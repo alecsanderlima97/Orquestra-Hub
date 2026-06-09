@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function belongsToTenant(tenantId) {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/tenants/$(tenantId)/users/$(request.auth.uid));
+    }
+
+    match /tenants/{tenantId}/receipts/{fileName=**} {
+      allow read, write: if belongsToTenant(tenantId);
+    }
+  }
+}

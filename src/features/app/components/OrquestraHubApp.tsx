@@ -40,6 +40,7 @@ import { compareDateBR, formatCnpj, formatPhone, nowDateTimeBR, parseBRL, toTitl
 import { defaultTenantId } from "@/lib/tenant/tenant";
 
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
+const demoUserId = "demo-user";
 
 function parseMoney(value: string) {
   return parseBRL(value);
@@ -90,19 +91,23 @@ export function OrquestraHubApp() {
   }, []);
 
   useEffect(() => {
-    if (!firebaseReady) return;
+    if (!firebaseReady || !user || user.id === demoUserId) return;
     async function loadFirebaseData() {
-      const [firebaseStores, firebaseSuppliers, firebaseAccounts] = await Promise.all([
-        listStores(defaultTenantId),
-        listSuppliers(defaultTenantId),
-        listAccountsPayable(defaultTenantId),
-      ]);
-      if (firebaseStores.length) setStoreList(firebaseStores);
-      if (firebaseSuppliers.length) setSupplierList(firebaseSuppliers);
-      if (firebaseAccounts.length) setAccountList(firebaseAccounts);
+      try {
+        const [firebaseStores, firebaseSuppliers, firebaseAccounts] = await Promise.all([
+          listStores(defaultTenantId),
+          listSuppliers(defaultTenantId),
+          listAccountsPayable(defaultTenantId),
+        ]);
+        if (firebaseStores.length) setStoreList(firebaseStores);
+        if (firebaseSuppliers.length) setSupplierList(firebaseSuppliers);
+        if (firebaseAccounts.length) setAccountList(firebaseAccounts);
+      } catch {
+        setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível carregar dados do Firebase." }));
+      }
     }
     void loadFirebaseData();
-  }, []);
+  }, [user]);
 
   const openTotal = accountList.filter((item) => item.status !== "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const paidTotal = accountList.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
@@ -167,7 +172,7 @@ export function OrquestraHubApp() {
       phone: formatPhone(supplierForm.phone || "00000000000"),
       status: "Ativo",
     };
-    if (firebaseReady) await createSupplier(defaultTenantId, newSupplier);
+    if (firebaseReady && user?.id !== demoUserId) await createSupplier(defaultTenantId, newSupplier);
     setSupplierList((current) => [{ id: crypto.randomUUID(), ...newSupplier }, ...current]);
     setPurchaseForm((form) => ({ ...form, supplier: newSupplier.name }));
     setSupplierForm({ document: "", name: "", phone: "" });
@@ -189,7 +194,7 @@ export function OrquestraHubApp() {
       monthlyGoal: storeForm.monthlyGoal || "R$ 0,00",
       name: toTitleCaseBR(storeForm.name.trim()),
     };
-    if (firebaseReady) await createStore(defaultTenantId, newStore);
+    if (firebaseReady && user?.id !== demoUserId) await createStore(defaultTenantId, newStore);
     setStoreList((current) => [{ id: crypto.randomUUID(), ...newStore }, ...current]);
     setPurchaseForm((form) => ({ ...form, store: newStore.name }));
     setStoreForm({ balance: "R$ 0,00", manager: "", monthlyGoal: "R$ 0,00", name: "" });
@@ -241,7 +246,7 @@ export function OrquestraHubApp() {
       store: toTitleCaseBR(purchaseForm.store),
       supplier: toTitleCaseBR(purchaseForm.supplier),
     }));
-    if (firebaseReady) await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts);
+    if (firebaseReady && user?.id !== demoUserId) await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts);
     setPurchaseList((current) => [{ id: purchaseId, ...newPurchase }, ...current]);
     setAccountList((current) => [
       ...newAccounts.map((account, index) => ({ id: `${purchaseId}-${index + 1}`, ...account })),
@@ -259,7 +264,7 @@ export function OrquestraHubApp() {
 
   async function confirmMarkPaid() {
     if (!paymentToConfirm) return;
-    if (firebaseReady) await markAccountAsPaid(defaultTenantId, paymentToConfirm.id);
+    if (firebaseReady && user?.id !== demoUserId) await markAccountAsPaid(defaultTenantId, paymentToConfirm.id);
     setAccountList((current) =>
       current.map((account) =>
         account.id === paymentToConfirm.id ? { ...account, paidAt: paymentDateTime, status: "Pago" } : account,

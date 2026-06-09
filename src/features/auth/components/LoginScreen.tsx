@@ -59,7 +59,7 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
           </div>
           <h2 className="mt-5 text-2xl font-semibold">Acessar sistema</h2>
           <p className="mt-2 text-sm text-slate-600">
-            {firebaseReady ? "Entre com seu usuario cadastrado." : "Modo demo ativo ate configurar o Firebase."}
+            {firebaseReady ? "Entre com seu usuário cadastrado ou use o modo demo." : "Modo demo ativo até configurar o Firebase."}
           </p>
 
           <div className="mt-6 space-y-4">
@@ -74,6 +74,14 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
             >
               <LogIn size={18} />
               {loading ? "Entrando..." : "Entrar"}
+            </button>
+            <button
+              className="h-11 w-full rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              onClick={() => onLogin(demoUser)}
+              title="Acessar o sistema com dados demonstrativos enquanto o Firebase Auth é configurado."
+              type="button"
+            >
+              Entrar em modo demo
             </button>
           </div>
         </div>
