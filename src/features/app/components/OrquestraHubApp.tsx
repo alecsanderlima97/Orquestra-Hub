@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Plus, X } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { EditModal, type EditField } from "@/components/ui/EditModal";
 import { FormAlert } from "@/components/ui/FormAlert";
@@ -92,6 +93,9 @@ export function OrquestraHubApp() {
     state: "",
   });
   const [storePhoto, setStorePhoto] = useState<File | null>(null);
+  const [showStoreForm, setShowStoreForm] = useState(false);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState<PurchaseFormState>({
     description: "",
     dueDate: "2026-06-10",
@@ -205,6 +209,7 @@ export function OrquestraHubApp() {
       setPurchaseForm((form) => ({ ...form, supplier: newSupplier.name }));
       setSupplierForm({ document: "", name: "", phone: "" });
       setFormErrors((errors) => ({ ...errors, supplier: "" }));
+      setShowSupplierForm(false);
     } catch {
       setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível salvar o fornecedor. Verifique sua conexão e tente novamente." }));
     }
@@ -240,6 +245,7 @@ export function OrquestraHubApp() {
     setStoreForm({ address: "", balance: "R$ 0,00", cep: "", city: "", manager: "", mapsUrl: "", monthlyGoal: "R$ 0,00", name: "", phone: "", state: "" });
     setStorePhoto(null);
     setFormErrors((errors) => ({ ...errors, store: "" }));
+    setShowStoreForm(false);
   }
 
   async function addPurchase() {
@@ -311,6 +317,7 @@ export function OrquestraHubApp() {
       return;
     }
     setFormErrors((errors) => ({ ...errors, purchase: "" }));
+    setShowPurchaseForm(false);
   }
 
   async function addFixedExpense() {
@@ -439,12 +446,19 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
-          <StoreForm error={formErrors.store} form={storeForm} onChange={setStoreForm} onPhotoChange={setStorePhoto} onSubmit={addStore} photo={storePhoto} />
+          <div className="mb-4 flex justify-end">
+            <button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowStoreForm((visible) => !visible)} type="button">
+              {showStoreForm ? <X size={18} /> : <Plus size={18} />}
+              {showStoreForm ? "Cancelar cadastro" : "Cadastrar nova loja"}
+            </button>
+          </div>
+          {showStoreForm ? <StoreForm error={formErrors.store} form={storeForm} onChange={setStoreForm} onPhotoChange={setStorePhoto} onSubmit={addStore} photo={storePhoto} /> : null}
           <StoresPanel onEdit={(item) => setEditTarget({ kind: "store", item })} stores={storeList} />
         </Section>
 
         <Section description="Cadastro central de fornecedores." id="fornecedores" title="Fornecedores">
-          <div className="mb-4 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
+          <div className="mb-4 flex justify-end"><button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowSupplierForm((visible) => !visible)} type="button">{showSupplierForm ? <X size={18} /> : <Plus size={18} />}{showSupplierForm ? "Cancelar cadastro" : "Cadastrar novo fornecedor"}</button></div>
+          {showSupplierForm ? <div className="mb-4 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
             <TextField label="Nome" onBlur={() => setSupplierForm((form) => ({ ...form, name: toTitleCaseBR(form.name) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, name: event.target.value }))} placeholder="Nome do Fornecedor" value={supplierForm.name} />
             <TextField label="CNPJ" onChange={(event) => setSupplierForm((form) => ({ ...form, document: formatCnpj(event.target.value) }))} placeholder="00.000.000/0000-00" value={supplierForm.document} />
             <TextField label="Telefone" onChange={(event) => setSupplierForm((form) => ({ ...form, phone: formatPhone(event.target.value) }))} placeholder="(00) 00000-0000" value={supplierForm.phone} />
@@ -459,7 +473,7 @@ export function OrquestraHubApp() {
             <div className="md:col-span-4">
               <FormAlert message={formErrors.supplier} />
             </div>
-          </div>
+          </div> : null}
           <div className="mb-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <TextField
               label="Buscar fornecedor"
@@ -474,7 +488,8 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Lance a nota e gere parcelas automaticamente." id="compras" title="Compras e notas">
-          <PurchaseForm
+          <div className="mb-4 flex justify-end"><button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowPurchaseForm((visible) => !visible)} type="button">{showPurchaseForm ? <X size={18} /> : <Plus size={18} />}{showPurchaseForm ? "Cancelar lançamento" : "Cadastrar nova compra"}</button></div>
+          {showPurchaseForm ? <PurchaseForm
             boletoFiles={boletoFiles}
             form={purchaseForm}
             invoiceFile={invoiceFile}
@@ -485,7 +500,7 @@ export function OrquestraHubApp() {
             error={formErrors.purchase}
             storeOptions={storeList.map((store) => store.name)}
             supplierOptions={supplierList.map((supplier) => supplier.name)}
-          />
+          /> : null}
           <div className="my-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <TextField
               label="Buscar nota"
