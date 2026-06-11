@@ -13,7 +13,7 @@ import { AccountsPayableSummary } from "@/features/accounts-payable/components/A
 import type { AccountsPayableSummaryItem } from "@/features/accounts-payable/components/AccountsPayableSummary";
 import { AccountsPayableTable } from "@/features/accounts-payable/components/AccountsPayableTable";
 import { PaymentConfirmModal } from "@/features/accounts-payable/components/PaymentConfirmModal";
-import { listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
+import { createAccountPayable, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
 import { listenAuth, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
@@ -21,6 +21,9 @@ import type { AppUser } from "@/features/auth/types/authTypes";
 import { PaymentsTable } from "@/features/dashboard/components/PaymentsTable";
 import { SummaryCard } from "@/features/dashboard/components/SummaryCard";
 import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes";
+import { FixedExpensesPanel, type FixedExpenseForm } from "@/features/fixed-expenses/components/FixedExpensesPanel";
+import { createFixedExpense, listFixedExpenses } from "@/features/fixed-expenses/services/fixedExpenseService";
+import type { FixedExpense } from "@/features/fixed-expenses/types/fixedExpenseTypes";
 import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
 import type { PurchaseFormState } from "@/features/purchases/components/PurchaseForm";
 import { PurchasesTable } from "@/features/purchases/components/PurchasesTable";
@@ -64,6 +67,8 @@ export function OrquestraHubApp() {
   const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers);
   const [purchaseList, setPurchaseList] = useState<Purchase[]>(purchases);
   const [accountList, setAccountList] = useState<AccountPayable[]>(accountsPayable);
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+  const [fixedExpenseForm, setFixedExpenseForm] = useState<FixedExpenseForm>({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: stores[0]?.name || "" });
   const [accountFilters, setAccountFilters] = useState<AccountFilters>({ status: "Todos", store: "Todas", supplier: "Todos" });
   const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
   const [paymentDateTime, setPaymentDateTime] = useState("");
@@ -103,16 +108,18 @@ export function OrquestraHubApp() {
     if (!firebaseReady || !user || user.id === demoUserId) return;
     async function loadFirebaseData() {
       try {
-        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases] = await Promise.all([
+        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses] = await Promise.all([
           listStores(defaultTenantId),
           listSuppliers(defaultTenantId),
           listAccountsPayable(defaultTenantId),
           listPurchases(defaultTenantId),
+          listFixedExpenses(defaultTenantId),
         ]);
         if (firebaseStores.length) setStoreList(firebaseStores);
         if (firebaseSuppliers.length) setSupplierList(firebaseSuppliers);
         if (firebaseAccounts.length) setAccountList(firebaseAccounts);
         if (firebasePurchases.length) setPurchaseList(firebasePurchases);
+        if (firebaseFixedExpenses.length) setFixedExpenses(firebaseFixedExpenses);
       } catch {
         setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível carregar dados do Firebase." }));
       }
@@ -123,6 +130,8 @@ export function OrquestraHubApp() {
   const openTotal = accountList.filter((item) => item.status !== "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const paidTotal = accountList.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const overdueTotal = accountList.filter((item) => item.status === "Atrasado").reduce((total, item) => total + parseMoney(item.amount), 0);
+  const today = new Date();
+  const fixedExpenseAlerts = fixedExpenses.filter((item) => item.active && item.dueDay - today.getDate() <= item.alertDays && item.dueDay >= today.getDate());
   const filteredAccounts = accountList
     .filter((account) => {
       const statusMatch = accountFilters.status === "Todos" || account.status === accountFilters.status;
@@ -287,6 +296,22 @@ export function OrquestraHubApp() {
     setFormErrors((errors) => ({ ...errors, purchase: "" }));
   }
 
+  async function addFixedExpense() {
+    const amount = parseMoney(fixedExpenseForm.amount);
+    const dueDay = Math.min(Math.max(Number(fixedExpenseForm.dueDay), 1), 28);
+    if (!fixedExpenseForm.name.trim() || !fixedExpenseForm.payee.trim() || amount <= 0) return;
+    const expense: Omit<FixedExpense, "id"> = { active: true, alertDays: Math.max(Number(fixedExpenseForm.alertDays), 0), amount: money.format(amount), category: toTitleCaseBR(fixedExpenseForm.category || "Outros"), dueDay, name: toTitleCaseBR(fixedExpenseForm.name), payee: toTitleCaseBR(fixedExpenseForm.payee), store: fixedExpenseForm.store };
+    const saved = firebaseReady && user?.id !== demoUserId ? await createFixedExpense(defaultTenantId, expense) : null;
+    const id = saved?.id || crypto.randomUUID();
+    const now = new Date();
+    const dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay).toLocaleDateString("pt-BR");
+    const account: Omit<AccountPayable, "id"> = { amount: expense.amount, dueDate, fixedExpenseId: id, installment: "Mensal", referenceMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, status: "Aberto", store: expense.store, supplier: expense.payee };
+    const savedAccount = firebaseReady && user?.id !== demoUserId ? await createAccountPayable(defaultTenantId, account) : null;
+    setFixedExpenses((items) => [{ id, ...expense }, ...items]);
+    setAccountList((items) => [{ id: savedAccount?.id || crypto.randomUUID(), ...account }, ...items]);
+    setFixedExpenseForm({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: storeList[0]?.name || "" });
+  }
+
   function requestMarkPaid(id: string) {
     const account = accountList.find((item) => item.id === id);
     if (!account || account.status === "Pago") return;
@@ -387,6 +412,7 @@ export function OrquestraHubApp() {
               <SummaryCard item={item} key={item.label} />
             ))}
           </div>
+          {fixedExpenseAlerts.length ? <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4"><strong className="text-sm text-amber-950">Lembretes de despesas fixas</strong><div className="mt-2 grid gap-2 md:grid-cols-2">{fixedExpenseAlerts.map((item) => <div className="text-sm text-amber-900" key={item.id}>{item.name} · {item.amount} · vence dia {item.dueDay}</div>)}</div></div> : null}
           <div className="mt-6">
             <PaymentsTable accounts={accountList.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate))} />
           </div>
@@ -470,6 +496,10 @@ export function OrquestraHubApp() {
               onReceiptSelected={handleReceiptSelected}
             />
           </div>
+        </Section>
+
+        <Section description="Cadastre despesas recorrentes e gere automaticamente a conta do mês com antecedência de alerta." id="despesas-fixas" title="Despesas fixas">
+          <FixedExpensesPanel expenses={fixedExpenses} form={fixedExpenseForm} onChange={setFixedExpenseForm} onSubmit={addFixedExpense} storeOptions={storeList.map((store) => store.name)} />
         </Section>
 
         <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">
