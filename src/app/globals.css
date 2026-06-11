@@ -22,12 +22,30 @@ body {
   50% { transform: perspective(500px) rotateY(18deg) rotateZ(3deg); }
   100% { transform: perspective(500px) rotateY(-18deg) rotateZ(-3deg); }
 }
+@keyframes score-drift {
+  0%, 100% { opacity: .28; transform: translateX(-2%) rotate(-4deg); }
+  50% { opacity: .55; transform: translateX(2%) rotate(-4deg); }
+}
 .crystal-o {
-  display: grid; place-items: center; width: 180px; height: 180px; flex: 0 0 auto;
-  color: #d9f5ff; font-size: 118px; font-weight: 800; line-height: 1;
+  display: grid; place-items: center; width: 230px; height: 230px; flex: 0 0 auto;
+  color: #d9f5ff; font-size: 154px; font-weight: 800; line-height: 1;
   text-shadow: 0 0 10px #5fd8ff, 0 0 32px rgba(0,145,220,.9), 0 0 70px rgba(0,113,190,.65);
   filter: drop-shadow(0 18px 28px rgba(0,111,181,.35));
   transform-style: preserve-3d; animation: crystal-spin 4.8s ease-in-out infinite;
 }
 .crystal-o-small { width: 78px; height: 78px; font-size: 62px; }
+.crystal-stage { position: relative; display: grid; width: 260px; height: 260px; place-items: center; }
+.crystal-stage::before, .crystal-stage::after { content: ""; position: absolute; border: 1px solid rgba(93, 213, 255, .2); border-radius: 50%; }
+.crystal-stage::before { width: 238px; height: 238px; }
+.crystal-stage::after { width: 188px; height: 188px; border-style: dashed; }
+.login-score { position: absolute; top: 27%; right: -4%; left: 4%; height: 150px; animation: score-drift 8s ease-in-out infinite; }
+.login-score span { position: relative; display: block; height: 1px; margin-bottom: 24px; background: linear-gradient(90deg, transparent, rgba(76, 195, 238, .3), rgba(255, 255, 255, .1), transparent); }
+.login-score span:nth-child(2)::after, .login-score span:nth-child(4)::after { content: ""; position: absolute; top: -7px; width: 10px; height: 10px; border-radius: 50%; background: #65d5fa; box-shadow: 0 0 16px rgba(101, 213, 250, .8); }
+.login-score span:nth-child(2)::after { left: 27%; }
+.login-score span:nth-child(4)::after { left: 72%; }
+.login-module { display: flex; min-height: 72px; align-items: center; gap: 11px; border: 1px solid rgba(125, 211, 252, .16); border-radius: 8px; background: rgba(13, 39, 56, .72); padding: 13px; backdrop-filter: blur(8px); }
+.login-module svg { flex: 0 0 auto; color: #67d8fb; }
+.login-module strong, .login-module span { display: block; }
+.login-module strong { color: #f8fafc; font-size: 13px; }
+.login-module span { margin-top: 3px; color: #94a3b8; font-size: 11px; }
 @media print { aside, header, button, form, .no-print { display: none !important; } main, section { padding: 0 !important; margin: 0 !important; } body { background: #fff !important; } }

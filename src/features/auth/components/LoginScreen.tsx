@@ -1,6 +1,6 @@
 "use client";
 
-import { LogIn } from "lucide-react";
+import { BarChart3, Building2, LogIn, PackageCheck, ReceiptText } from "lucide-react";
 import { useState } from "react";
 import { TextField } from "@/components/ui/TextField";
 import { firebaseReady } from "@/lib/firebase/config";
@@ -8,6 +8,12 @@ import { loginWithEmail } from "../services/authService";
 import type { AppUser } from "../types/authTypes";
 
 const demoUser: AppUser = { email: "demo@orquestrahub.com", id: "demo-user", name: "Demo Orquestra Hub", role: "Dono" };
+const modules = [
+  { detail: "Fluxo em tempo real", icon: BarChart3, title: "Financeiro" },
+  { detail: "Gestão integrada", icon: Building2, title: "Unidades" },
+  { detail: "Compras organizadas", icon: PackageCheck, title: "Fornecedores" },
+  { detail: "Decisões mais claras", icon: ReceiptText, title: "Relatórios" },
+];
 
 export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
   const [email, setEmail] = useState(firebaseReady ? "" : "demo@orquestrahub.com");
@@ -34,12 +40,18 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
 
   return (
     <main className="grid min-h-screen bg-[#f4f8fc] text-slate-950 lg:grid-cols-[1fr_460px]">
-      <section className="relative hidden overflow-hidden bg-[#071521] px-12 py-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_35%_40%,rgba(23,135,203,0.18),transparent_42%)]" />
+      <section className="relative hidden overflow-hidden bg-[#071521] px-12 py-12 text-white lg:flex lg:flex-col">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_38%_44%,rgba(23,135,203,0.22),transparent_44%)]" />
+        <div className="login-score" aria-hidden="true"><span /><span /><span /><span /><span /></div>
         <div className="relative"><p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">Orquestra.cs</p><h1 className="mt-3 text-4xl font-bold">Orquestra Hub</h1></div>
-        <div className="relative flex items-center gap-10">
-          <div className="crystal-o" aria-label="O de Orquestra">O</div>
-          <div className="max-w-lg"><h2 className="text-3xl font-semibold">Gestão empresarial inteligente e modular.</h2><p className="mt-4 text-base leading-7 text-slate-300">Controle financeiro, unidades, fornecedores, compras e decisões em um único ambiente seguro.</p></div>
+        <div className="relative flex flex-1 flex-col justify-center py-8">
+          <div className="grid items-center gap-8 xl:grid-cols-[260px_1fr]">
+            <div className="crystal-stage"><div className="crystal-o" aria-label="O de Orquestra">O</div></div>
+            <div className="max-w-xl"><h2 className="text-3xl font-semibold">Gestão empresarial inteligente e modular.</h2><p className="mt-4 text-base leading-7 text-slate-300">Controle financeiro, unidades, fornecedores, compras e decisões em um único ambiente seguro.</p></div>
+          </div>
+          <div className="mt-12 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {modules.map(({ detail, icon: Icon, title }) => <div className="login-module" key={title}><Icon aria-hidden="true" size={19} /><div><strong>{title}</strong><span>{detail}</span></div></div>)}
+          </div>
         </div>
       </section>
       <section className="flex items-center justify-center px-5 py-10">
