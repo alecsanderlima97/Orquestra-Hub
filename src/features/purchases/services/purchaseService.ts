@@ -18,8 +18,10 @@ export async function createPurchaseWithAccounts(
   });
 
   const batch = writeBatch(firestore);
+  const accountIds: string[] = [];
   accounts.forEach((account) => {
     const accountRef = doc(collection(firestore, tenantCollectionPath(tenantId, "accountsPayable")));
+    accountIds.push(accountRef.id);
     batch.set(accountRef, {
       ...account,
       purchaseId: purchaseRef.id,
@@ -27,7 +29,7 @@ export async function createPurchaseWithAccounts(
     });
   });
   await batch.commit();
-  return purchaseRef.id;
+  return { accountIds, purchaseId: purchaseRef.id };
 }
 
 export async function updatePurchase(tenantId: string, purchaseId: string, purchase: Partial<Purchase>) {

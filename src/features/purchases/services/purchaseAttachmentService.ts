@@ -1,6 +1,6 @@
 import type { PurchaseAttachment } from "../types/purchaseTypes";
 
-export async function uploadPurchaseAttachment(tenantId: string, purchaseId: string, category: "boletos" | "notas-fiscais" | "lojas", file: File): Promise<PurchaseAttachment> {
+export async function uploadPurchaseAttachment(tenantId: string, purchaseId: string, category: "boletos" | "notas-fiscais" | "lojas" | "comprovantes", file: File): Promise<PurchaseAttachment> {
   const data = new FormData();
   data.append("tenantId", tenantId);
   data.append("purchaseId", purchaseId);

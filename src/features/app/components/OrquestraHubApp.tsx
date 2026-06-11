@@ -122,11 +122,11 @@ export function OrquestraHubApp() {
           listPurchases(defaultTenantId),
           listFixedExpenses(defaultTenantId),
         ]);
-        if (firebaseStores.length) setStoreList(firebaseStores);
-        if (firebaseSuppliers.length) setSupplierList(firebaseSuppliers);
-        if (firebaseAccounts.length) setAccountList(firebaseAccounts);
-        if (firebasePurchases.length) setPurchaseList(firebasePurchases);
-        if (firebaseFixedExpenses.length) setFixedExpenses(firebaseFixedExpenses);
+        setStoreList(firebaseStores);
+        setSupplierList(firebaseSuppliers);
+        setAccountList(firebaseAccounts);
+        setPurchaseList(firebasePurchases);
+        setFixedExpenses(firebaseFixedExpenses);
       } catch {
         setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível carregar dados do Firebase." }));
       }
@@ -293,23 +293,23 @@ export function OrquestraHubApp() {
       supplier: toTitleCaseBR(purchaseForm.supplier),
     }));
     try {
-      const savedId = firebaseReady && user?.id !== demoUserId ? await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts) : null;
-      const finalId = savedId || purchaseId;
+      const saved = firebaseReady && user?.id !== demoUserId ? await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts) : null;
+      const finalId = saved?.purchaseId || purchaseId;
       const invoiceAttachment = invoiceFile ? await uploadPurchaseAttachment(defaultTenantId, finalId, "notas-fiscais", invoiceFile) : undefined;
       const boletoAttachments = await Promise.all(boletoFiles.map((file) => uploadPurchaseAttachment(defaultTenantId, finalId, "boletos", file)));
       const attachments = { invoiceAttachment, boletoAttachments };
-      if (savedId && (invoiceAttachment || boletoAttachments.length)) await updatePurchase(defaultTenantId, savedId, attachments);
+      if (saved?.purchaseId && (invoiceAttachment || boletoAttachments.length)) await updatePurchase(defaultTenantId, saved.purchaseId, attachments);
       setPurchaseList((current) => [{ id: finalId, ...newPurchase, ...attachments }, ...current]);
+      setAccountList((current) => [
+        ...newAccounts.map((account, index) => ({ id: saved?.accountIds[index] || `${purchaseId}-${index + 1}`, ...account })),
+        ...current,
+      ]);
       setInvoiceFile(null);
       setBoletoFiles([]);
     } catch {
       setFormErrors((errors) => ({ ...errors, purchase: "A nota foi validada, mas não foi possível salvar os dados ou anexos." }));
       return;
     }
-    setAccountList((current) => [
-      ...newAccounts.map((account, index) => ({ id: `${purchaseId}-${index + 1}`, ...account })),
-      ...current,
-    ]);
     setFormErrors((errors) => ({ ...errors, purchase: "" }));
   }
 
@@ -348,8 +348,11 @@ export function OrquestraHubApp() {
     setPaymentDateTime("");
   }
 
-  function handleReceiptSelected(id: string, fileName: string) {
-    setAccountList((current) => current.map((account) => (account.id === id ? { ...account, receiptName: fileName } : account)));
+  async function handleReceiptSelected(id: string, file: File) {
+    const attachment = await uploadPurchaseAttachment(defaultTenantId, id, "comprovantes", file);
+    const updates = { receiptName: attachment.name, receiptUrl: attachment.url };
+    if (firebaseReady && user?.id !== demoUserId) await updateAccountPayable(defaultTenantId, id, updates);
+    setAccountList((current) => current.map((account) => (account.id === id ? { ...account, ...updates } : account)));
   }
 
   function exportFilteredAccounts() {
@@ -375,10 +378,10 @@ export function OrquestraHubApp() {
   }
 
   function editFields(target: EditTarget): EditField[] {
-    if (target.kind === "store") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "manager", label: "Responsável", value: target.item.manager }, { key: "phone", label: "Telefone", value: target.item.phone || "" }, { key: "cep", label: "CEP", value: target.item.cep || "" }, { key: "address", label: "Endereço", value: target.item.address || "" }, { key: "city", label: "Cidade", value: target.item.city || "" }, { key: "state", label: "Estado", value: target.item.state || "" }, { key: "mapsUrl", label: "Google Maps", value: target.item.mapsUrl || "" }, { key: "monthlyGoal", label: "Meta mensal", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", value: target.item.balance }];
-    if (target.kind === "supplier") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "document", label: "CNPJ", value: target.item.document }, { key: "phone", label: "Telefone", value: target.item.phone }];
-    if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
-    return [{ key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", value: target.item.amount }, { key: "installment", label: "Parcela", value: target.item.installment }];
+    if (target.kind === "store") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "manager", label: "Responsável", mask: "title", value: target.item.manager }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone || "" }, { key: "cep", label: "CEP", mask: "cep", value: target.item.cep || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "city", label: "Cidade", mask: "title", value: target.item.city || "" }, { key: "state", label: "Estado", mask: "upper", value: target.item.state || "" }, { key: "mapsUrl", label: "Google Maps", value: target.item.mapsUrl || "" }, { key: "monthlyGoal", label: "Meta mensal", mask: "currency", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", mask: "currency", value: target.item.balance }];
+    if (target.kind === "supplier") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "document", label: "CNPJ", mask: "cnpj", value: target.item.document }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone }];
+    if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", mask: "upper", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", mask: "currency", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
+    return [{ key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "installment", label: "Parcela", value: target.item.installment }];
   }
 
   async function saveEdit(values: Record<string, string>, password: string) {

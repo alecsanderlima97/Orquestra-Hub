@@ -51,6 +51,10 @@ export function formatPhone(value: string) {
   return digits.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
 }
 
+export function formatCep(value: string) {
+  return onlyDigits(value).slice(0, 8).replace(/(\d{5})(\d)/, "$1-$2");
+}
+
 export function toTitleCaseBR(value: string) {
   return value
     .toLocaleLowerCase("pt-BR")

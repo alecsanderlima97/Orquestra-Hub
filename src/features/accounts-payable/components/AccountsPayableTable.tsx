@@ -33,7 +33,7 @@ export function AccountsPayableTable({
   accounts: AccountPayable[];
   onMarkPaid?: (id: string) => void;
   onEdit?: (account: AccountPayable) => void;
-  onReceiptSelected?: (id: string, fileName: string) => void;
+  onReceiptSelected?: (id: string, file: File) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -98,13 +98,13 @@ export function AccountsPayableTable({
                             className="sr-only"
                             onChange={(event) => {
                               const file = event.target.files?.[0];
-                              if (file) onReceiptSelected?.(account.id, file.name);
+                              if (file) onReceiptSelected?.(account.id, file);
                             }}
                             type="file"
                           />
                         </label>
                       </button>
-                      {account.receiptName ? <span className="self-center text-xs font-medium text-emerald-700">Comprovante</span> : null}
+                      {account.receiptUrl ? <a className="self-center text-xs font-medium text-emerald-700" href={account.receiptUrl} rel="noreferrer" target="_blank">Comprovante</a> : account.receiptName ? <span className="self-center text-xs font-medium text-emerald-700">Comprovante</span> : null}
                     </div>
                   </td>
                 </tr>

@@ -3,11 +3,13 @@
 import { X } from "lucide-react";
 import { useState } from "react";
 import { TextField } from "@/components/ui/TextField";
+import { formatBRL, formatCep, formatCnpj, formatPhone, toTitleCaseBR } from "@/lib/formatters/br";
 
 export type EditField = {
   key: string;
   label: string;
   type?: string;
+  mask?: "currency" | "cep" | "cnpj" | "phone" | "title" | "upper";
   value: string;
 };
 
@@ -45,6 +47,15 @@ export function EditModal({
     }
   }
 
+  function maskValue(field: EditField, value: string) {
+    if (field.mask === "currency") return formatBRL(value);
+    if (field.mask === "cep") return formatCep(value);
+    if (field.mask === "cnpj") return formatCnpj(value);
+    if (field.mask === "phone") return formatPhone(value);
+    if (field.mask === "upper") return value.toUpperCase();
+    return value;
+  }
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-4">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
@@ -59,7 +70,8 @@ export function EditModal({
             <TextField
               key={field.key}
               label={field.label}
-              onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+              onBlur={() => field.mask === "title" && setValues((current) => ({ ...current, [field.key]: toTitleCaseBR(current[field.key] || "") }))}
+              onChange={(event) => setValues((current) => ({ ...current, [field.key]: maskValue(field, event.target.value) }))}
               placeholder={field.label}
               type={field.type}
               value={values[field.key] || ""}

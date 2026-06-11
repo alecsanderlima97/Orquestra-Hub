@@ -7,6 +7,7 @@ export type AccountPayable = {
   installment: string;
   paidAt?: string;
   receiptName?: string;
+  receiptUrl?: string;
   status: "Aberto" | "Pago" | "Atrasado";
   fixedExpenseId?: string;
   referenceMonth?: string;
