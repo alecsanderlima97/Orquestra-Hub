@@ -7,4 +7,13 @@ export type Purchase = {
   issueDate: string;
   total: string;
   installments: number;
+  invoiceAttachment?: PurchaseAttachment;
+  boletoAttachments?: PurchaseAttachment[];
+};
+
+export type PurchaseAttachment = {
+  name: string;
+  type: string;
+  size: number;
+  url: string;
 };

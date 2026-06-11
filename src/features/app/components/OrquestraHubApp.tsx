@@ -25,6 +25,7 @@ import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
 import type { PurchaseFormState } from "@/features/purchases/components/PurchaseForm";
 import { PurchasesTable } from "@/features/purchases/components/PurchasesTable";
 import { createPurchaseWithAccounts, listPurchases, updatePurchase } from "@/features/purchases/services/purchaseService";
+import { uploadPurchaseAttachment } from "@/features/purchases/services/purchaseAttachmentService";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import { FinancialReports } from "@/features/reports/components/FinancialReports";
 import { UserProfile } from "@/features/profile/components/UserProfile";
@@ -69,6 +70,8 @@ export function OrquestraHubApp() {
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [formErrors, setFormErrors] = useState({ purchase: "", store: "", supplier: "" });
   const [purchaseSearch, setPurchaseSearch] = useState("");
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [boletoFiles, setBoletoFiles] = useState<File[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierForm, setSupplierForm] = useState({ document: "", name: "", phone: "" });
   const [storeForm, setStoreForm] = useState<StoreFormState>({
@@ -180,11 +183,15 @@ export function OrquestraHubApp() {
       phone: formatPhone(supplierForm.phone || "00000000000"),
       status: "Ativo",
     };
-    if (firebaseReady && user?.id !== demoUserId) await createSupplier(defaultTenantId, newSupplier);
-    setSupplierList((current) => [{ id: crypto.randomUUID(), ...newSupplier }, ...current]);
-    setPurchaseForm((form) => ({ ...form, supplier: newSupplier.name }));
-    setSupplierForm({ document: "", name: "", phone: "" });
-    setFormErrors((errors) => ({ ...errors, supplier: "" }));
+    try {
+      const created = firebaseReady && user?.id !== demoUserId ? await createSupplier(defaultTenantId, newSupplier) : null;
+      setSupplierList((current) => [{ id: created?.id || crypto.randomUUID(), ...newSupplier }, ...current]);
+      setPurchaseForm((form) => ({ ...form, supplier: newSupplier.name }));
+      setSupplierForm({ document: "", name: "", phone: "" });
+      setFormErrors((errors) => ({ ...errors, supplier: "" }));
+    } catch {
+      setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível salvar o fornecedor. Verifique sua conexão e tente novamente." }));
+    }
   }
 
   async function addStore() {
@@ -259,8 +266,20 @@ export function OrquestraHubApp() {
       store: toTitleCaseBR(purchaseForm.store),
       supplier: toTitleCaseBR(purchaseForm.supplier),
     }));
-    if (firebaseReady && user?.id !== demoUserId) await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts);
-    setPurchaseList((current) => [{ id: purchaseId, ...newPurchase }, ...current]);
+    try {
+      const savedId = firebaseReady && user?.id !== demoUserId ? await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts) : null;
+      const finalId = savedId || purchaseId;
+      const invoiceAttachment = invoiceFile ? await uploadPurchaseAttachment(defaultTenantId, finalId, "notas-fiscais", invoiceFile) : undefined;
+      const boletoAttachments = await Promise.all(boletoFiles.map((file) => uploadPurchaseAttachment(defaultTenantId, finalId, "boletos", file)));
+      const attachments = { invoiceAttachment, boletoAttachments };
+      if (savedId && (invoiceAttachment || boletoAttachments.length)) await updatePurchase(defaultTenantId, savedId, attachments);
+      setPurchaseList((current) => [{ id: finalId, ...newPurchase, ...attachments }, ...current]);
+      setInvoiceFile(null);
+      setBoletoFiles([]);
+    } catch {
+      setFormErrors((errors) => ({ ...errors, purchase: "A nota foi validada, mas não foi possível salvar os dados ou anexos." }));
+      return;
+    }
     setAccountList((current) => [
       ...newAccounts.map((account, index) => ({ id: `${purchaseId}-${index + 1}`, ...account })),
       ...current,
@@ -410,8 +429,12 @@ export function OrquestraHubApp() {
 
         <Section description="Lance a nota e gere parcelas automaticamente." id="compras" title="Compras e notas">
           <PurchaseForm
+            boletoFiles={boletoFiles}
             form={purchaseForm}
+            invoiceFile={invoiceFile}
+            onBoletoFilesChange={setBoletoFiles}
             onChange={setPurchaseForm}
+            onInvoiceFileChange={setInvoiceFile}
             onSubmit={addPurchase}
             error={formErrors.purchase}
             storeOptions={storeList.map((store) => store.name)}
