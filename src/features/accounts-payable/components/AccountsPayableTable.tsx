@@ -1,4 +1,4 @@
-import { CheckCircle2, Paperclip } from "lucide-react";
+import { CheckCircle2, Paperclip, Pencil } from "lucide-react";
 import { parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
 import type { AccountPayable } from "../types/accountPayableTypes";
 
@@ -27,10 +27,12 @@ function rowStyle(account: AccountPayable) {
 export function AccountsPayableTable({
   accounts,
   onMarkPaid,
+  onEdit,
   onReceiptSelected,
 }: {
   accounts: AccountPayable[];
   onMarkPaid?: (id: string) => void;
+  onEdit?: (account: AccountPayable) => void;
   onReceiptSelected?: (id: string, fileName: string) => void;
 }) {
   return (
@@ -73,6 +75,7 @@ export function AccountsPayableTable({
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex gap-2">
+                      <button aria-label="Editar conta" className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(account)} title={account.status === "Pago" ? "Editar conta paga mediante confirmação da senha" : "Editar esta conta a pagar"} type="button"><Pencil size={17} /></button>
                       <button
                         aria-label="Dar baixa"
                         className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"

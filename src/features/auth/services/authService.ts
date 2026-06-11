@@ -1,4 +1,4 @@
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
+import { EmailAuthProvider, onAuthStateChanged, reauthenticateWithCredential, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
 import { auth, firebaseReady } from "@/lib/firebase/config";
 import type { AppUser } from "../types/authTypes";
 
@@ -20,6 +20,13 @@ export async function loginWithEmail(email: string, password: string) {
 export async function logoutUser() {
   if (!firebaseReady || !auth) return;
   await signOut(auth);
+}
+
+export async function verifyCurrentPassword(password: string) {
+  if (!firebaseReady || !auth?.currentUser?.email) return password === "123456";
+  const credential = EmailAuthProvider.credential(auth.currentUser.email, password);
+  await reauthenticateWithCredential(auth.currentUser, credential);
+  return true;
 }
 
 export function listenAuth(callback: (user: AppUser | null) => void) {

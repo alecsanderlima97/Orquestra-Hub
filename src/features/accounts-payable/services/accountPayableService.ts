@@ -19,3 +19,8 @@ export async function markAccountAsPaid(tenantId: string, accountId: string) {
     updatedAt: serverTimestamp(),
   });
 }
+
+export async function updateAccountPayable(tenantId: string, accountId: string, account: Partial<AccountPayable>) {
+  if (!firebaseReady || !db) return;
+  await updateDoc(doc(db, tenantCollectionPath(tenantId, collectionName), accountId), { ...account, updatedAt: serverTimestamp() });
+}

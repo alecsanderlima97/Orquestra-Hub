@@ -7,8 +7,10 @@ import {
   FileText,
   LayoutDashboard,
   Plus,
+  Settings,
   Store,
   Truck,
+  UserRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -21,6 +23,8 @@ const navigation = [
   { description: "Lançamento de notas e geração de parcelas.", id: "compras", label: "Compras", icon: FileText },
   { description: "Controle de boletos, baixas, filtros e comprovantes.", id: "contas-a-pagar", label: "Contas a pagar", icon: CreditCard },
   { description: "Resumo financeiro por loja, fornecedor e operação.", id: "relatorios", label: "Relatórios", icon: BarChart3 },
+  { description: "Dados e permissões do usuário conectado.", id: "perfil", label: "Perfil", icon: UserRound },
+  { description: "Preferências, segurança e integrações do sistema.", id: "configuracoes", label: "Configurações", icon: Settings },
 ];
 
 export function AppShell({
@@ -95,7 +99,7 @@ export function AppShell({
         <header className="border-b border-slate-200 bg-white px-5 py-5 sm:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Hub SaaS modular para pequenos negócios</p>
+              <p className="text-sm font-medium text-slate-500">Plataforma modular de gestão empresarial</p>
               <h2 className="mt-1 text-2xl font-semibold">Controle financeiro</h2>
             </div>
             <div className="flex flex-col gap-3 md:flex-row md:items-center">

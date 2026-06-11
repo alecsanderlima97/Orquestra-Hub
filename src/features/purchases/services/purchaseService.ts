@@ -1,4 +1,4 @@
-import { addDoc, collection, serverTimestamp, writeBatch, doc } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, writeBatch, doc, updateDoc } from "firebase/firestore";
 import { db, firebaseReady } from "@/lib/firebase/config";
 import { tenantCollectionPath } from "@/lib/firebase/paths";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
@@ -28,4 +28,9 @@ export async function createPurchaseWithAccounts(
   });
   await batch.commit();
   return purchaseRef.id;
+}
+
+export async function updatePurchase(tenantId: string, purchaseId: string, purchase: Partial<Purchase>) {
+  if (!firebaseReady || !db) return;
+  await updateDoc(doc(db, tenantCollectionPath(tenantId, "purchases"), purchaseId), { ...purchase, updatedAt: serverTimestamp() });
 }

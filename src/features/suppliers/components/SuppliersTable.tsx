@@ -1,6 +1,7 @@
+import { Pencil } from "lucide-react";
 import type { Supplier } from "../types/supplierTypes";
 
-export function SuppliersTable({ suppliers }: { suppliers: Supplier[] }) {
+export function SuppliersTable({ onEdit, suppliers }: { onEdit?: (supplier: Supplier) => void; suppliers: Supplier[] }) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <table className="w-full min-w-[760px] text-left text-sm">
@@ -11,6 +12,7 @@ export function SuppliersTable({ suppliers }: { suppliers: Supplier[] }) {
             <th className="px-5 py-3 font-medium">Telefone</th>
             <th className="px-5 py-3 font-medium">Em aberto</th>
             <th className="px-5 py-3 font-medium">Status</th>
+            <th className="px-5 py-3 font-medium">Ações</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -26,11 +28,12 @@ export function SuppliersTable({ suppliers }: { suppliers: Supplier[] }) {
                     {supplier.status}
                   </span>
                 </td>
+                <td className="px-5 py-4"><button aria-label="Editar fornecedor" className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(supplier)} title="Editar cadastro deste fornecedor" type="button"><Pencil size={17} /></button></td>
               </tr>
             ))
           ) : (
             <tr>
-              <td className="px-5 py-8 text-center text-slate-500" colSpan={5}>
+              <td className="px-5 py-8 text-center text-slate-500" colSpan={6}>
                 Nenhum fornecedor encontrado.
               </td>
             </tr>

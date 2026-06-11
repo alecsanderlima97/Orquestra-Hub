@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
+import { EditModal, type EditField } from "@/components/ui/EditModal";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { Section } from "@/components/ui/Section";
 import { TextField } from "@/components/ui/TextField";
@@ -12,10 +13,10 @@ import { AccountsPayableSummary } from "@/features/accounts-payable/components/A
 import type { AccountsPayableSummaryItem } from "@/features/accounts-payable/components/AccountsPayableSummary";
 import { AccountsPayableTable } from "@/features/accounts-payable/components/AccountsPayableTable";
 import { PaymentConfirmModal } from "@/features/accounts-payable/components/PaymentConfirmModal";
-import { listAccountsPayable, markAccountAsPaid } from "@/features/accounts-payable/services/accountPayableService";
+import { listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
-import { listenAuth, logoutUser } from "@/features/auth/services/authService";
+import { listenAuth, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import { PaymentsTable } from "@/features/dashboard/components/PaymentsTable";
 import { SummaryCard } from "@/features/dashboard/components/SummaryCard";
@@ -23,16 +24,18 @@ import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes
 import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
 import type { PurchaseFormState } from "@/features/purchases/components/PurchaseForm";
 import { PurchasesTable } from "@/features/purchases/components/PurchasesTable";
-import { createPurchaseWithAccounts } from "@/features/purchases/services/purchaseService";
+import { createPurchaseWithAccounts, updatePurchase } from "@/features/purchases/services/purchaseService";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import { FinancialReports } from "@/features/reports/components/FinancialReports";
+import { UserProfile } from "@/features/profile/components/UserProfile";
+import { SystemSettings } from "@/features/settings/components/SystemSettings";
 import { StoreForm } from "@/features/stores/components/StoreForm";
 import type { StoreFormState } from "@/features/stores/components/StoreForm";
 import { StoresPanel } from "@/features/stores/components/StoresPanel";
-import { createStore, listStores } from "@/features/stores/services/storeService";
+import { createStore, listStores, updateStore } from "@/features/stores/services/storeService";
 import type { Store } from "@/features/stores/types/storeTypes";
 import { SuppliersTable } from "@/features/suppliers/components/SuppliersTable";
-import { createSupplier, listSuppliers } from "@/features/suppliers/services/supplierService";
+import { createSupplier, listSuppliers, updateSupplier } from "@/features/suppliers/services/supplierService";
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
 import { accountsPayable, purchases, stores, suppliers } from "@/lib/data/mockData";
 import { firebaseReady } from "@/lib/firebase/config";
@@ -41,6 +44,7 @@ import { defaultTenantId } from "@/lib/tenant/tenant";
 
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 const demoUserId = "demo-user";
+type EditTarget = { kind: "store"; item: Store } | { kind: "supplier"; item: Supplier } | { kind: "purchase"; item: Purchase } | { kind: "account"; item: AccountPayable };
 
 function parseMoney(value: string) {
   return parseBRL(value);
@@ -62,6 +66,7 @@ export function OrquestraHubApp() {
   const [accountFilters, setAccountFilters] = useState<AccountFilters>({ status: "Todos", store: "Todas", supplier: "Todos" });
   const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
   const [paymentDateTime, setPaymentDateTime] = useState("");
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [formErrors, setFormErrors] = useState({ purchase: "", store: "", supplier: "" });
   const [purchaseSearch, setPurchaseSearch] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
@@ -300,6 +305,37 @@ export function OrquestraHubApp() {
     URL.revokeObjectURL(url);
   }
 
+  function editFields(target: EditTarget): EditField[] {
+    if (target.kind === "store") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "manager", label: "Responsável", value: target.item.manager }, { key: "monthlyGoal", label: "Meta mensal", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", value: target.item.balance }];
+    if (target.kind === "supplier") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "document", label: "CNPJ", value: target.item.document }, { key: "phone", label: "Telefone", value: target.item.phone }];
+    if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", value: target.item.invoiceNumber }, { key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
+    return [{ key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", value: target.item.amount }, { key: "installment", label: "Parcela", value: target.item.installment }];
+  }
+
+  async function saveEdit(values: Record<string, string>, password: string) {
+    if (!editTarget) return;
+    const persist = firebaseReady && user?.id !== demoUserId;
+    if (editTarget.kind === "account" && editTarget.item.status === "Pago") await verifyCurrentPassword(password);
+    if (editTarget.kind === "store") {
+      const updates = { name: toTitleCaseBR(values.name), manager: toTitleCaseBR(values.manager), monthlyGoal: values.monthlyGoal, balance: values.balance };
+      if (persist) await updateStore(defaultTenantId, editTarget.item.id, updates);
+      setStoreList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+    } else if (editTarget.kind === "supplier") {
+      const updates = { name: toTitleCaseBR(values.name), document: formatCnpj(values.document), phone: formatPhone(values.phone) };
+      if (persist) await updateSupplier(defaultTenantId, editTarget.item.id, updates);
+      setSupplierList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+    } else if (editTarget.kind === "purchase") {
+      const updates = { invoiceNumber: values.invoiceNumber.toUpperCase(), supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), issueDate: values.issueDate, total: values.total, installments: Number(values.installments) };
+      if (persist) await updatePurchase(defaultTenantId, editTarget.item.id, updates);
+      setPurchaseList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+    } else {
+      const updates = { supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, installment: values.installment };
+      if (persist) await updateAccountPayable(defaultTenantId, editTarget.item.id, updates);
+      setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+    }
+    setEditTarget(null);
+  }
+
   async function handleLogout() {
     await logoutUser();
     setUser(null);
@@ -331,7 +367,7 @@ export function OrquestraHubApp() {
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
           <StoreForm error={formErrors.store} form={storeForm} onChange={setStoreForm} onSubmit={addStore} />
-          <StoresPanel stores={storeList} />
+          <StoresPanel onEdit={(item) => setEditTarget({ kind: "store", item })} stores={storeList} />
         </Section>
 
         <Section description="Cadastro central de fornecedores." id="fornecedores" title="Fornecedores">
@@ -360,7 +396,7 @@ export function OrquestraHubApp() {
             />
           </div>
           <div className="overflow-x-auto">
-            <SuppliersTable suppliers={filteredSuppliers} />
+            <SuppliersTable onEdit={(item) => setEditTarget({ kind: "supplier", item })} suppliers={filteredSuppliers} />
           </div>
         </Section>
 
@@ -382,7 +418,7 @@ export function OrquestraHubApp() {
             />
           </div>
           <div className="overflow-x-auto">
-            <PurchasesTable purchases={filteredPurchases} />
+            <PurchasesTable onEdit={(item) => setEditTarget({ kind: "purchase", item })} purchases={filteredPurchases} />
           </div>
         </Section>
 
@@ -398,6 +434,7 @@ export function OrquestraHubApp() {
           <div className="overflow-x-auto">
             <AccountsPayableTable
               accounts={filteredAccounts}
+              onEdit={(item) => setEditTarget({ kind: "account", item })}
               onMarkPaid={requestMarkPaid}
               onReceiptSelected={handleReceiptSelected}
             />
@@ -407,6 +444,8 @@ export function OrquestraHubApp() {
         <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
+        <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile user={user} /></Section>
+        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings /></Section>
       </div>
       <PaymentConfirmModal
         account={paymentToConfirm}
@@ -414,6 +453,7 @@ export function OrquestraHubApp() {
         onConfirm={confirmMarkPaid}
         paidAt={paymentDateTime}
       />
+      {editTarget ? <EditModal fields={editFields(editTarget)} onClose={() => setEditTarget(null)} onSave={saveEdit} passwordRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} title={`Editar ${editTarget.kind === "store" ? "loja" : editTarget.kind === "supplier" ? "fornecedor" : editTarget.kind === "purchase" ? "nota" : "conta a pagar"}`} /> : null}
     </AppShell>
   );
 }
