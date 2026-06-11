@@ -1,39 +1,10 @@
+import { ImagePlus, MapPin } from "lucide-react";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { TextField } from "@/components/ui/TextField";
-import { formatBRL, toTitleCaseBR } from "@/lib/formatters/br";
+import { formatBRL, formatPhone, toTitleCaseBR } from "@/lib/formatters/br";
 
-export type StoreFormState = {
-  balance: string;
-  manager: string;
-  monthlyGoal: string;
-  name: string;
-};
-
-export function StoreForm({
-  error,
-  form,
-  onChange,
-  onSubmit,
-}: {
-  error?: string;
-  form: StoreFormState;
-  onChange: (form: StoreFormState) => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <form className="mb-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="grid gap-4 md:grid-cols-5">
-        <TextField label="Nome da loja" onBlur={() => onChange({ ...form, name: toTitleCaseBR(form.name) })} onChange={(event) => onChange({ ...form, name: event.target.value })} placeholder="Loja de Baixo" value={form.name} />
-        <TextField label="Responsável" onBlur={() => onChange({ ...form, manager: toTitleCaseBR(form.manager) })} onChange={(event) => onChange({ ...form, manager: event.target.value })} placeholder="Equipe Principal" value={form.manager} />
-        <TextField label="Meta mensal" onBlur={() => onChange({ ...form, monthlyGoal: formatBRL(form.monthlyGoal) })} onChange={(event) => onChange({ ...form, monthlyGoal: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.monthlyGoal} />
-        <TextField label="Saldo atual" onBlur={() => onChange({ ...form, balance: formatBRL(form.balance) })} onChange={(event) => onChange({ ...form, balance: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.balance} />
-        <button className="mt-7 h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={onSubmit} title="Cadastrar esta loja para separar saldos, compras e contas." type="button">
-          Salvar loja
-        </button>
-      </div>
-      <div className="mt-4">
-        <FormAlert message={error} />
-      </div>
-    </form>
-  );
+export type StoreFormState = { address: string; balance: string; cep: string; city: string; manager: string; mapsUrl: string; monthlyGoal: string; name: string; phone: string; state: string };
+function formatCep(value: string) { const digits = value.replace(/\D/g, "").slice(0, 8); return digits.replace(/(\d{5})(\d)/, "$1-$2"); }
+export function StoreForm({ error, form, onChange, onPhotoChange, onSubmit, photo }: { error?: string; form: StoreFormState; onChange: (form: StoreFormState) => void; onPhotoChange: (file: File | null) => void; onSubmit: () => void; photo: File | null }) {
+  return <form className="mb-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><TextField label="Nome da loja" onBlur={() => onChange({ ...form, name: toTitleCaseBR(form.name) })} onChange={(e) => onChange({ ...form, name: e.target.value })} placeholder="Loja Centro" value={form.name} /><TextField label="Responsável" onBlur={() => onChange({ ...form, manager: toTitleCaseBR(form.manager) })} onChange={(e) => onChange({ ...form, manager: e.target.value })} placeholder="Nome do responsável" value={form.manager} /><TextField label="Telefone" onChange={(e) => onChange({ ...form, phone: formatPhone(e.target.value) })} placeholder="(00) 00000-0000" value={form.phone} /><TextField label="CEP" onChange={(e) => onChange({ ...form, cep: formatCep(e.target.value) })} placeholder="00000-000" value={form.cep} /><TextField label="Endereço" onChange={(e) => onChange({ ...form, address: e.target.value })} placeholder="Rua, número e bairro" value={form.address} /><TextField label="Cidade" onBlur={() => onChange({ ...form, city: toTitleCaseBR(form.city) })} onChange={(e) => onChange({ ...form, city: e.target.value })} placeholder="Cidade" value={form.city} /><TextField label="Estado" onChange={(e) => onChange({ ...form, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="UF" value={form.state} /><TextField label="Google Maps" onChange={(e) => onChange({ ...form, mapsUrl: e.target.value })} placeholder="Cole o link da localização" value={form.mapsUrl} /><TextField label="Meta mensal" onChange={(e) => onChange({ ...form, monthlyGoal: formatBRL(e.target.value) })} placeholder="R$ 0,00" value={form.monthlyGoal} /><TextField label="Saldo atual" onChange={(e) => onChange({ ...form, balance: formatBRL(e.target.value) })} placeholder="R$ 0,00" value={form.balance} /><label className="rounded-md border border-dashed border-slate-300 p-3 text-sm"><span className="flex items-center gap-2 font-semibold"><ImagePlus size={17} />Foto da loja</span><input accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-xs" onChange={(e) => onPhotoChange(e.target.files?.[0] || null)} type="file" />{photo ? <span className="mt-1 block text-xs text-cyan-700">{photo.name}</span> : null}</label><button className="mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white" onClick={onSubmit} type="button"><MapPin size={17} />Salvar loja</button></div><div className="mt-4"><FormAlert message={error} /></div></form>;
 }

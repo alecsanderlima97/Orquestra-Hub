@@ -1,27 +1,3 @@
-import { Pencil } from "lucide-react";
+import { ExternalLink, MapPin, Pencil, Phone } from "lucide-react";
 import type { Store } from "../types/storeTypes";
-
-export function StoresPanel({ onEdit, stores }: { onEdit?: (store: Store) => void; stores: Store[] }) {
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {stores.map((store) => (
-        <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={store.id}>
-          <div className="flex items-start justify-between gap-4">
-            <div><p className="text-sm font-medium text-slate-500">{store.manager}</p><h3 className="mt-2 text-xl font-semibold text-slate-950">{store.name}</h3></div>
-            <button aria-label="Editar loja" className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(store)} title="Editar informações desta loja" type="button"><Pencil size={17} /></button>
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="text-slate-500">Meta mensal</span>
-              <strong className="mt-1 block text-slate-950">{store.monthlyGoal}</strong>
-            </div>
-            <div>
-              <span className="text-slate-500">Saldo atual</span>
-              <strong className="mt-1 block text-emerald-700">{store.balance}</strong>
-            </div>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
+export function StoresPanel({ onEdit, stores }: { onEdit?: (store: Store) => void; stores: Store[] }) { return <div className="grid gap-4 md:grid-cols-2">{stores.map((store) => <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" key={store.id}>{store.photoUrl ? <div aria-label={`Fachada da ${store.name}`} className="h-44 w-full bg-cover bg-center" role="img" style={{ backgroundImage: `url(${store.photoUrl})` }} /> : null}<div className="p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-slate-500">{store.manager}</p><h3 className="mt-1 text-xl font-semibold">{store.name}</h3></div><button aria-label="Editar loja" className="rounded-md border border-slate-200 p-2 hover:bg-amber-50" onClick={() => onEdit?.(store)} title="Editar informações desta loja" type="button"><Pencil size={17} /></button></div><div className="mt-4 space-y-2 text-sm text-slate-600">{store.address ? <p className="flex gap-2"><MapPin className="mt-0.5 shrink-0" size={16} />{store.address}, {store.city}/{store.state} · CEP {store.cep}</p> : null}{store.phone ? <p className="flex items-center gap-2"><Phone size={16} />{store.phone}</p> : null}{store.mapsUrl ? <a className="inline-flex items-center gap-2 font-semibold text-cyan-700" href={store.mapsUrl} rel="noreferrer" target="_blank">Abrir no Google Maps <ExternalLink size={14} /></a> : null}</div><div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><span className="text-slate-500">Meta mensal</span><strong className="block">{store.monthlyGoal}</strong></div><div><span className="text-slate-500">Saldo atual</span><strong className="block text-emerald-700">{store.balance}</strong></div></div></div></article>)}</div>; }

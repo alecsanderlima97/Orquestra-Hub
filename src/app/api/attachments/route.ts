@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const tenantId = String(data.get("tenantId") || "");
   const purchaseId = String(data.get("purchaseId") || "");
   const category = String(data.get("category") || "");
-  if (!(file instanceof File) || !tenantId || !purchaseId || !["boletos", "notas-fiscais"].includes(category)) return NextResponse.json({ error: "Dados do anexo inválidos." }, { status: 400 });
+  if (!(file instanceof File) || !tenantId || !purchaseId || !["boletos", "notas-fiscais", "lojas"].includes(category)) return NextResponse.json({ error: "Dados do anexo inválidos." }, { status: 400 });
   if (!allowedTypes.has(file.type) || file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "Envie PDF ou imagem com até 10 MB." }, { status: 400 });
 
   const buckets = await supabase.storage.listBuckets();

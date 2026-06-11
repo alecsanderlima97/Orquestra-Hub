@@ -80,11 +80,18 @@ export function OrquestraHubApp() {
   const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierForm, setSupplierForm] = useState({ document: "", name: "", phone: "" });
   const [storeForm, setStoreForm] = useState<StoreFormState>({
+    address: "",
     balance: "R$ 0,00",
+    cep: "",
+    city: "",
     manager: "",
+    mapsUrl: "",
     monthlyGoal: "R$ 0,00",
     name: "",
+    phone: "",
+    state: "",
   });
+  const [storePhoto, setStorePhoto] = useState<File | null>(null);
   const [purchaseForm, setPurchaseForm] = useState<PurchaseFormState>({
     description: "",
     dueDate: "2026-06-10",
@@ -213,15 +220,25 @@ export function OrquestraHubApp() {
       return;
     }
     const newStore: Omit<Store, "id"> = {
+      address: toTitleCaseBR(storeForm.address),
       balance: storeForm.balance || "R$ 0,00",
+      cep: storeForm.cep,
+      city: toTitleCaseBR(storeForm.city),
       manager: toTitleCaseBR(storeForm.manager || "Sem Responsável"),
+      mapsUrl: storeForm.mapsUrl,
       monthlyGoal: storeForm.monthlyGoal || "R$ 0,00",
       name: toTitleCaseBR(storeForm.name.trim()),
+      phone: storeForm.phone,
+      state: storeForm.state.toUpperCase(),
     };
-    if (firebaseReady && user?.id !== demoUserId) await createStore(defaultTenantId, newStore);
-    setStoreList((current) => [{ id: crypto.randomUUID(), ...newStore }, ...current]);
+    const created = firebaseReady && user?.id !== demoUserId ? await createStore(defaultTenantId, newStore) : null;
+    const storeId = created?.id || crypto.randomUUID();
+    const photo = storePhoto ? await uploadPurchaseAttachment(defaultTenantId, storeId, "lojas", storePhoto) : null;
+    if (created && photo) await updateStore(defaultTenantId, storeId, { photoUrl: photo.url });
+    setStoreList((current) => [{ id: storeId, ...newStore, photoUrl: photo?.url }, ...current]);
     setPurchaseForm((form) => ({ ...form, store: newStore.name }));
-    setStoreForm({ balance: "R$ 0,00", manager: "", monthlyGoal: "R$ 0,00", name: "" });
+    setStoreForm({ address: "", balance: "R$ 0,00", cep: "", city: "", manager: "", mapsUrl: "", monthlyGoal: "R$ 0,00", name: "", phone: "", state: "" });
+    setStorePhoto(null);
     setFormErrors((errors) => ({ ...errors, store: "" }));
   }
 
@@ -358,7 +375,7 @@ export function OrquestraHubApp() {
   }
 
   function editFields(target: EditTarget): EditField[] {
-    if (target.kind === "store") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "manager", label: "Responsável", value: target.item.manager }, { key: "monthlyGoal", label: "Meta mensal", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", value: target.item.balance }];
+    if (target.kind === "store") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "manager", label: "Responsável", value: target.item.manager }, { key: "phone", label: "Telefone", value: target.item.phone || "" }, { key: "cep", label: "CEP", value: target.item.cep || "" }, { key: "address", label: "Endereço", value: target.item.address || "" }, { key: "city", label: "Cidade", value: target.item.city || "" }, { key: "state", label: "Estado", value: target.item.state || "" }, { key: "mapsUrl", label: "Google Maps", value: target.item.mapsUrl || "" }, { key: "monthlyGoal", label: "Meta mensal", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", value: target.item.balance }];
     if (target.kind === "supplier") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "document", label: "CNPJ", value: target.item.document }, { key: "phone", label: "Telefone", value: target.item.phone }];
     if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
     return [{ key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", value: target.item.amount }, { key: "installment", label: "Parcela", value: target.item.installment }];
@@ -369,7 +386,7 @@ export function OrquestraHubApp() {
     const persist = firebaseReady && user?.id !== demoUserId;
     if (editTarget.kind === "account" && editTarget.item.status === "Pago") await verifyCurrentPassword(password);
     if (editTarget.kind === "store") {
-      const updates = { name: toTitleCaseBR(values.name), manager: toTitleCaseBR(values.manager), monthlyGoal: values.monthlyGoal, balance: values.balance };
+      const updates = { name: toTitleCaseBR(values.name), manager: toTitleCaseBR(values.manager), phone: formatPhone(values.phone), cep: values.cep, address: toTitleCaseBR(values.address), city: toTitleCaseBR(values.city), state: values.state.toUpperCase(), mapsUrl: values.mapsUrl, monthlyGoal: values.monthlyGoal, balance: values.balance };
       if (persist) await updateStore(defaultTenantId, editTarget.item.id, updates);
       setStoreList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
     } else if (editTarget.kind === "supplier") {
@@ -419,7 +436,7 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
-          <StoreForm error={formErrors.store} form={storeForm} onChange={setStoreForm} onSubmit={addStore} />
+          <StoreForm error={formErrors.store} form={storeForm} onChange={setStoreForm} onPhotoChange={setStorePhoto} onSubmit={addStore} photo={storePhoto} />
           <StoresPanel onEdit={(item) => setEditTarget({ kind: "store", item })} stores={storeList} />
         </Section>
 

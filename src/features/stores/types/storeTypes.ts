@@ -4,4 +4,11 @@ export type Store = {
   manager: string;
   monthlyGoal: string;
   balance: string;
+  cep?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  phone?: string;
+  mapsUrl?: string;
+  photoUrl?: string;
 };
