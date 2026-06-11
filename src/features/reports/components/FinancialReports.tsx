@@ -24,7 +24,7 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
   const upcoming = open.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate)).slice(0, 10);
 
   return (
-    <div className="space-y-5" id="printable-reports">
+    <div className="printable-reports space-y-5" id="printable-reports">
       <div className="no-print flex justify-end"><button className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => window.print()} title="Imprimir ou salvar este relatório em PDF" type="button"><Printer size={17} />Imprimir relatório</button></div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <ReportCard label="Compras lançadas" value={String(purchases.length)} helper={money.format(purchases.reduce((sum, item) => sum + parseBRL(item.total), 0))} />

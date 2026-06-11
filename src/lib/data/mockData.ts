@@ -51,6 +51,7 @@ export const purchases: Purchase[] = [
   {
     id: "nf-1003",
     invoiceNumber: "NF 1003",
+    description: "Vestidos, conjuntos e acessórios femininos",
     supplier: "Mister Multimarcas",
     store: "Loja de Baixo",
     issueDate: "02/06/2026",
@@ -60,6 +61,7 @@ export const purchases: Purchase[] = [
   {
     id: "nf-884",
     invoiceNumber: "NF 884",
+    description: "Calças jeans, blusas e peças básicas",
     supplier: "Mister Conceito",
     store: "Loja de Cima",
     issueDate: "04/06/2026",

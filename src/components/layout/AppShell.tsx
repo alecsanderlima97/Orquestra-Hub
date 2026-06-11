@@ -39,6 +39,14 @@ export function AppShell({
   const [activeSection, setActiveSection] = useState(navigation[0].id);
 
   useEffect(() => {
+    function updateFromScroll() {
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24) {
+        setActiveSection("configuracoes");
+        return;
+      }
+      const current = navigation.map((item) => document.getElementById(item.id)).filter(Boolean).filter((section) => section!.getBoundingClientRect().top <= window.innerHeight * 0.38).at(-1);
+      if (current?.id) setActiveSection(current.id);
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -53,8 +61,10 @@ export function AppShell({
       const section = document.getElementById(item.id);
       if (section) observer.observe(section);
     });
+    window.addEventListener("scroll", updateFromScroll, { passive: true });
+    updateFromScroll();
 
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); window.removeEventListener("scroll", updateFromScroll); };
   }, []);
 
   return (

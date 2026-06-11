@@ -24,7 +24,7 @@ import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes
 import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
 import type { PurchaseFormState } from "@/features/purchases/components/PurchaseForm";
 import { PurchasesTable } from "@/features/purchases/components/PurchasesTable";
-import { createPurchaseWithAccounts, updatePurchase } from "@/features/purchases/services/purchaseService";
+import { createPurchaseWithAccounts, listPurchases, updatePurchase } from "@/features/purchases/services/purchaseService";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import { FinancialReports } from "@/features/reports/components/FinancialReports";
 import { UserProfile } from "@/features/profile/components/UserProfile";
@@ -78,6 +78,7 @@ export function OrquestraHubApp() {
     name: "",
   });
   const [purchaseForm, setPurchaseForm] = useState<PurchaseFormState>({
+    description: "",
     dueDate: "2026-06-10",
     installments: "3",
     invoiceNumber: "NF 1003",
@@ -99,14 +100,16 @@ export function OrquestraHubApp() {
     if (!firebaseReady || !user || user.id === demoUserId) return;
     async function loadFirebaseData() {
       try {
-        const [firebaseStores, firebaseSuppliers, firebaseAccounts] = await Promise.all([
+        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases] = await Promise.all([
           listStores(defaultTenantId),
           listSuppliers(defaultTenantId),
           listAccountsPayable(defaultTenantId),
+          listPurchases(defaultTenantId),
         ]);
         if (firebaseStores.length) setStoreList(firebaseStores);
         if (firebaseSuppliers.length) setSupplierList(firebaseSuppliers);
         if (firebaseAccounts.length) setAccountList(firebaseAccounts);
+        if (firebasePurchases.length) setPurchaseList(firebasePurchases);
       } catch {
         setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível carregar dados do Firebase." }));
       }
@@ -137,7 +140,7 @@ export function OrquestraHubApp() {
   const filteredPurchases = purchaseList.filter((purchase) => {
     const search = purchaseSearch.toLocaleLowerCase("pt-BR").trim();
     if (!search) return true;
-    return [purchase.invoiceNumber, purchase.supplier, purchase.store, purchase.issueDate].some((value) =>
+    return [purchase.invoiceNumber, purchase.description, purchase.supplier, purchase.store, purchase.issueDate].some((value) =>
       value.toLocaleLowerCase("pt-BR").includes(search),
     );
   });
@@ -221,6 +224,10 @@ export function OrquestraHubApp() {
       setFormErrors((errors) => ({ ...errors, purchase: "Informe o número da nota." }));
       return;
     }
+    if (!purchaseForm.description.trim()) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Informe a descrição dos produtos da nota." }));
+      return;
+    }
     if (total <= 0) {
       setFormErrors((errors) => ({ ...errors, purchase: "Informe um valor total maior que R$ 0,00." }));
       return;
@@ -236,6 +243,7 @@ export function OrquestraHubApp() {
     const installmentAmount = total / installments;
     const purchaseId = crypto.randomUUID();
     const newPurchase: Omit<Purchase, "id"> = {
+      description: purchaseForm.description.trim(),
       installments,
       invoiceNumber: purchaseForm.invoiceNumber,
       issueDate: new Date(purchaseForm.issueDate).toLocaleDateString("pt-BR"),
@@ -308,7 +316,7 @@ export function OrquestraHubApp() {
   function editFields(target: EditTarget): EditField[] {
     if (target.kind === "store") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "manager", label: "Responsável", value: target.item.manager }, { key: "monthlyGoal", label: "Meta mensal", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", value: target.item.balance }];
     if (target.kind === "supplier") return [{ key: "name", label: "Nome", value: target.item.name }, { key: "document", label: "CNPJ", value: target.item.document }, { key: "phone", label: "Telefone", value: target.item.phone }];
-    if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", value: target.item.invoiceNumber }, { key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
+    if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
     return [{ key: "supplier", label: "Fornecedor", value: target.item.supplier }, { key: "store", label: "Loja", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", value: target.item.amount }, { key: "installment", label: "Parcela", value: target.item.installment }];
   }
 
@@ -325,7 +333,7 @@ export function OrquestraHubApp() {
       if (persist) await updateSupplier(defaultTenantId, editTarget.item.id, updates);
       setSupplierList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
     } else if (editTarget.kind === "purchase") {
-      const updates = { invoiceNumber: values.invoiceNumber.toUpperCase(), supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), issueDate: values.issueDate, total: values.total, installments: Number(values.installments) };
+      const updates = { invoiceNumber: values.invoiceNumber.toUpperCase(), description: values.description.trim(), supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), issueDate: values.issueDate, total: values.total, installments: Number(values.installments) };
       if (persist) await updatePurchase(defaultTenantId, editTarget.item.id, updates);
       setPurchaseList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
     } else {
