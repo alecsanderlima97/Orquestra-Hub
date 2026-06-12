@@ -49,7 +49,7 @@ import { UsersPanel } from "@/features/users/components/UsersPanel";
 import { listTenantUsers, updateTenantUserRole } from "@/features/users/services/userService";
 import { createInvite } from "@/features/users/services/inviteService";
 import { SuppliersTable } from "@/features/suppliers/components/SuppliersTable";
-import { createSupplier, listSuppliers, updateSupplier } from "@/features/suppliers/services/supplierService";
+import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from "@/features/suppliers/services/supplierService";
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
 import { accountsPayable, purchases, stores, suppliers } from "@/lib/data/mockData";
 import { firebaseReady } from "@/lib/firebase/config";
@@ -92,7 +92,7 @@ export function OrquestraHubApp() {
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [boletoFiles, setBoletoFiles] = useState<File[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
-  const [supplierForm, setSupplierForm] = useState({ document: "", name: "", phone: "" });
+  const [supplierForm, setSupplierForm] = useState({ account: "", address: "", agency: "", bank: "", contactName: "", document: "", email: "", name: "", notes: "", paymentMethod: "PIX" as NonNullable<Supplier["paymentMethod"]>, paymentTerms: "", phone: "", pixKey: "" });
   const [storeForm, setStoreForm] = useState<StoreFormState>({
     address: "",
     balance: "R$ 0,00",
@@ -220,22 +220,42 @@ export function OrquestraHubApp() {
     }
     const newSupplier: Omit<Supplier, "id"> = {
       document: formatCnpj(supplierForm.document || "00000000000000"),
+      account: supplierForm.account,
+      address: toTitleCaseBR(supplierForm.address),
+      agency: supplierForm.agency,
+      bank: toTitleCaseBR(supplierForm.bank),
+      contactName: toTitleCaseBR(supplierForm.contactName),
+      email: supplierForm.email.trim().toLowerCase(),
       name: toTitleCaseBR(supplierForm.name.trim()),
+      notes: supplierForm.notes.trim(),
       openAmount: "R$ 0,00",
+      paymentMethod: supplierForm.paymentMethod,
+      paymentTerms: supplierForm.paymentTerms.trim(),
       phone: formatPhone(supplierForm.phone || "00000000000"),
+      pixKey: supplierForm.pixKey.trim(),
       status: "Ativo",
     };
     try {
       const created = firebaseReady && user?.id !== demoUserId ? await createSupplier(defaultTenantId, newSupplier) : null;
       setSupplierList((current) => [{ id: created?.id || crypto.randomUUID(), ...newSupplier }, ...current]);
       setPurchaseForm((form) => ({ ...form, supplier: newSupplier.name }));
-      setSupplierForm({ document: "", name: "", phone: "" });
+      setSupplierForm({ account: "", address: "", agency: "", bank: "", contactName: "", document: "", email: "", name: "", notes: "", paymentMethod: "PIX", paymentTerms: "", phone: "", pixKey: "" });
       setFormErrors((errors) => ({ ...errors, supplier: "" }));
       await recordAudit(defaultTenantId, user, "criou", "fornecedor", created?.id || "demo");
       setShowSupplierForm(false);
     } catch {
       setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível salvar o fornecedor. Verifique sua conexão e tente novamente." }));
     }
+  }
+
+  async function removeSupplier(supplier: Supplier) {
+    const linked = purchaseList.some((item) => item.supplier === supplier.name) || accountList.some((item) => item.supplier === supplier.name);
+    if (linked) { setFormErrors((errors) => ({ ...errors, supplier: "Este fornecedor possui compras ou contas vinculadas e não pode ser excluído." })); return; }
+    if (!window.confirm(`Excluir o fornecedor ${supplier.name}?`)) return;
+    if (firebaseReady && user?.id !== demoUserId) await deleteSupplier(defaultTenantId, supplier.id);
+    setSupplierList((items) => items.filter((item) => item.id !== supplier.id));
+    setFormErrors((errors) => ({ ...errors, supplier: "" }));
+    await recordAudit(defaultTenantId, user, "excluiu", "fornecedor", supplier.id);
   }
 
   async function addStore() {
@@ -433,7 +453,7 @@ export function OrquestraHubApp() {
 
   function editFields(target: EditTarget): EditField[] {
     if (target.kind === "store") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "manager", label: "Responsável", mask: "title", value: target.item.manager }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone || "" }, { key: "cep", label: "CEP", mask: "cep", value: target.item.cep || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "city", label: "Cidade", mask: "title", value: target.item.city || "" }, { key: "state", label: "Estado", mask: "upper", value: target.item.state || "" }, { key: "mapsUrl", label: "Google Maps", value: target.item.mapsUrl || "" }, { key: "monthlyGoal", label: "Meta mensal", mask: "currency", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", mask: "currency", value: target.item.balance }];
-    if (target.kind === "supplier") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "document", label: "CNPJ", mask: "cnpj", value: target.item.document }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone }];
+    if (target.kind === "supplier") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "document", label: "CNPJ", mask: "cnpj", value: target.item.document }, { key: "contactName", label: "Contato", mask: "title", value: target.item.contactName || "" }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone }, { key: "email", label: "E-mail", value: target.item.email || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "paymentMethod", label: "Forma de pagamento", value: target.item.paymentMethod || "" }, { key: "pixKey", label: "Chave PIX", value: target.item.pixKey || "" }, { key: "bank", label: "Banco", mask: "title", value: target.item.bank || "" }, { key: "agency", label: "Agência", value: target.item.agency || "" }, { key: "account", label: "Conta", value: target.item.account || "" }, { key: "paymentTerms", label: "Condição de pagamento", value: target.item.paymentTerms || "" }, { key: "notes", label: "Observações", value: target.item.notes || "" }];
     if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", mask: "upper", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", mask: "currency", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
     return [{ key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "installment", label: "Parcela", value: target.item.installment }];
   }
@@ -447,7 +467,7 @@ export function OrquestraHubApp() {
       if (persist) await updateStore(defaultTenantId, editTarget.item.id, updates);
       setStoreList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
     } else if (editTarget.kind === "supplier") {
-      const updates = { name: toTitleCaseBR(values.name), document: formatCnpj(values.document), phone: formatPhone(values.phone) };
+      const updates = { name: toTitleCaseBR(values.name), document: formatCnpj(values.document), contactName: toTitleCaseBR(values.contactName), phone: formatPhone(values.phone), email: values.email.toLowerCase(), address: toTitleCaseBR(values.address), paymentMethod: values.paymentMethod as Supplier["paymentMethod"], pixKey: values.pixKey, bank: toTitleCaseBR(values.bank), agency: values.agency, account: values.account, paymentTerms: values.paymentTerms, notes: values.notes };
       if (persist) await updateSupplier(defaultTenantId, editTarget.item.id, updates);
       setSupplierList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
     } else if (editTarget.kind === "purchase") {
@@ -515,7 +535,17 @@ export function OrquestraHubApp() {
           {showSupplierForm ? <div className="mb-4 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
             <TextField label="Nome" onBlur={() => setSupplierForm((form) => ({ ...form, name: toTitleCaseBR(form.name) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, name: event.target.value }))} placeholder="Nome do Fornecedor" value={supplierForm.name} />
             <TextField label="CNPJ" onChange={(event) => setSupplierForm((form) => ({ ...form, document: formatCnpj(event.target.value) }))} placeholder="00.000.000/0000-00" value={supplierForm.document} />
+            <TextField label="Pessoa de contato" onChange={(event) => setSupplierForm((form) => ({ ...form, contactName: event.target.value }))} placeholder="Nome do contato" value={supplierForm.contactName} />
             <TextField label="Telefone" onChange={(event) => setSupplierForm((form) => ({ ...form, phone: formatPhone(event.target.value) }))} placeholder="(00) 00000-0000" value={supplierForm.phone} />
+            <TextField label="E-mail" onChange={(event) => setSupplierForm((form) => ({ ...form, email: event.target.value }))} placeholder="financeiro@fornecedor.com" type="email" value={supplierForm.email} />
+            <TextField label="Endereço" onChange={(event) => setSupplierForm((form) => ({ ...form, address: event.target.value }))} placeholder="Rua, número e cidade" value={supplierForm.address} />
+            <label className="block"><span className="text-sm font-medium text-slate-700">Forma de pagamento</span><select className="mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => setSupplierForm((form) => ({ ...form, paymentMethod: event.target.value as NonNullable<Supplier["paymentMethod"]> }))} value={supplierForm.paymentMethod}><option>PIX</option><option>Boleto</option><option>Transferência</option><option>Dinheiro</option><option>Cartão</option></select></label>
+            <TextField label="Chave PIX" onChange={(event) => setSupplierForm((form) => ({ ...form, pixKey: event.target.value }))} placeholder="CPF, CNPJ, e-mail ou chave" value={supplierForm.pixKey} />
+            <TextField label="Banco" onChange={(event) => setSupplierForm((form) => ({ ...form, bank: event.target.value }))} placeholder="Nome do banco" value={supplierForm.bank} />
+            <TextField label="Agência" onChange={(event) => setSupplierForm((form) => ({ ...form, agency: event.target.value }))} placeholder="0000" value={supplierForm.agency} />
+            <TextField label="Conta" onChange={(event) => setSupplierForm((form) => ({ ...form, account: event.target.value }))} placeholder="00000-0" value={supplierForm.account} />
+            <TextField label="Condição de pagamento" onChange={(event) => setSupplierForm((form) => ({ ...form, paymentTerms: event.target.value }))} placeholder="Ex.: 30/60/90 dias" value={supplierForm.paymentTerms} />
+            <div className="md:col-span-2"><TextField label="Observações" onChange={(event) => setSupplierForm((form) => ({ ...form, notes: event.target.value }))} placeholder="Dados importantes para compras e pagamentos" value={supplierForm.notes} /></div>
             <button
               className="mt-7 h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
               onClick={addSupplier}
@@ -537,7 +567,7 @@ export function OrquestraHubApp() {
             />
           </div>
           <div className="overflow-x-auto">
-            <SuppliersTable onEdit={(item) => setEditTarget({ kind: "supplier", item })} suppliers={filteredSuppliers} />
+            <SuppliersTable onDelete={removeSupplier} onEdit={(item) => setEditTarget({ kind: "supplier", item })} suppliers={filteredSuppliers} />
           </div>
         </Section>
 
@@ -603,6 +633,7 @@ export function OrquestraHubApp() {
         onCancel={() => setPaymentToConfirm(null)}
         onConfirm={confirmMarkPaid}
         paidAt={paymentDateTime}
+        supplier={supplierList.find((item) => item.name === paymentToConfirm?.supplier)}
       />
       {editTarget ? <EditModal fields={editFields(editTarget)} onClose={() => setEditTarget(null)} onSave={saveEdit} passwordRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} title={`Editar ${editTarget.kind === "store" ? "loja" : editTarget.kind === "supplier" ? "fornecedor" : editTarget.kind === "purchase" ? "nota" : "conta a pagar"}`} /> : null}
     </AppShell>

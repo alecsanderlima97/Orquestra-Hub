@@ -17,6 +17,19 @@ export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", 
   };
 }
 
+function cacheUser(user: AppUser) {
+  if (typeof window !== "undefined") window.localStorage.setItem("orquestra-user", JSON.stringify(user));
+  return user;
+}
+
+function cachedUser(user: User) {
+  if (typeof window === "undefined") return null;
+  try {
+    const cached = JSON.parse(window.localStorage.getItem("orquestra-user") || "null") as AppUser | null;
+    return cached?.id === user.uid ? cached : null;
+  } catch { return null; }
+}
+
 async function mapUserWithRole(user: User) {
   if (!db) return mapFirebaseUser(user);
   const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
@@ -66,7 +79,7 @@ export async function registerWithEmail(name: string, companyName: string, email
       if (!invite) await deleteDoc(doc(db, tenantPath(tenantId))).catch(() => undefined);
       throw error;
     }
-    return mapFirebaseUser(credential.user, role, tenantId, finalCompanyName);
+    return cacheUser(mapFirebaseUser(credential.user, role, tenantId, finalCompanyName));
   } catch (error) {
     await deleteUser(credential.user).catch(() => undefined);
     throw error;
@@ -108,11 +121,11 @@ export function listenAuth(callback: (user: AppUser | null) => void) {
       return;
     }
     const timeout = new Promise<AppUser>((resolve) => {
-      window.setTimeout(() => resolve(mapFirebaseUser(user)), 8000);
+      window.setTimeout(() => resolve(cachedUser(user) || mapFirebaseUser(user)), 8000);
     });
     void Promise.race([mapUserWithRole(user), timeout])
-      .then(callback)
-      .catch(() => callback(mapFirebaseUser(user)));
+      .then((mapped) => callback(cacheUser(mapped)))
+      .catch(() => callback(cachedUser(user) || mapFirebaseUser(user)));
   }, () => callback(null));
 }
 

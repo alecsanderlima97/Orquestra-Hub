@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db, firebaseReady } from "@/lib/firebase/config";
 import { tenantCollectionPath } from "@/lib/firebase/paths";
 import type { Supplier } from "../types/supplierTypes";
@@ -22,4 +22,9 @@ export async function createSupplier(tenantId: string, supplier: Omit<Supplier, 
     ...supplier,
     createdAt: serverTimestamp(),
   });
+}
+
+export async function deleteSupplier(tenantId: string, supplierId: string) {
+  if (!firebaseReady || !db) return;
+  await deleteDoc(doc(db, tenantCollectionPath(tenantId, collectionName), supplierId));
 }
