@@ -1,5 +1,5 @@
-import { createUserWithEmailAndPassword, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from "firebase/auth";
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
 import { defaultTenantId } from "@/lib/tenant/tenant";
@@ -46,23 +46,28 @@ async function ensureTenantAccess(user: User) {
 }
 
 export async function registerWithEmail(name: string, companyName: string, email: string, password: string, inviteCode = "") {
-  if (!firebaseReady || !auth) return null;
+  if (!firebaseReady || !auth || !db) return null;
   const normalizedInviteCode = inviteCode.trim().toUpperCase();
-  const invite = await getInvite(normalizedInviteCode);
-  if (normalizedInviteCode && !invite) throw new Error("invite-invalid");
   if (!name.trim()) throw new Error("name-required");
-  if (!invite && !companyName.trim()) throw new Error("company-required");
+  if (!normalizedInviteCode && !companyName.trim()) throw new Error("company-required");
   const credential = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(credential.user, { displayName: name.trim() });
-  const tenantId = invite?.tenantId || crypto.randomUUID();
-  const finalCompanyName = invite?.companyName || companyName.trim();
-  const role: AppUser["role"] = invite?.role || "Dono";
-  if (!invite) {
-  await setDoc(doc(db!, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: finalCompanyName, ownerId: credential.user.uid, status: "Ativo" });
+  try {
+    await updateProfile(credential.user, { displayName: name.trim() });
+    const invite = await getInvite(normalizedInviteCode);
+    if (normalizedInviteCode && !invite) throw new Error("invite-invalid");
+    const tenantId = invite?.tenantId || crypto.randomUUID();
+    const finalCompanyName = invite?.companyName || companyName.trim();
+    const role: AppUser["role"] = invite?.role || "Dono";
+    const batch = writeBatch(db);
+    if (!invite) batch.set(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: finalCompanyName, ownerId: credential.user.uid, status: "Ativo" });
+    batch.set(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: normalizedInviteCode, name: name.trim(), role, userId: credential.user.uid, createdAt: serverTimestamp() });
+    batch.set(doc(db, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: finalCompanyName, role, createdAt: serverTimestamp() });
+    await batch.commit();
+    return mapFirebaseUser(credential.user, role, tenantId, finalCompanyName);
+  } catch (error) {
+    await deleteUser(credential.user).catch(() => undefined);
+    throw error;
   }
-  await setDoc(doc(db!, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: normalizedInviteCode, name: name.trim(), role, userId: credential.user.uid, createdAt: serverTimestamp() });
-  await setDoc(doc(db!, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: finalCompanyName, role, createdAt: serverTimestamp() });
-  return mapFirebaseUser(credential.user, role, tenantId, finalCompanyName);
 }
 
 export async function loginWithGoogle() {

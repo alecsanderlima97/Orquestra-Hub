@@ -18,6 +18,8 @@ function registrationError(error: unknown) {
   if (code === "invite-invalid") return "O código de convite é inválido.";
   if (code === "name-required") return "Informe seu nome.";
   if (code === "company-required") return "Informe o nome da empresa ou um código de convite.";
+  if (code.includes("permission-denied")) return "O acesso ao cadastro foi negado. Atualize a página e tente novamente.";
+  if (code.includes("network-request-failed") || code.includes("unavailable")) return "Falha de conexão. Verifique sua internet e tente novamente.";
   return "Não foi possível concluir o cadastro. Tente novamente.";
 }
 
