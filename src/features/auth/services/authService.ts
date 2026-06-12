@@ -9,11 +9,12 @@ import { getInvite } from "@/features/users/services/inviteService";
 const platformOwnerEmails = new Set(["limaalecsander@gmail.com"]);
 
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub"): AppUser {
+  const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) ? "Dono" : role;
   return {
     email: user.email || "",
     id: user.uid,
     name: user.displayName || user.email || "Usuario",
-    role,
+    role: effectiveRole,
     tenantId,
     companyName,
   };
@@ -28,7 +29,8 @@ function cachedUser(user: User) {
   if (typeof window === "undefined") return null;
   try {
     const cached = JSON.parse(window.localStorage.getItem("orquestra-user") || "null") as AppUser | null;
-    return cached?.id === user.uid ? cached : null;
+    if (cached?.id !== user.uid) return null;
+    return platformOwnerEmails.has((user.email || "").toLowerCase()) ? { ...cached, role: "Dono" as const } : cached;
   } catch { return null; }
 }
 
