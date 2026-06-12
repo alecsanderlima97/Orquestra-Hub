@@ -11,7 +11,8 @@ const demoUser: AppUser = { companyName: "Orquestra Hub Demo", email: "demo@orqu
 const modules = [{ detail: "Fluxo em tempo real", icon: BarChart3, title: "Financeiro" }, { detail: "Gestão integrada", icon: Building2, title: "Unidades" }, { detail: "Compras organizadas", icon: PackageCheck, title: "Fornecedores" }, { detail: "Decisões mais claras", icon: ReceiptText, title: "Relatórios" }];
 
 function registrationError(error: unknown) {
-  const code = error instanceof Error ? error.message : "";
+  const firebaseError = error as { code?: string; message?: string };
+  const code = firebaseError?.code || firebaseError?.message || "";
   if (code.includes("email-already-in-use")) return "Este e-mail já possui uma conta.";
   if (code.includes("invalid-email")) return "Informe um e-mail válido.";
   if (code.includes("weak-password")) return "A senha deve ter pelo menos 6 caracteres.";
@@ -20,7 +21,7 @@ function registrationError(error: unknown) {
   if (code === "company-required") return "Informe o nome da empresa ou um código de convite.";
   if (code.includes("permission-denied")) return "O acesso ao cadastro foi negado. Atualize a página e tente novamente.";
   if (code.includes("network-request-failed") || code.includes("unavailable")) return "Falha de conexão. Verifique sua internet e tente novamente.";
-  return "Não foi possível concluir o cadastro. Tente novamente.";
+  return `Não foi possível concluir o cadastro${code ? ` (${code.replace("firebase/", "")})` : ""}.`;
 }
 
 export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {

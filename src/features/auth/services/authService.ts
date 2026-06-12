@@ -1,5 +1,5 @@
 import { createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
 import { defaultTenantId } from "@/lib/tenant/tenant";
@@ -58,11 +58,14 @@ export async function registerWithEmail(name: string, companyName: string, email
     const tenantId = invite?.tenantId || crypto.randomUUID();
     const finalCompanyName = invite?.companyName || companyName.trim();
     const role: AppUser["role"] = invite?.role || "Dono";
-    const batch = writeBatch(db);
-    if (!invite) batch.set(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: finalCompanyName, ownerId: credential.user.uid, status: "Ativo" });
-    batch.set(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: normalizedInviteCode, name: name.trim(), role, userId: credential.user.uid, createdAt: serverTimestamp() });
-    batch.set(doc(db, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: finalCompanyName, role, createdAt: serverTimestamp() });
-    await batch.commit();
+    if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: finalCompanyName, ownerId: credential.user.uid, status: "Ativo" });
+    try {
+      await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: normalizedInviteCode, name: name.trim(), role, userId: credential.user.uid, createdAt: serverTimestamp() });
+      await setDoc(doc(db, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: finalCompanyName, role, createdAt: serverTimestamp() });
+    } catch (error) {
+      if (!invite) await deleteDoc(doc(db, tenantPath(tenantId))).catch(() => undefined);
+      throw error;
+    }
     return mapFirebaseUser(credential.user, role, tenantId, finalCompanyName);
   } catch (error) {
     await deleteUser(credential.user).catch(() => undefined);

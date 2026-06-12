@@ -1,6 +1,6 @@
 import { getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -21,5 +21,5 @@ export const firebaseApp = firebaseReady
   : null;
 
 export const auth = firebaseApp ? getAuth(firebaseApp) : null;
-export const db = firebaseApp ? getFirestore(firebaseApp) : null;
+export const db = firebaseApp ? initializeFirestore(firebaseApp, { experimentalAutoDetectLongPolling: true }) : null;
 export const storage = firebaseApp ? getStorage(firebaseApp) : null;

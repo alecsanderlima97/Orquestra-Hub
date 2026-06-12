@@ -23,7 +23,7 @@ service cloud.firestore {
       match /users/{userId} {
         allow read: if belongsToTenant(tenantId);
         allow create: if signedIn() && request.auth.uid == userId
-          && (getAfter(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
+          && (get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
             || (exists(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode))
               && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.tenantId == tenantId));
         allow update: if isOwner(tenantId) || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
@@ -40,7 +40,7 @@ service cloud.firestore {
     match /userTenants/{userId}/memberships/{tenantId} {
       allow read: if signedIn() && request.auth.uid == userId;
       allow create: if signedIn() && request.auth.uid == userId
-        && existsAfter(/databases/$(database)/documents/tenants/$(tenantId)/users/$(userId));
+        && exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(userId));
       allow update, delete: if false;
     }
 
