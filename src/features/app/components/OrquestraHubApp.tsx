@@ -124,7 +124,14 @@ export function OrquestraHubApp() {
     const accessTimeout = window.setTimeout(() => setAuthChecked(true), 9000);
     const unsubscribe = listenAuth((currentUser) => {
       setUser(currentUser);
-      if (currentUser) void listUserCompanies(currentUser.id).then(setCompanies).catch(() => setCompanies([]));
+      if (currentUser) void listUserCompanies(currentUser.id).then((memberships) => {
+        setCompanies(memberships);
+        const activeCompany = memberships.find((item) => item.tenantId === currentUser.tenantId) || memberships[0];
+        if (activeCompany) {
+          setUser((activeUser) => activeUser ? { ...activeUser, ...activeCompany } : activeUser);
+          window.localStorage.setItem("orquestra-user", JSON.stringify({ ...currentUser, ...activeCompany }));
+        }
+      }).catch(() => setCompanies([]));
       setAuthChecked(true);
     });
     return () => {
