@@ -1,4 +1,4 @@
-import { createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from "firebase/auth";
+import { createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from "firebase/auth";
 import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
@@ -99,12 +99,8 @@ export async function loginWithGoogle() {
 }
 
 export async function resetPassword(email: string) {
-  if (!firebaseReady || !auth) return;
-  auth.languageCode = "pt-BR";
-  await sendPasswordResetEmail(auth, email.trim().toLowerCase(), {
-    handleCodeInApp: false,
-    url: "https://orquestra-hub.vercel.app",
-  });
+  const response = await fetch("/api/auth/password-reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+  if (!response.ok) throw new Error((await response.json()).error || "reset-failed");
 }
 
 export async function logoutUser() {
