@@ -42,6 +42,7 @@ async function mapUserWithRole(user: User) {
 export async function loginWithEmail(email: string, password: string) {
   if (!firebaseReady || !auth) return null;
   const credential = await signInWithEmailAndPassword(auth, email, password);
+  await ensureTenantAccess(credential.user);
   return mapUserWithRole(credential.user);
 }
 
