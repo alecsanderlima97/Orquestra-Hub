@@ -7,8 +7,10 @@ const attempts = new Map<string, number>();
 function adminAuth() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) return null;
-  const serviceAccount = JSON.parse(raw);
-  const app = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
+  let parsed: unknown = JSON.parse(raw.trim());
+  if (typeof parsed === "string") parsed = JSON.parse(parsed);
+  const serviceAccount = parsed as { client_email: string; private_key: string; project_id: string };
+  const app = getApps()[0] || initializeApp({ credential: cert({ clientEmail: serviceAccount.client_email, privateKey: serviceAccount.private_key.replace(/\\n/g, "\n"), projectId: serviceAccount.project_id }) });
   return getAuth(app);
 }
 
@@ -20,7 +22,11 @@ export async function POST(request: Request) {
 
   const { email } = await request.json();
   if (!email || typeof email !== "string") return NextResponse.json({ error: "Informe um e-mail válido." }, { status: 400 });
-  const auth = adminAuth();
+  let auth;
+  try { auth = adminAuth(); } catch (error) {
+    console.error("firebase-service-account", error);
+    return NextResponse.json({ error: "A credencial do Firebase está com formato inválido na Vercel." }, { status: 503 });
+  }
   const resendKey = process.env.RESEND_API_KEY;
   if (!auth || !resendKey) return NextResponse.json({ error: "Recuperação de senha ainda não configurada." }, { status: 503 });
 
