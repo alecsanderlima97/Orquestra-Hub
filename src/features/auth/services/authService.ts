@@ -6,6 +6,8 @@ import { defaultTenantId } from "@/lib/tenant/tenant";
 import type { AppUser, CompanyMembership } from "../types/authTypes";
 import { getInvite } from "@/features/users/services/inviteService";
 
+const platformOwnerEmails = new Set(["limaalecsander@gmail.com"]);
+
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub"): AppUser {
   return {
     email: user.email || "",
@@ -33,7 +35,7 @@ function cachedUser(user: User) {
 async function mapUserWithRole(user: User) {
   if (!db) return mapFirebaseUser(user);
   const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
-  if (!memberships.empty) { const membership = memberships.docs[0]; const data = membership.data(); const access = await getDoc(doc(db, `${tenantPath(membership.id)}/users/${user.uid}`)); return mapFirebaseUser(user, access.data()?.role || data.role || "Consulta", membership.id, data.companyName || "Empresa"); }
+  if (!memberships.empty) { const membership = memberships.docs[0]; const data = membership.data(); const access = await getDoc(doc(db, `${tenantPath(membership.id)}/users/${user.uid}`)); const role = platformOwnerEmails.has((user.email || "").toLowerCase()) ? "Dono" : access.data()?.role || data.role || "Consulta"; return mapFirebaseUser(user, role, membership.id, data.companyName || "Empresa"); }
   const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
   if (legacy.exists()) return mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub");
   return mapFirebaseUser(user);
@@ -134,5 +136,6 @@ export async function listUserCompanies(userId: string): Promise<CompanyMembersh
   if (!db || !firebaseReady || userId === "demo-user") return [];
   const firestore = db;
   const snapshot = await getDocs(collection(firestore, `userTenants/${userId}/memberships`));
-  return Promise.all(snapshot.docs.map(async (membership) => { const access = await getDoc(doc(firestore, `${tenantPath(membership.id)}/users/${userId}`)); return { companyName: membership.data().companyName || "Empresa", role: access.data()?.role || membership.data().role || "Consulta", tenantId: membership.id }; }));
+  const currentEmail = auth?.currentUser?.email?.toLowerCase() || "";
+  return Promise.all(snapshot.docs.map(async (membership) => { const access = await getDoc(doc(firestore, `${tenantPath(membership.id)}/users/${userId}`)); return { companyName: membership.data().companyName || "Empresa", role: platformOwnerEmails.has(currentEmail) ? "Dono" : access.data()?.role || membership.data().role || "Consulta", tenantId: membership.id }; }));
 }

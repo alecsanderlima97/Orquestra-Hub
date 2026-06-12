@@ -5,14 +5,15 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null;
     }
+    function isPlatformOwner() { return signedIn() && request.auth.token.email == 'limaalecsander@gmail.com'; }
 
     function belongsToTenant(tenantId) {
       return signedIn()
         && exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid));
     }
     function role(tenantId) { return get(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid)).data.role; }
-    function canWrite(tenantId) { return belongsToTenant(tenantId) && role(tenantId) in ['Dono', 'Financeiro']; }
-    function isOwner(tenantId) { return belongsToTenant(tenantId) && role(tenantId) == 'Dono'; }
+    function canWrite(tenantId) { return isPlatformOwner() || (belongsToTenant(tenantId) && role(tenantId) in ['Dono', 'Financeiro']); }
+    function isOwner(tenantId) { return isPlatformOwner() || (belongsToTenant(tenantId) && role(tenantId) == 'Dono'); }
 
     match /tenants/{tenantId} {
       allow read: if belongsToTenant(tenantId);
