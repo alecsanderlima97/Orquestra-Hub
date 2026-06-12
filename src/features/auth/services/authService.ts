@@ -100,7 +100,11 @@ export async function loginWithGoogle() {
 
 export async function resetPassword(email: string) {
   if (!firebaseReady || !auth) return;
-  await sendPasswordResetEmail(auth, email);
+  auth.languageCode = "pt-BR";
+  await sendPasswordResetEmail(auth, email.trim().toLowerCase(), {
+    handleCodeInApp: false,
+    url: "https://orquestra-hub.vercel.app",
+  });
 }
 
 export async function logoutUser() {
