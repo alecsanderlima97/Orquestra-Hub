@@ -121,12 +121,16 @@ export function OrquestraHubApp() {
   });
 
   useEffect(() => {
+    const accessTimeout = window.setTimeout(() => setAuthChecked(true), 9000);
     const unsubscribe = listenAuth((currentUser) => {
       setUser(currentUser);
-      if (currentUser) void listUserCompanies(currentUser.id).then(setCompanies);
+      if (currentUser) void listUserCompanies(currentUser.id).then(setCompanies).catch(() => setCompanies([]));
       setAuthChecked(true);
     });
-    return unsubscribe;
+    return () => {
+      window.clearTimeout(accessTimeout);
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

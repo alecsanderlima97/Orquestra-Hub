@@ -102,7 +102,18 @@ export function listenAuth(callback: (user: AppUser | null) => void) {
     callback(null);
     return () => undefined;
   }
-  return onAuthStateChanged(auth, (user) => { if (!user) callback(null); else void mapUserWithRole(user).then(callback); });
+  return onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      callback(null);
+      return;
+    }
+    const timeout = new Promise<AppUser>((resolve) => {
+      window.setTimeout(() => resolve(mapFirebaseUser(user)), 8000);
+    });
+    void Promise.race([mapUserWithRole(user), timeout])
+      .then(callback)
+      .catch(() => callback(mapFirebaseUser(user)));
+  }, () => callback(null));
 }
 
 export async function listUserCompanies(userId: string): Promise<CompanyMembership[]> {
