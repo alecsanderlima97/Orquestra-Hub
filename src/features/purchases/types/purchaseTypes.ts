@@ -16,4 +16,5 @@ export type PurchaseAttachment = {
   type: string;
   size: number;
   url: string;
+  path?: string;
 };

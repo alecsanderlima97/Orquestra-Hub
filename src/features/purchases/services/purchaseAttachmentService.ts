@@ -11,3 +11,9 @@ export async function uploadPurchaseAttachment(tenantId: string, purchaseId: str
   if (!response.ok) throw new Error(result.error || "Não foi possível enviar o anexo.");
   return result as PurchaseAttachment;
 }
+
+export async function deletePurchaseAttachment(path?: string) {
+  if (!path) throw new Error("Este anexo antigo não possui caminho para exclusão.");
+  const response = await fetch("/api/attachments", { body: JSON.stringify({ path }), headers: { "Content-Type": "application/json" }, method: "DELETE" });
+  if (!response.ok) throw new Error("Não foi possível excluir o anexo.");
+}

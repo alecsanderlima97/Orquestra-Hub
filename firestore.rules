@@ -10,6 +10,9 @@ service cloud.firestore {
       return signedIn()
         && exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid));
     }
+    function role(tenantId) { return get(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid)).data.role; }
+    function canWrite(tenantId) { return belongsToTenant(tenantId) && role(tenantId) in ['Dono', 'Financeiro']; }
+    function isOwner(tenantId) { return belongsToTenant(tenantId) && role(tenantId) == 'Dono'; }
 
     match /tenants/{tenantId} {
       allow read: if belongsToTenant(tenantId);
@@ -17,11 +20,15 @@ service cloud.firestore {
 
       match /users/{userId} {
         allow read: if belongsToTenant(tenantId);
-        allow write: if signedIn() && request.auth.uid == userId;
+        allow create: if signedIn() && request.auth.uid == userId;
+        allow update: if isOwner(tenantId) || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
       }
 
+      match /auditLogs/{logId} { allow read: if isOwner(tenantId); allow create: if canWrite(tenantId); allow update, delete: if false; }
+
       match /{document=**} {
-        allow read, write: if belongsToTenant(tenantId);
+        allow read: if belongsToTenant(tenantId);
+        allow write: if canWrite(tenantId);
       }
     }
   }

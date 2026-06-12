@@ -19,7 +19,12 @@ import type { AccountPayable } from "@/features/accounts-payable/types/accountPa
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
 import { listenAuth, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
 import type { AppUser } from "@/features/auth/types/authTypes";
+import { AuditPanel } from "@/features/audit/components/AuditPanel";
+import { BackupPanel } from "@/features/backup/components/BackupPanel";
+import { listAuditLogs, recordAudit } from "@/features/audit/services/auditService";
+import type { AuditLog } from "@/features/audit/types/auditTypes";
 import { PaymentsTable } from "@/features/dashboard/components/PaymentsTable";
+import { MonthlyCashFlow } from "@/features/dashboard/components/MonthlyCashFlow";
 import { SummaryCard } from "@/features/dashboard/components/SummaryCard";
 import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes";
 import { FixedExpensesPanel, type FixedExpenseForm } from "@/features/fixed-expenses/components/FixedExpensesPanel";
@@ -39,6 +44,8 @@ import type { StoreFormState } from "@/features/stores/components/StoreForm";
 import { StoresPanel } from "@/features/stores/components/StoresPanel";
 import { createStore, listStores, updateStore } from "@/features/stores/services/storeService";
 import type { Store } from "@/features/stores/types/storeTypes";
+import { UsersPanel } from "@/features/users/components/UsersPanel";
+import { listTenantUsers, updateTenantUserRole } from "@/features/users/services/userService";
 import { SuppliersTable } from "@/features/suppliers/components/SuppliersTable";
 import { createSupplier, listSuppliers, updateSupplier } from "@/features/suppliers/services/supplierService";
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
@@ -69,6 +76,8 @@ export function OrquestraHubApp() {
   const [purchaseList, setPurchaseList] = useState<Purchase[]>(purchases);
   const [accountList, setAccountList] = useState<AccountPayable[]>(accountsPayable);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [tenantUsers, setTenantUsers] = useState<AppUser[]>([]);
   const [fixedExpenseForm, setFixedExpenseForm] = useState<FixedExpenseForm>({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: stores[0]?.name || "" });
   const [accountFilters, setAccountFilters] = useState<AccountFilters>({ status: "Todos", store: "Todas", supplier: "Todos" });
   const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
@@ -119,18 +128,22 @@ export function OrquestraHubApp() {
     if (!firebaseReady || !user || user.id === demoUserId) return;
     async function loadFirebaseData() {
       try {
-        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses] = await Promise.all([
+        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseAuditLogs, firebaseUsers] = await Promise.all([
           listStores(defaultTenantId),
           listSuppliers(defaultTenantId),
           listAccountsPayable(defaultTenantId),
           listPurchases(defaultTenantId),
           listFixedExpenses(defaultTenantId),
+          user?.role === "Dono" ? listAuditLogs(defaultTenantId) : Promise.resolve([]),
+          user?.role === "Dono" ? listTenantUsers(defaultTenantId) : Promise.resolve([]),
         ]);
         setStoreList(firebaseStores);
         setSupplierList(firebaseSuppliers);
         setAccountList(firebaseAccounts);
         setPurchaseList(firebasePurchases);
         setFixedExpenses(firebaseFixedExpenses);
+        setAuditLogs(firebaseAuditLogs);
+        setTenantUsers(firebaseUsers);
       } catch {
         setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível carregar dados do Firebase." }));
       }
@@ -209,6 +222,7 @@ export function OrquestraHubApp() {
       setPurchaseForm((form) => ({ ...form, supplier: newSupplier.name }));
       setSupplierForm({ document: "", name: "", phone: "" });
       setFormErrors((errors) => ({ ...errors, supplier: "" }));
+      await recordAudit(defaultTenantId, user, "criou", "fornecedor", created?.id || "demo");
       setShowSupplierForm(false);
     } catch {
       setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível salvar o fornecedor. Verifique sua conexão e tente novamente." }));
@@ -245,6 +259,7 @@ export function OrquestraHubApp() {
     setStoreForm({ address: "", balance: "R$ 0,00", cep: "", city: "", manager: "", mapsUrl: "", monthlyGoal: "R$ 0,00", name: "", phone: "", state: "" });
     setStorePhoto(null);
     setFormErrors((errors) => ({ ...errors, store: "" }));
+    await recordAudit(defaultTenantId, user, "criou", "loja", storeId);
     setShowStoreForm(false);
   }
 
@@ -317,6 +332,7 @@ export function OrquestraHubApp() {
       return;
     }
     setFormErrors((errors) => ({ ...errors, purchase: "" }));
+    await recordAudit(defaultTenantId, user, "criou", "compra", purchaseId);
     setShowPurchaseForm(false);
   }
 
@@ -334,6 +350,7 @@ export function OrquestraHubApp() {
     setFixedExpenses((items) => [{ id, ...expense }, ...items]);
     setAccountList((items) => [{ id: savedAccount?.id || crypto.randomUUID(), ...account }, ...items]);
     setFixedExpenseForm({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: storeList[0]?.name || "" });
+    await recordAudit(defaultTenantId, user, "criou", "despesa fixa", id);
   }
 
   function requestMarkPaid(id: string) {
@@ -353,6 +370,7 @@ export function OrquestraHubApp() {
     );
     setPaymentToConfirm(null);
     setPaymentDateTime("");
+    await recordAudit(defaultTenantId, user, "pagou", "conta", paymentToConfirm.id);
   }
 
   async function handleReceiptSelected(id: string, file: File) {
@@ -360,6 +378,22 @@ export function OrquestraHubApp() {
     const updates = { receiptName: attachment.name, receiptUrl: attachment.url };
     if (firebaseReady && user?.id !== demoUserId) await updateAccountPayable(defaultTenantId, id, updates);
     setAccountList((current) => current.map((account) => (account.id === id ? { ...account, ...updates } : account)));
+    await recordAudit(defaultTenantId, user, "anexou", "comprovante", id);
+  }
+
+  function sendWhatsApp(account: AccountPayable) {
+    const supplier = supplierList.find((item) => item.name === account.supplier);
+    const phone = supplier?.phone.replace(/\D/g, "");
+    const message = account.status === "Pago"
+      ? `Olá! Confirmamos o pagamento de ${account.amount}, referente a ${account.installment}, com vencimento em ${account.dueDate}.`
+      : `Olá! Lembrete de pagamento no valor de ${account.amount}, referente a ${account.installment}, com vencimento em ${account.dueDate}.`;
+    window.open(`https://wa.me/${phone ? `55${phone}` : ""}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function changeUserRole(id: string, role: AppUser["role"]) {
+    await updateTenantUserRole(defaultTenantId, id, role);
+    setTenantUsers((items) => items.map((item) => item.id === id ? { ...item, role } : item));
+    await recordAudit(defaultTenantId, user, "editou", "permissão de usuário", id);
   }
 
   function exportFilteredAccounts() {
@@ -413,6 +447,7 @@ export function OrquestraHubApp() {
       setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
     }
     setEditTarget(null);
+    await recordAudit(defaultTenantId, user, "editou", editTarget.kind, editTarget.item.id);
   }
 
   async function handleLogout() {
@@ -443,6 +478,7 @@ export function OrquestraHubApp() {
           <div className="mt-6">
             <PaymentsTable accounts={accountList.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate))} />
           </div>
+          <MonthlyCashFlow accounts={accountList} />
         </Section>
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
@@ -529,6 +565,7 @@ export function OrquestraHubApp() {
               onEdit={(item) => setEditTarget({ kind: "account", item })}
               onMarkPaid={requestMarkPaid}
               onReceiptSelected={handleReceiptSelected}
+              onWhatsApp={sendWhatsApp}
             />
           </div>
         </Section>
@@ -541,7 +578,7 @@ export function OrquestraHubApp() {
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
         <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile user={user} /></Section>
-        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings /></Section>
+        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings />{user.role === "Dono" ? <div className="mt-5 space-y-5"><UsersPanel onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
       </div>
       <PaymentConfirmModal
         account={paymentToConfirm}

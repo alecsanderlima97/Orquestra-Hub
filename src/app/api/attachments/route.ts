@@ -30,5 +30,15 @@ export async function POST(request: Request) {
   if (upload.error) return NextResponse.json({ error: upload.error.message }, { status: 500 });
   const signed = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24 * 365);
   if (signed.error) return NextResponse.json({ error: signed.error.message }, { status: 500 });
-  return NextResponse.json({ name: file.name, size: file.size, type: file.type, url: signed.data.signedUrl });
+  return NextResponse.json({ name: file.name, path, size: file.size, type: file.type, url: signed.data.signedUrl });
+}
+
+export async function DELETE(request: Request) {
+  const supabase = adminClient();
+  if (!supabase) return NextResponse.json({ error: "Armazenamento ainda não configurado." }, { status: 503 });
+  const { path } = await request.json();
+  if (!path || typeof path !== "string") return NextResponse.json({ error: "Caminho inválido." }, { status: 400 });
+  const result = await supabase.storage.from(bucket).remove([path]);
+  if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

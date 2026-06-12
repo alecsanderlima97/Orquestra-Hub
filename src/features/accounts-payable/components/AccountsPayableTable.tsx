@@ -1,4 +1,4 @@
-import { CheckCircle2, Paperclip, Pencil } from "lucide-react";
+import { CheckCircle2, MessageCircle, Paperclip, Pencil } from "lucide-react";
 import { parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
 import type { AccountPayable } from "../types/accountPayableTypes";
 
@@ -29,11 +29,13 @@ export function AccountsPayableTable({
   onMarkPaid,
   onEdit,
   onReceiptSelected,
+  onWhatsApp,
 }: {
   accounts: AccountPayable[];
   onMarkPaid?: (id: string) => void;
   onEdit?: (account: AccountPayable) => void;
   onReceiptSelected?: (id: string, file: File) => void;
+  onWhatsApp?: (account: AccountPayable) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -86,6 +88,7 @@ export function AccountsPayableTable({
                       >
                         <CheckCircle2 size={17} />
                       </button>
+                      <button aria-label="Enviar pelo WhatsApp" className="rounded-md border border-slate-200 bg-white p-2 text-emerald-700 hover:bg-emerald-50" onClick={() => onWhatsApp?.(account)} title="Abrir alerta ou confirmação no WhatsApp" type="button"><MessageCircle size={17} /></button>
                       <button
                         aria-label="Anexar comprovante"
                         className="relative rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-100"
