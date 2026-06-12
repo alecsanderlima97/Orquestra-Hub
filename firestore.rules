@@ -16,11 +16,16 @@ service cloud.firestore {
 
     match /tenants/{tenantId} {
       allow read: if belongsToTenant(tenantId);
-      allow write: if false;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isOwner(tenantId);
+      allow delete: if false;
 
       match /users/{userId} {
         allow read: if belongsToTenant(tenantId);
-        allow create: if signedIn() && request.auth.uid == userId;
+        allow create: if signedIn() && request.auth.uid == userId
+          && (get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
+            || (exists(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode))
+              && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.tenantId == tenantId));
         allow update: if isOwner(tenantId) || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
       }
 
@@ -30,6 +35,19 @@ service cloud.firestore {
         allow read: if belongsToTenant(tenantId);
         allow write: if canWrite(tenantId);
       }
+    }
+
+    match /userTenants/{userId}/memberships/{tenantId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn() && request.auth.uid == userId
+        && exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(userId));
+      allow update, delete: if false;
+    }
+
+    match /invites/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && isOwner(request.resource.data.tenantId);
+      allow update, delete: if false;
     }
   }
 }

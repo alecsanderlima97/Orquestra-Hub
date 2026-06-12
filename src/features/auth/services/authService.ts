@@ -1,24 +1,29 @@
 import { createUserWithEmailAndPassword, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
 import { defaultTenantId } from "@/lib/tenant/tenant";
-import type { AppUser } from "../types/authTypes";
+import type { AppUser, CompanyMembership } from "../types/authTypes";
+import { getInvite } from "@/features/users/services/inviteService";
 
-export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta"): AppUser {
+export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub"): AppUser {
   return {
     email: user.email || "",
     id: user.uid,
     name: user.displayName || user.email || "Usuario",
     role,
+    tenantId,
+    companyName,
   };
 }
 
 async function mapUserWithRole(user: User) {
   if (!db) return mapFirebaseUser(user);
-  const snapshot = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
-  const role = snapshot.data()?.role as AppUser["role"] | undefined;
-  return mapFirebaseUser(user, role || "Consulta");
+  const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
+  if (!memberships.empty) { const membership = memberships.docs[0]; const data = membership.data(); const access = await getDoc(doc(db, `${tenantPath(membership.id)}/users/${user.uid}`)); return mapFirebaseUser(user, access.data()?.role || data.role || "Consulta", membership.id, data.companyName || "Empresa"); }
+  const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
+  if (legacy.exists()) return mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub");
+  return mapFirebaseUser(user);
 }
 
 export async function loginWithEmail(email: string, password: string) {
@@ -29,17 +34,31 @@ export async function loginWithEmail(email: string, password: string) {
 
 async function ensureTenantAccess(user: User) {
   if (!db) return;
-  const reference = doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`);
-  const existing = await getDoc(reference);
-  await setDoc(reference, { email: user.email || "", name: user.displayName || user.email || "Usuário", ...(existing.exists() ? {} : { role: "Consulta" }), updatedAt: serverTimestamp() }, { merge: true });
+  const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
+  if (!memberships.empty) return;
+  const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
+  if (legacy.exists()) return;
+  const tenantId = crypto.randomUUID();
+  const companyName = `Empresa de ${user.displayName || "Novo usuário"}`;
+  await setDoc(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, status: "Ativo" });
+  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.uid}`), { email: user.email || "", name: user.displayName || user.email || "Usuário", role: "Dono", userId: user.uid, createdAt: serverTimestamp() });
+  await setDoc(doc(db, `userTenants/${user.uid}/memberships/${tenantId}`), { companyName, role: "Dono", createdAt: serverTimestamp() });
 }
 
-export async function registerWithEmail(name: string, email: string, password: string) {
+export async function registerWithEmail(name: string, companyName: string, email: string, password: string, inviteCode = "") {
   if (!firebaseReady || !auth) return null;
   const credential = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(credential.user, { displayName: name });
-  await ensureTenantAccess(credential.user);
-  return mapUserWithRole(credential.user);
+  const invite = await getInvite(inviteCode);
+  const tenantId = invite?.tenantId || crypto.randomUUID();
+  const finalCompanyName = invite?.companyName || companyName;
+  const role: AppUser["role"] = invite?.role || "Dono";
+  if (!invite) {
+  await setDoc(doc(db!, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: companyName, ownerId: credential.user.uid, status: "Ativo" });
+  }
+  await setDoc(doc(db!, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: inviteCode.toUpperCase(), name, role, userId: credential.user.uid, createdAt: serverTimestamp() });
+  await setDoc(doc(db!, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: finalCompanyName, role, createdAt: serverTimestamp() });
+  return mapFirebaseUser(credential.user, role, tenantId, finalCompanyName);
 }
 
 export async function loginWithGoogle() {
@@ -72,4 +91,11 @@ export function listenAuth(callback: (user: AppUser | null) => void) {
     return () => undefined;
   }
   return onAuthStateChanged(auth, (user) => { if (!user) callback(null); else void mapUserWithRole(user).then(callback); });
+}
+
+export async function listUserCompanies(userId: string): Promise<CompanyMembership[]> {
+  if (!db || !firebaseReady || userId === "demo-user") return [];
+  const firestore = db;
+  const snapshot = await getDocs(collection(firestore, `userTenants/${userId}/memberships`));
+  return Promise.all(snapshot.docs.map(async (membership) => { const access = await getDoc(doc(firestore, `${tenantPath(membership.id)}/users/${userId}`)); return { companyName: membership.data().companyName || "Empresa", role: access.data()?.role || membership.data().role || "Consulta", tenantId: membership.id }; }));
 }

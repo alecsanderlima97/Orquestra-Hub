@@ -17,8 +17,9 @@ import { PaymentConfirmModal } from "@/features/accounts-payable/components/Paym
 import { createAccountPayable, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
-import { listenAuth, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
+import { listenAuth, listUserCompanies, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
 import type { AppUser } from "@/features/auth/types/authTypes";
+import type { CompanyMembership } from "@/features/auth/types/authTypes";
 import { AuditPanel } from "@/features/audit/components/AuditPanel";
 import { BackupPanel } from "@/features/backup/components/BackupPanel";
 import { listAuditLogs, recordAudit } from "@/features/audit/services/auditService";
@@ -46,13 +47,14 @@ import { createStore, listStores, updateStore } from "@/features/stores/services
 import type { Store } from "@/features/stores/types/storeTypes";
 import { UsersPanel } from "@/features/users/components/UsersPanel";
 import { listTenantUsers, updateTenantUserRole } from "@/features/users/services/userService";
+import { createInvite } from "@/features/users/services/inviteService";
 import { SuppliersTable } from "@/features/suppliers/components/SuppliersTable";
 import { createSupplier, listSuppliers, updateSupplier } from "@/features/suppliers/services/supplierService";
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
 import { accountsPayable, purchases, stores, suppliers } from "@/lib/data/mockData";
 import { firebaseReady } from "@/lib/firebase/config";
 import { compareDateBR, formatCnpj, formatPhone, nowDateTimeBR, parseBRL, toTitleCaseBR } from "@/lib/formatters/br";
-import { defaultTenantId } from "@/lib/tenant/tenant";
+import { defaultTenantId as legacyTenantId } from "@/lib/tenant/tenant";
 
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 const demoUserId = "demo-user";
@@ -70,6 +72,8 @@ function addMonths(date: string, months: number) {
 
 export function OrquestraHubApp() {
   const [user, setUser] = useState<AppUser | null>(null);
+  const [companies, setCompanies] = useState<CompanyMembership[]>([]);
+  const defaultTenantId = user?.tenantId || legacyTenantId;
   const [authChecked, setAuthChecked] = useState(!firebaseReady);
   const [storeList, setStoreList] = useState<Store[]>(stores);
   const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers);
@@ -119,6 +123,7 @@ export function OrquestraHubApp() {
   useEffect(() => {
     const unsubscribe = listenAuth((currentUser) => {
       setUser(currentUser);
+      if (currentUser) void listUserCompanies(currentUser.id).then(setCompanies);
       setAuthChecked(true);
     });
     return unsubscribe;
@@ -135,7 +140,7 @@ export function OrquestraHubApp() {
           listPurchases(defaultTenantId),
           listFixedExpenses(defaultTenantId),
           user?.role === "Dono" ? listAuditLogs(defaultTenantId) : Promise.resolve([]),
-          user?.role === "Dono" ? listTenantUsers(defaultTenantId) : Promise.resolve([]),
+          user?.role === "Dono" ? listTenantUsers(defaultTenantId, user.companyName) : Promise.resolve([]),
         ]);
         setStoreList(firebaseStores);
         setSupplierList(firebaseSuppliers);
@@ -149,7 +154,7 @@ export function OrquestraHubApp() {
       }
     }
     void loadFirebaseData();
-  }, [user]);
+  }, [user, defaultTenantId]);
 
   const openTotal = accountList.filter((item) => item.status !== "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const paidTotal = accountList.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
@@ -396,6 +401,10 @@ export function OrquestraHubApp() {
     await recordAudit(defaultTenantId, user, "editou", "permissão de usuário", id);
   }
 
+  async function generateInvite(role: AppUser["role"]) {
+    return createInvite(defaultTenantId, user?.companyName || "Empresa", role);
+  }
+
   function exportFilteredAccounts() {
     const header = ["Fornecedor", "Loja", "Parcela", "Vencimento", "Valor", "Status", "Pago em", "Comprovante"];
     const rows = filteredAccounts.map((account) => [
@@ -455,6 +464,11 @@ export function OrquestraHubApp() {
     setUser(null);
   }
 
+  function changeCompany(tenantId: string) {
+    const company = companies.find((item) => item.tenantId === tenantId);
+    if (company) setUser((current) => current ? { ...current, ...company } : current);
+  }
+
   if (!authChecked) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100 text-sm font-medium text-slate-600">
@@ -466,7 +480,7 @@ export function OrquestraHubApp() {
   if (!user) return <LoginScreen onLogin={setUser} />;
 
   return (
-    <AppShell onLogout={handleLogout} user={user}>
+    <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} user={user}>
       <div className="space-y-8 px-5 py-6 sm:px-8">
         <Section description="Visao rapida do mes e dos pagamentos." id="dashboard" title="Dashboard">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -578,7 +592,7 @@ export function OrquestraHubApp() {
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
         <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile user={user} /></Section>
-        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings />{user.role === "Dono" ? <div className="mt-5 space-y-5"><UsersPanel onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
+        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings />{user.role === "Dono" ? <div className="mt-5 space-y-5"><UsersPanel onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
       </div>
       <PaymentConfirmModal
         account={paymentToConfirm}

@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import type { AppUser } from "@/features/auth/types/authTypes";
+import type { CompanyMembership } from "@/features/auth/types/authTypes";
 
 const navigation = [
   { description: "Visão geral dos indicadores e próximos vencimentos.", id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -33,10 +34,14 @@ export function AppShell({
   children,
   onLogout,
   user,
+  companies = [],
+  onCompanyChange,
 }: {
   children: ReactNode;
   onLogout?: () => void;
   user?: AppUser | null;
+  companies?: CompanyMembership[];
+  onCompanyChange?: (tenantId: string) => void;
 }) {
   const [activeSection, setActiveSection] = useState(navigation[0].id);
 
@@ -111,7 +116,7 @@ export function AppShell({
         <header className="border-b border-slate-200 bg-white px-5 py-5 sm:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Plataforma modular de gestão empresarial</p>
+              <p className="text-sm font-medium text-slate-500">{user?.companyName || "Plataforma modular de gestão empresarial"}</p>
               <h2 className="mt-1 text-2xl font-semibold">Controle financeiro</h2>
             </div>
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -121,6 +126,7 @@ export function AppShell({
                   <span>{user.role}</span>
                 </div>
               ) : null}
+              {companies.length > 1 ? <select aria-label="Empresa ativa" className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => onCompanyChange?.(event.target.value)} value={user?.tenantId}>{companies.map((company) => <option key={company.tenantId} value={company.tenantId}>{company.companyName}</option>)}</select> : null}
               <a
                 className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 md:w-auto"
                 href="#compras"
