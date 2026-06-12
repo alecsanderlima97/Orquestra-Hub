@@ -47,16 +47,20 @@ async function ensureTenantAccess(user: User) {
 
 export async function registerWithEmail(name: string, companyName: string, email: string, password: string, inviteCode = "") {
   if (!firebaseReady || !auth) return null;
+  const normalizedInviteCode = inviteCode.trim().toUpperCase();
+  const invite = await getInvite(normalizedInviteCode);
+  if (normalizedInviteCode && !invite) throw new Error("invite-invalid");
+  if (!name.trim()) throw new Error("name-required");
+  if (!invite && !companyName.trim()) throw new Error("company-required");
   const credential = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(credential.user, { displayName: name });
-  const invite = await getInvite(inviteCode);
+  await updateProfile(credential.user, { displayName: name.trim() });
   const tenantId = invite?.tenantId || crypto.randomUUID();
-  const finalCompanyName = invite?.companyName || companyName;
+  const finalCompanyName = invite?.companyName || companyName.trim();
   const role: AppUser["role"] = invite?.role || "Dono";
   if (!invite) {
-  await setDoc(doc(db!, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: companyName, ownerId: credential.user.uid, status: "Ativo" });
+  await setDoc(doc(db!, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: finalCompanyName, ownerId: credential.user.uid, status: "Ativo" });
   }
-  await setDoc(doc(db!, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: inviteCode.toUpperCase(), name, role, userId: credential.user.uid, createdAt: serverTimestamp() });
+  await setDoc(doc(db!, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: normalizedInviteCode, name: name.trim(), role, userId: credential.user.uid, createdAt: serverTimestamp() });
   await setDoc(doc(db!, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: finalCompanyName, role, createdAt: serverTimestamp() });
   return mapFirebaseUser(credential.user, role, tenantId, finalCompanyName);
 }
