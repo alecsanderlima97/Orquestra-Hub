@@ -1,5 +1,3 @@
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -7,9 +5,10 @@ export const dynamic = "force-dynamic";
 
 const attempts = new Map<string, number>();
 
-function adminAuth() {
+async function adminAuth() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) return null;
+  const [{ cert, getApps, initializeApp }, { getAuth }] = await Promise.all([import("firebase-admin/app"), import("firebase-admin/auth")]);
   let parsed: unknown = JSON.parse(raw.trim());
   if (typeof parsed === "string") parsed = JSON.parse(parsed);
   const serviceAccount = parsed as { client_email: string; private_key: string; project_id: string };
@@ -26,7 +25,7 @@ export async function POST(request: Request) {
   const { email } = await request.json();
   if (!email || typeof email !== "string") return NextResponse.json({ error: "Informe um e-mail válido." }, { status: 400 });
   let auth;
-  try { auth = adminAuth(); } catch (error) {
+  try { auth = await adminAuth(); } catch (error) {
     console.error("firebase-service-account", error);
     return NextResponse.json({ error: "A credencial do Firebase está com formato inválido na Vercel." }, { status: 503 });
   }
