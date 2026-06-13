@@ -7,6 +7,7 @@ const attempts = new Map<string, number>();
 
 export async function GET() {
   let firebaseJsonValid = false;
+  let adminError = "";
   try {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     if (raw) {
@@ -16,7 +17,8 @@ export async function GET() {
       firebaseJsonValid = Boolean(value.client_email && value.private_key && value.project_id);
     }
   } catch { firebaseJsonValid = false; }
-  return NextResponse.json({ firebaseConfigured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON), firebaseJsonValid, resendConfigured: Boolean(process.env.RESEND_API_KEY) });
+  try { await adminAuth(); } catch (error) { adminError = error instanceof Error ? error.message.replace(/[A-Za-z0-9+/=_-]{40,}/g, "[oculto]") : "Erro desconhecido"; }
+  return NextResponse.json({ adminError, firebaseConfigured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON), firebaseJsonValid, resendConfigured: Boolean(process.env.RESEND_API_KEY) });
 }
 
 async function adminAuth() {
