@@ -5,6 +5,20 @@ export const dynamic = "force-dynamic";
 
 const attempts = new Map<string, number>();
 
+export async function GET() {
+  let firebaseJsonValid = false;
+  try {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (raw) {
+      let parsed: unknown = JSON.parse(raw.trim());
+      if (typeof parsed === "string") parsed = JSON.parse(parsed);
+      const value = parsed as { client_email?: string; private_key?: string; project_id?: string };
+      firebaseJsonValid = Boolean(value.client_email && value.private_key && value.project_id);
+    }
+  } catch { firebaseJsonValid = false; }
+  return NextResponse.json({ firebaseConfigured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON), firebaseJsonValid, resendConfigured: Boolean(process.env.RESEND_API_KEY) });
+}
+
 async function adminAuth() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) return null;
