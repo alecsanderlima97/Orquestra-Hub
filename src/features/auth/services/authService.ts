@@ -155,5 +155,5 @@ export async function listUserCompanies(userId: string): Promise<CompanyMembersh
   const firestore = db;
   const snapshot = await getDocs(collection(firestore, `userTenants/${userId}/memberships`));
   const currentEmail = auth?.currentUser?.email?.toLowerCase() || "";
-  return Promise.all(snapshot.docs.map(async (membership) => { const access = await getDoc(doc(firestore, `${tenantPath(membership.id)}/users/${userId}`)); const role = platformOwnerEmails.has(currentEmail) ? "Proprietário" : access.data()?.role || membership.data().role || "Consulta"; return { companyName: membership.data().companyName || "Empresa", role: role === "Dono" ? "Proprietário" : role, tenantId: membership.id }; }));
+  return Promise.all(snapshot.docs.map(async (membership) => { const access = await getDoc(doc(firestore, `${tenantPath(membership.id)}/users/${userId}`)); const tenant = await getDoc(doc(firestore, tenantPath(membership.id))); const role = platformOwnerEmails.has(currentEmail) || tenant.data()?.ownerId === userId ? "Proprietário" : access.data()?.role || membership.data().role || "Consulta"; return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", role: role === "Dono" ? "Proprietário" : role, tenantId: membership.id }; }));
 }

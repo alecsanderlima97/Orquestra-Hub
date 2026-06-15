@@ -45,8 +45,8 @@ import { FinancialReports } from "@/features/reports/components/FinancialReports
 import { PrivacyPanel } from "@/features/privacy/components/PrivacyPanel";
 import { UserProfile } from "@/features/profile/components/UserProfile";
 import { SystemSettings } from "@/features/settings/components/SystemSettings";
-import { GettingStartedPanel } from "@/features/settings/components/GettingStartedPanel";
 import { FirstAccessOnboarding } from "@/features/onboarding/components/FirstAccessOnboarding";
+import { GuideAssistant } from "@/features/onboarding/components/GuideAssistant";
 import { StoreForm } from "@/features/stores/components/StoreForm";
 import type { StoreFormState } from "@/features/stores/components/StoreForm";
 import { StoresPanel } from "@/features/stores/components/StoresPanel";
@@ -625,7 +625,7 @@ export function OrquestraHubApp() {
           {canWrite ? <div className="mb-4 flex justify-end">
             <button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowStoreForm((visible) => !visible)} type="button">
               {showStoreForm ? <X size={18} /> : <Plus size={18} />}
-              {showStoreForm ? "Cancelar cadastro" : "Cadastrar nova loja"}
+              {showStoreForm ? "Cancelar cadastro" : "Cadastrar nova unidade"}
             </button>
           </div> : null}
           {showStoreForm ? <StoreForm error={formErrors.store} form={storeForm} onChange={setStoreForm} onPhotoChange={setStorePhoto} onSubmit={addStore} photo={storePhoto} /> : null}
@@ -734,8 +734,9 @@ export function OrquestraHubApp() {
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
         <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile user={user} /></Section>
-        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings /><div className="mt-5"><GettingStartedPanel /></div><div className="mt-5"><PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} /></div>{canManageUsers(user.role) ? <div className="mt-5 space-y-5"><CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} /><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
+        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings /><div className="mt-5"><PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} /></div>{canManageUsers(user.role) ? <div className="mt-5 space-y-5"><CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} /><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
       </div>
+      {user.id !== demoUserId ? <GuideAssistant userId={user.id} /> : null}
       <PaymentConfirmModal
         account={paymentToConfirm}
         onCancel={() => setPaymentToConfirm(null)}
