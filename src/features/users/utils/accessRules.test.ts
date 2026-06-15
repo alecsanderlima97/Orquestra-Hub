@@ -11,13 +11,16 @@ describe("regras de acesso", () => {
     expect(canWrite("Consulta")).toBe(false);
     expect(canWrite("Financeiro")).toBe(true);
     expect(canWrite("Dono")).toBe(true);
+    expect(canWrite("Proprietário")).toBe(true);
     expect(canManageUsers("Financeiro")).toBe(false);
     expect(canManageUsers("Dono")).toBe(true);
+    expect(canManageUsers("Proprietário")).toBe(true);
   });
 
   it("bloqueia a remoção do último dono", () => {
     expect(wouldRemoveLastOwner([user("1", "Dono"), user("2", "Financeiro")], "1", "Consulta")).toBe(true);
     expect(wouldRemoveLastOwner([user("1", "Dono"), user("2", "Dono")], "1", "Consulta")).toBe(false);
+    expect(wouldRemoveLastOwner([user("1", "Proprietário"), user("2", "Proprietário")], "1", "Consulta")).toBe(false);
   });
 
   it("aceita apenas convite ativo e não vencido", () => {

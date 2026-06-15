@@ -26,6 +26,8 @@ import { listAuditLogs, recordAudit } from "@/features/audit/services/auditServi
 import type { AuditLog } from "@/features/audit/types/auditTypes";
 import { PaymentsTable } from "@/features/dashboard/components/PaymentsTable";
 import { MonthlyCashFlow } from "@/features/dashboard/components/MonthlyCashFlow";
+import { CompaniesPanel } from "@/features/companies/components/CompaniesPanel";
+import { createCompany } from "@/features/companies/services/companyService";
 import { SummaryCard } from "@/features/dashboard/components/SummaryCard";
 import { FinancialAlertsPanel } from "@/features/dashboard/components/FinancialAlertsPanel";
 import { buildFinancialAlerts, type FinancialAlert } from "@/features/dashboard/utils/financialAlerts";
@@ -40,6 +42,7 @@ import { createPurchaseWithAccounts, listPurchases, updatePurchase } from "@/fea
 import { deletePurchaseAttachment, uploadPurchaseAttachment } from "@/features/purchases/services/purchaseAttachmentService";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import { FinancialReports } from "@/features/reports/components/FinancialReports";
+import { PrivacyPanel } from "@/features/privacy/components/PrivacyPanel";
 import { UserProfile } from "@/features/profile/components/UserProfile";
 import { SystemSettings } from "@/features/settings/components/SystemSettings";
 import { StoreForm } from "@/features/stores/components/StoreForm";
@@ -50,7 +53,7 @@ import type { Store } from "@/features/stores/types/storeTypes";
 import { UsersPanel } from "@/features/users/components/UsersPanel";
 import { listTenantUsers, updateTenantUserRole } from "@/features/users/services/userService";
 import { cancelInvite, createInvite, listInvites, type Invite } from "@/features/users/services/inviteService";
-import { canWrite as roleCanWrite, wouldRemoveLastOwner } from "@/features/users/utils/accessRules";
+import { canManageUsers, canWrite as roleCanWrite, wouldRemoveLastOwner } from "@/features/users/utils/accessRules";
 import { SuppliersTable } from "@/features/suppliers/components/SuppliersTable";
 import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from "@/features/suppliers/services/supplierService";
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
@@ -154,9 +157,9 @@ export function OrquestraHubApp() {
           listAccountsPayable(defaultTenantId),
           listPurchases(defaultTenantId),
           listFixedExpenses(defaultTenantId),
-          user?.role === "Dono" ? listAuditLogs(defaultTenantId) : Promise.resolve([]),
-          user?.role === "Dono" ? listTenantUsers(defaultTenantId, user.companyName) : Promise.resolve([]),
-          user?.role === "Dono" ? listInvites(defaultTenantId) : Promise.resolve([]),
+          user && canManageUsers(user.role) ? listAuditLogs(defaultTenantId) : Promise.resolve([]),
+          user && canManageUsers(user.role) ? listTenantUsers(defaultTenantId, user.companyName) : Promise.resolve([]),
+          user && canManageUsers(user.role) ? listInvites(defaultTenantId) : Promise.resolve([]),
         ]);
         setStoreList(firebaseStores);
         setSupplierList(firebaseSuppliers);
@@ -470,7 +473,7 @@ export function OrquestraHubApp() {
 
   async function changeUserRole(id: string, role: AppUser["role"]) {
     if (wouldRemoveLastOwner(tenantUsers, id, role)) {
-      window.alert("A empresa precisa manter pelo menos um usuário com perfil Dono.");
+      window.alert("A empresa precisa manter pelo menos um usuário com perfil Proprietário.");
       return;
     }
     await updateTenantUserRole(defaultTenantId, id, role);
@@ -547,9 +550,37 @@ export function OrquestraHubApp() {
     setUser(null);
   }
 
+  function activateCompany(company?: CompanyMembership) {
+    if (company && company.tenantId !== user?.tenantId) {
+      setStoreList([]);
+      setSupplierList([]);
+      setPurchaseList([]);
+      setAccountList([]);
+      setFixedExpenses([]);
+      setAuditLogs([]);
+      setTenantUsers([]);
+      setInvites([]);
+      setUser((current) => {
+      if (!current) return current;
+      const updated = { ...current, ...company };
+      window.localStorage.setItem("orquestra-user", JSON.stringify(updated));
+      return updated;
+      });
+    }
+  }
+
   function changeCompany(tenantId: string) {
     const company = companies.find((item) => item.tenantId === tenantId);
-    if (company) setUser((current) => current ? { ...current, ...company } : current);
+    activateCompany(company);
+    if (company && user) void recordAudit(company.tenantId, { ...user, ...company }, "editou", "empresa ativa", company.tenantId);
+  }
+
+  async function addCompany(name: string) {
+    if (!user) return;
+    const company = await createCompany(user, name);
+    setCompanies((items) => [...items, company]);
+    activateCompany(company);
+    await recordAudit(company.tenantId, { ...user, ...company }, "criou", "empresa", company.tenantId);
   }
 
   if (!authChecked) {
@@ -693,7 +724,7 @@ export function OrquestraHubApp() {
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
         <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile user={user} /></Section>
-        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings />{user.role === "Dono" ? <div className="mt-5 space-y-5"><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
+        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings /><div className="mt-5"><PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} /></div>{canManageUsers(user.role) ? <div className="mt-5 space-y-5"><CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} /><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
       </div>
       <PaymentConfirmModal
         account={paymentToConfirm}

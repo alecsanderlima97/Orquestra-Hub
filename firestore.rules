@@ -12,8 +12,8 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid));
     }
     function role(tenantId) { return get(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid)).data.role; }
-    function canWrite(tenantId) { return isPlatformOwner() || (belongsToTenant(tenantId) && role(tenantId) in ['Dono', 'Financeiro']); }
-    function isOwner(tenantId) { return isPlatformOwner() || (belongsToTenant(tenantId) && role(tenantId) == 'Dono'); }
+    function canWrite(tenantId) { return isPlatformOwner() || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono', 'Financeiro']); }
+    function isOwner(tenantId) { return isPlatformOwner() || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono']); }
 
     match /tenants/{tenantId} {
       allow read: if belongsToTenant(tenantId);
@@ -33,6 +33,7 @@ service cloud.firestore {
       }
 
       match /auditLogs/{logId} { allow read: if isOwner(tenantId); allow create: if canWrite(tenantId); allow update, delete: if false; }
+      match /privacyRequests/{requestId} { allow read: if isOwner(tenantId) || resource.data.userId == request.auth.uid; allow create: if belongsToTenant(tenantId) && request.resource.data.userId == request.auth.uid; allow update, delete: if false; }
 
       match /{document=**} {
         allow read: if belongsToTenant(tenantId);

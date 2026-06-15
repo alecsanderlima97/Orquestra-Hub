@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { authorizeTenant } from "@/lib/firebase/admin";
+import { tenantFromAttachmentPath } from "@/lib/firebase/tenantSecurity";
+
+export const runtime = "nodejs";
 
 const bucket = "orquestra-documentos";
 const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
@@ -20,6 +24,7 @@ export async function POST(request: Request) {
   const purchaseId = String(data.get("purchaseId") || "");
   const category = String(data.get("category") || "");
   if (!(file instanceof File) || !tenantId || !purchaseId || !["boletos", "notas-fiscais", "lojas", "comprovantes"].includes(category)) return NextResponse.json({ error: "Dados do anexo inválidos." }, { status: 400 });
+  try { if (!await authorizeTenant(request, tenantId)) return NextResponse.json({ error: "Acesso negado para esta empresa." }, { status: 403 }); } catch { return NextResponse.json({ error: "Sessão inválida ou expirada." }, { status: 401 }); }
   if (!allowedTypes.has(file.type) || file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "Envie PDF ou imagem com até 10 MB." }, { status: 400 });
 
   const buckets = await supabase.storage.listBuckets();
@@ -38,6 +43,9 @@ export async function DELETE(request: Request) {
   if (!supabase) return NextResponse.json({ error: "Armazenamento ainda não configurado." }, { status: 503 });
   const { path } = await request.json();
   if (!path || typeof path !== "string") return NextResponse.json({ error: "Caminho inválido." }, { status: 400 });
+  const tenantId = tenantFromAttachmentPath(path);
+  if (!tenantId) return NextResponse.json({ error: "Caminho inválido." }, { status: 400 });
+  try { if (!await authorizeTenant(request, tenantId)) return NextResponse.json({ error: "Acesso negado para esta empresa." }, { status: 403 }); } catch { return NextResponse.json({ error: "Sessão inválida ou expirada." }, { status: 401 }); }
   const result = await supabase.storage.from(bucket).remove([path]);
   if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

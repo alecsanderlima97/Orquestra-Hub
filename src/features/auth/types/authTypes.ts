@@ -2,7 +2,7 @@ export type AppUser = {
   email: string;
   id: string;
   name: string;
-  role: "Dono" | "Financeiro" | "Consulta";
+  role: "Proprietário" | "Dono" | "Financeiro" | "Consulta";
   tenantId: string;
   companyName: string;
 };

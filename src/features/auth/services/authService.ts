@@ -9,7 +9,7 @@ import { consumeInvite, getInvite } from "@/features/users/services/inviteServic
 const platformOwnerEmails = new Set(["limaalecsander@gmail.com"]);
 
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub"): AppUser {
-  const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) ? "Dono" : role;
+  const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) ? "Proprietário" : role === "Dono" ? "Proprietário" : role;
   return {
     email: user.email || "",
     id: user.uid,
@@ -30,14 +30,14 @@ function cachedUser(user: User) {
   try {
     const cached = JSON.parse(window.localStorage.getItem("orquestra-user") || "null") as AppUser | null;
     if (cached?.id !== user.uid) return null;
-    return platformOwnerEmails.has((user.email || "").toLowerCase()) ? { ...cached, role: "Dono" as const } : cached;
+    return platformOwnerEmails.has((user.email || "").toLowerCase()) || cached.role === "Dono" ? { ...cached, role: "Proprietário" as const } : cached;
   } catch { return null; }
 }
 
 async function mapUserWithRole(user: User) {
   if (!db) return mapFirebaseUser(user);
   const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
-  if (!memberships.empty) { const membership = memberships.docs[0]; const data = membership.data(); const access = await getDoc(doc(db, `${tenantPath(membership.id)}/users/${user.uid}`)); const role = platformOwnerEmails.has((user.email || "").toLowerCase()) ? "Dono" : access.data()?.role || data.role || "Consulta"; return mapFirebaseUser(user, role, membership.id, data.companyName || "Empresa"); }
+  if (!memberships.empty) { const membership = memberships.docs[0]; const data = membership.data(); const access = await getDoc(doc(db, `${tenantPath(membership.id)}/users/${user.uid}`)); const role = platformOwnerEmails.has((user.email || "").toLowerCase()) ? "Proprietário" : access.data()?.role || data.role || "Consulta"; return mapFirebaseUser(user, role, membership.id, data.companyName || "Empresa"); }
   const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
   if (legacy.exists()) return mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub");
   return mapFirebaseUser(user);
@@ -59,14 +59,15 @@ async function ensureTenantAccess(user: User) {
   const tenantId = crypto.randomUUID();
   const companyName = `Empresa de ${user.displayName || "Novo usuário"}`;
   await setDoc(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, status: "Ativo" });
-  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.uid}`), { email: user.email || "", name: user.displayName || user.email || "Usuário", role: "Dono", userId: user.uid, createdAt: serverTimestamp() });
-  await setDoc(doc(db, `userTenants/${user.uid}/memberships/${tenantId}`), { companyName, role: "Dono", createdAt: serverTimestamp() });
+  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.uid}`), { email: user.email || "", name: user.displayName || user.email || "Usuário", role: "Proprietário", userId: user.uid, createdAt: serverTimestamp() });
+  await setDoc(doc(db, `userTenants/${user.uid}/memberships/${tenantId}`), { companyName, role: "Proprietário", createdAt: serverTimestamp() });
 }
 
-export async function registerWithEmail(name: string, companyName: string, email: string, password: string, inviteCode = "") {
+export async function registerWithEmail(name: string, companyName: string, email: string, password: string, inviteCode = "", acceptedTerms = false) {
   if (!firebaseReady || !auth || !db) return null;
   const normalizedInviteCode = inviteCode.trim().toUpperCase();
   if (!name.trim()) throw new Error("name-required");
+  if (!acceptedTerms) throw new Error("consent-required");
   if (!normalizedInviteCode && !companyName.trim()) throw new Error("company-required");
   const credential = await createUserWithEmailAndPassword(auth, email, password);
   try {
@@ -75,10 +76,10 @@ export async function registerWithEmail(name: string, companyName: string, email
     if (normalizedInviteCode && !invite) throw new Error("invite-invalid");
     const tenantId = invite?.tenantId || crypto.randomUUID();
     const finalCompanyName = invite?.companyName || companyName.trim();
-    const role: AppUser["role"] = invite?.role || "Dono";
+    const role: AppUser["role"] = invite?.role || "Proprietário";
     if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: finalCompanyName, ownerId: credential.user.uid, status: "Ativo" });
     try {
-      await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: normalizedInviteCode, name: name.trim(), role, userId: credential.user.uid, createdAt: serverTimestamp() });
+      await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email, inviteCode: normalizedInviteCode, name: name.trim(), role, userId: credential.user.uid, createdAt: serverTimestamp() });
       await setDoc(doc(db, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: finalCompanyName, role, createdAt: serverTimestamp() });
       if (invite) await consumeInvite(normalizedInviteCode, credential.user.uid);
     } catch (error) {
@@ -140,5 +141,5 @@ export async function listUserCompanies(userId: string): Promise<CompanyMembersh
   const firestore = db;
   const snapshot = await getDocs(collection(firestore, `userTenants/${userId}/memberships`));
   const currentEmail = auth?.currentUser?.email?.toLowerCase() || "";
-  return Promise.all(snapshot.docs.map(async (membership) => { const access = await getDoc(doc(firestore, `${tenantPath(membership.id)}/users/${userId}`)); return { companyName: membership.data().companyName || "Empresa", role: platformOwnerEmails.has(currentEmail) ? "Dono" : access.data()?.role || membership.data().role || "Consulta", tenantId: membership.id }; }));
+  return Promise.all(snapshot.docs.map(async (membership) => { const access = await getDoc(doc(firestore, `${tenantPath(membership.id)}/users/${userId}`)); const role = platformOwnerEmails.has(currentEmail) ? "Proprietário" : access.data()?.role || membership.data().role || "Consulta"; return { companyName: membership.data().companyName || "Empresa", role: role === "Dono" ? "Proprietário" : role, tenantId: membership.id }; }));
 }

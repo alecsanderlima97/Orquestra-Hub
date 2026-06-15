@@ -1,0 +1,12 @@
+"use client";
+
+import { Building2, Plus } from "lucide-react";
+import { useState } from "react";
+import type { CompanyMembership } from "@/features/auth/types/authTypes";
+import { TextField } from "@/components/ui/TextField";
+
+export function CompaniesPanel({ companies, currentTenantId, onCreate, onSelect }: { companies: CompanyMembership[]; currentTenantId: string; onCreate: (name: string) => Promise<void>; onSelect: (tenantId: string) => void }) {
+  const [name, setName] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  async function submit() { if (!name.trim()) { setError("Informe o nome da empresa."); return; } setLoading(true); setError(""); try { await onCreate(name); setName(""); } catch (cause) { setError(cause instanceof Error ? cause.message : "Não foi possível criar a empresa."); } finally { setLoading(false); } }
+  return <section className="rounded-lg border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h3 className="font-semibold">Empresas vinculadas</h3><p className="mt-1 text-sm text-slate-500">Cada empresa possui dados, usuários e permissões independentes.</p></div><div className="grid gap-5 p-5 lg:grid-cols-[1fr_360px]"><div className="space-y-2">{companies.map((company) => <button className={`flex w-full items-center justify-between rounded-md border p-4 text-left ${company.tenantId === currentTenantId ? "border-amber-300 bg-amber-50" : "border-slate-200 hover:bg-slate-50"}`} key={company.tenantId} onClick={() => onSelect(company.tenantId)} type="button"><span className="flex items-center gap-3"><Building2 size={19} /><span><strong className="block">{company.companyName}</strong><small className="text-slate-500">{company.role === "Dono" ? "Proprietário" : company.role}</small></span></span>{company.tenantId === currentTenantId ? <small className="font-semibold text-amber-800">Empresa atual</small> : null}</button>)}</div><div><TextField label="Nova empresa" onChange={(event) => setName(event.target.value)} placeholder="Nome da empresa" value={name} />{error ? <p className="mt-2 text-sm text-rose-700">{error}</p> : null}<button className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={loading} onClick={submit} type="button"><Plus size={17} />{loading ? "Criando..." : "Criar nova empresa"}</button></div></div></section>;
+}
