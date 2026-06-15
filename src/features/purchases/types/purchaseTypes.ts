@@ -7,7 +7,7 @@ export type Purchase = {
   issueDate: string;
   total: string;
   installments: number;
-  invoiceAttachment?: PurchaseAttachment;
+  invoiceAttachment?: PurchaseAttachment | null;
   boletoAttachments?: PurchaseAttachment[];
 };
 

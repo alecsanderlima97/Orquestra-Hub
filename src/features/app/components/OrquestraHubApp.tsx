@@ -27,6 +27,8 @@ import type { AuditLog } from "@/features/audit/types/auditTypes";
 import { PaymentsTable } from "@/features/dashboard/components/PaymentsTable";
 import { MonthlyCashFlow } from "@/features/dashboard/components/MonthlyCashFlow";
 import { SummaryCard } from "@/features/dashboard/components/SummaryCard";
+import { FinancialAlertsPanel } from "@/features/dashboard/components/FinancialAlertsPanel";
+import { buildFinancialAlerts, type FinancialAlert } from "@/features/dashboard/utils/financialAlerts";
 import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes";
 import { FixedExpensesPanel, type FixedExpenseForm } from "@/features/fixed-expenses/components/FixedExpensesPanel";
 import { createFixedExpense, listFixedExpenses } from "@/features/fixed-expenses/services/fixedExpenseService";
@@ -35,7 +37,7 @@ import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
 import type { PurchaseFormState } from "@/features/purchases/components/PurchaseForm";
 import { PurchasesTable } from "@/features/purchases/components/PurchasesTable";
 import { createPurchaseWithAccounts, listPurchases, updatePurchase } from "@/features/purchases/services/purchaseService";
-import { uploadPurchaseAttachment } from "@/features/purchases/services/purchaseAttachmentService";
+import { deletePurchaseAttachment, uploadPurchaseAttachment } from "@/features/purchases/services/purchaseAttachmentService";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import { FinancialReports } from "@/features/reports/components/FinancialReports";
 import { UserProfile } from "@/features/profile/components/UserProfile";
@@ -47,7 +49,8 @@ import { createStore, listStores, updateStore } from "@/features/stores/services
 import type { Store } from "@/features/stores/types/storeTypes";
 import { UsersPanel } from "@/features/users/components/UsersPanel";
 import { listTenantUsers, updateTenantUserRole } from "@/features/users/services/userService";
-import { createInvite } from "@/features/users/services/inviteService";
+import { cancelInvite, createInvite, listInvites, type Invite } from "@/features/users/services/inviteService";
+import { canWrite as roleCanWrite, wouldRemoveLastOwner } from "@/features/users/utils/accessRules";
 import { SuppliersTable } from "@/features/suppliers/components/SuppliersTable";
 import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from "@/features/suppliers/services/supplierService";
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
@@ -82,6 +85,7 @@ export function OrquestraHubApp() {
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [tenantUsers, setTenantUsers] = useState<AppUser[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
   const [fixedExpenseForm, setFixedExpenseForm] = useState<FixedExpenseForm>({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: stores[0]?.name || "" });
   const [accountFilters, setAccountFilters] = useState<AccountFilters>({ status: "Todos", store: "Todas", supplier: "Todos" });
   const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
@@ -144,7 +148,7 @@ export function OrquestraHubApp() {
     if (!firebaseReady || !user || user.id === demoUserId) return;
     async function loadFirebaseData() {
       try {
-        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseAuditLogs, firebaseUsers] = await Promise.all([
+        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseAuditLogs, firebaseUsers, firebaseInvites] = await Promise.all([
           listStores(defaultTenantId),
           listSuppliers(defaultTenantId),
           listAccountsPayable(defaultTenantId),
@@ -152,6 +156,7 @@ export function OrquestraHubApp() {
           listFixedExpenses(defaultTenantId),
           user?.role === "Dono" ? listAuditLogs(defaultTenantId) : Promise.resolve([]),
           user?.role === "Dono" ? listTenantUsers(defaultTenantId, user.companyName) : Promise.resolve([]),
+          user?.role === "Dono" ? listInvites(defaultTenantId) : Promise.resolve([]),
         ]);
         setStoreList(firebaseStores);
         setSupplierList(firebaseSuppliers);
@@ -160,6 +165,7 @@ export function OrquestraHubApp() {
         setFixedExpenses(firebaseFixedExpenses);
         setAuditLogs(firebaseAuditLogs);
         setTenantUsers(firebaseUsers);
+        setInvites(firebaseInvites);
       } catch {
         setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível carregar dados do Firebase." }));
       }
@@ -170,8 +176,7 @@ export function OrquestraHubApp() {
   const openTotal = accountList.filter((item) => item.status !== "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const paidTotal = accountList.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const overdueTotal = accountList.filter((item) => item.status === "Atrasado").reduce((total, item) => total + parseMoney(item.amount), 0);
-  const today = new Date();
-  const fixedExpenseAlerts = fixedExpenses.filter((item) => item.active && item.dueDay - today.getDate() <= item.alertDays && item.dueDay >= today.getDate());
+  const financialAlerts = buildFinancialAlerts(accountList, fixedExpenses);
   const filteredAccounts = accountList
     .filter((account) => {
       const statusMatch = accountFilters.status === "Todos" || account.status === accountFilters.status;
@@ -410,30 +415,77 @@ export function OrquestraHubApp() {
   }
 
   async function handleReceiptSelected(id: string, file: File) {
+    const currentAccount = accountList.find((account) => account.id === id);
     const attachment = await uploadPurchaseAttachment(defaultTenantId, id, "comprovantes", file);
-    const updates = { receiptName: attachment.name, receiptUrl: attachment.url };
+    const updates = { receiptName: attachment.name, receiptPath: attachment.path, receiptUrl: attachment.url };
     if (firebaseReady && user?.id !== demoUserId) await updateAccountPayable(defaultTenantId, id, updates);
     setAccountList((current) => current.map((account) => (account.id === id ? { ...account, ...updates } : account)));
+    if (currentAccount?.receiptPath && currentAccount.receiptPath !== attachment.path) await deletePurchaseAttachment(currentAccount.receiptPath);
     await recordAudit(defaultTenantId, user, "anexou", "comprovante", id);
+  }
+
+  async function replaceInvoiceAttachment(purchase: Purchase, file: File) {
+    const attachment = await uploadPurchaseAttachment(defaultTenantId, purchase.id, "notas-fiscais", file);
+    if (firebaseReady && user?.id !== demoUserId) await updatePurchase(defaultTenantId, purchase.id, { invoiceAttachment: attachment });
+    setPurchaseList((items) => items.map((item) => item.id === purchase.id ? { ...item, invoiceAttachment: attachment } : item));
+    if (purchase.invoiceAttachment?.path && purchase.invoiceAttachment.path !== attachment.path) await deletePurchaseAttachment(purchase.invoiceAttachment.path);
+    await recordAudit(defaultTenantId, user, "editou", "anexo da nota fiscal", purchase.id);
+  }
+
+  async function removeInvoiceAttachment(purchase: Purchase) {
+    if (!purchase.invoiceAttachment?.path || !window.confirm("Excluir o anexo desta nota fiscal?")) return;
+    if (firebaseReady && user?.id !== demoUserId) await updatePurchase(defaultTenantId, purchase.id, { invoiceAttachment: null });
+    await deletePurchaseAttachment(purchase.invoiceAttachment.path);
+    setPurchaseList((items) => items.map((item) => item.id === purchase.id ? { ...item, invoiceAttachment: null } : item));
+    await recordAudit(defaultTenantId, user, "excluiu", "anexo da nota fiscal", purchase.id);
+  }
+
+  async function removeBoletoAttachment(purchase: Purchase, index: number) {
+    const attachment = purchase.boletoAttachments?.[index];
+    if (!attachment?.path || !window.confirm(`Excluir o boleto ${index + 1}?`)) return;
+    const boletoAttachments = purchase.boletoAttachments?.filter((_, itemIndex) => itemIndex !== index) || [];
+    if (firebaseReady && user?.id !== demoUserId) await updatePurchase(defaultTenantId, purchase.id, { boletoAttachments });
+    await deletePurchaseAttachment(attachment.path);
+    setPurchaseList((items) => items.map((item) => item.id === purchase.id ? { ...item, boletoAttachments } : item));
+    await recordAudit(defaultTenantId, user, "excluiu", "boleto", purchase.id);
   }
 
   function sendWhatsApp(account: AccountPayable) {
     const supplier = supplierList.find((item) => item.name === account.supplier);
     const phone = supplier?.phone.replace(/\D/g, "");
+    if (!phone) {
+      window.alert("Cadastre o telefone do fornecedor antes de enviar uma mensagem pelo WhatsApp.");
+      return;
+    }
     const message = account.status === "Pago"
       ? `Olá! Confirmamos o pagamento de ${account.amount}, referente a ${account.installment}, com vencimento em ${account.dueDate}.`
       : `Olá! Lembrete de pagamento no valor de ${account.amount}, referente a ${account.installment}, com vencimento em ${account.dueDate}.`;
-    window.open(`https://wa.me/${phone ? `55${phone}` : ""}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+    window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  }
+
+  function sendAlertWhatsApp(alert: FinancialAlert) {
+    const account = accountList.find((item) => item.id === alert.sourceId);
+    if (account) sendWhatsApp(account);
   }
 
   async function changeUserRole(id: string, role: AppUser["role"]) {
+    if (wouldRemoveLastOwner(tenantUsers, id, role)) {
+      window.alert("A empresa precisa manter pelo menos um usuário com perfil Dono.");
+      return;
+    }
     await updateTenantUserRole(defaultTenantId, id, role);
     setTenantUsers((items) => items.map((item) => item.id === id ? { ...item, role } : item));
     await recordAudit(defaultTenantId, user, "editou", "permissão de usuário", id);
   }
 
-  async function generateInvite(role: AppUser["role"]) {
-    return createInvite(defaultTenantId, user?.companyName || "Empresa", role);
+  async function generateInvite(role: Invite["role"]) {
+    const invite = await createInvite(defaultTenantId, user?.companyName || "Empresa", role);
+    setInvites((items) => [invite, ...items]);
+  }
+
+  async function removeInvite(code: string) {
+    await cancelInvite(code);
+    setInvites((items) => items.map((item) => item.code === code ? { ...item, status: "Cancelado" } : item));
   }
 
   function exportFilteredAccounts() {
@@ -510,6 +562,8 @@ export function OrquestraHubApp() {
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
+  const canWrite = roleCanWrite(user.role);
+
   return (
     <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} user={user}>
       <div className="space-y-8 px-5 py-6 sm:px-8">
@@ -519,7 +573,7 @@ export function OrquestraHubApp() {
               <SummaryCard item={item} key={item.label} />
             ))}
           </div>
-          {fixedExpenseAlerts.length ? <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4"><strong className="text-sm text-amber-950">Lembretes de despesas fixas</strong><div className="mt-2 grid gap-2 md:grid-cols-2">{fixedExpenseAlerts.map((item) => <div className="text-sm text-amber-900" key={item.id}>{item.name} · {item.amount} · vence dia {item.dueDay}</div>)}</div></div> : null}
+          <FinancialAlertsPanel alerts={financialAlerts} onWhatsApp={sendAlertWhatsApp} />
           <div className="mt-6">
             <PaymentsTable accounts={accountList.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate))} />
           </div>
@@ -527,18 +581,18 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
-          <div className="mb-4 flex justify-end">
+          {canWrite ? <div className="mb-4 flex justify-end">
             <button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowStoreForm((visible) => !visible)} type="button">
               {showStoreForm ? <X size={18} /> : <Plus size={18} />}
               {showStoreForm ? "Cancelar cadastro" : "Cadastrar nova loja"}
             </button>
-          </div>
+          </div> : null}
           {showStoreForm ? <StoreForm error={formErrors.store} form={storeForm} onChange={setStoreForm} onPhotoChange={setStorePhoto} onSubmit={addStore} photo={storePhoto} /> : null}
-          <StoresPanel onEdit={(item) => setEditTarget({ kind: "store", item })} stores={storeList} />
+          <StoresPanel onEdit={canWrite ? (item) => setEditTarget({ kind: "store", item }) : undefined} stores={storeList} />
         </Section>
 
         <Section description="Cadastro central de fornecedores." id="fornecedores" title="Fornecedores">
-          <div className="mb-4 flex justify-end"><button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowSupplierForm((visible) => !visible)} type="button">{showSupplierForm ? <X size={18} /> : <Plus size={18} />}{showSupplierForm ? "Cancelar cadastro" : "Cadastrar novo fornecedor"}</button></div>
+          {canWrite ? <div className="mb-4 flex justify-end"><button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowSupplierForm((visible) => !visible)} type="button">{showSupplierForm ? <X size={18} /> : <Plus size={18} />}{showSupplierForm ? "Cancelar cadastro" : "Cadastrar novo fornecedor"}</button></div> : null}
           {showSupplierForm ? <div className="mb-4 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
             <TextField label="Nome" onBlur={() => setSupplierForm((form) => ({ ...form, name: toTitleCaseBR(form.name) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, name: event.target.value }))} placeholder="Nome do Fornecedor" value={supplierForm.name} />
             <TextField label="CNPJ" onChange={(event) => setSupplierForm((form) => ({ ...form, document: formatCnpj(event.target.value) }))} placeholder="00.000.000/0000-00" value={supplierForm.document} />
@@ -574,12 +628,12 @@ export function OrquestraHubApp() {
             />
           </div>
           <div className="overflow-x-auto">
-            <SuppliersTable onDelete={removeSupplier} onEdit={(item) => setEditTarget({ kind: "supplier", item })} suppliers={filteredSuppliers} />
+            <SuppliersTable onDelete={canWrite ? removeSupplier : undefined} onEdit={canWrite ? (item) => setEditTarget({ kind: "supplier", item }) : undefined} suppliers={filteredSuppliers} />
           </div>
         </Section>
 
         <Section description="Lance a nota e gere parcelas automaticamente." id="compras" title="Compras e notas">
-          <div className="mb-4 flex justify-end"><button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowPurchaseForm((visible) => !visible)} type="button">{showPurchaseForm ? <X size={18} /> : <Plus size={18} />}{showPurchaseForm ? "Cancelar lançamento" : "Cadastrar nova compra"}</button></div>
+          {canWrite ? <div className="mb-4 flex justify-end"><button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowPurchaseForm((visible) => !visible)} type="button">{showPurchaseForm ? <X size={18} /> : <Plus size={18} />}{showPurchaseForm ? "Cancelar lançamento" : "Cadastrar nova compra"}</button></div> : null}
           {showPurchaseForm ? <PurchaseForm
             boletoFiles={boletoFiles}
             form={purchaseForm}
@@ -601,7 +655,13 @@ export function OrquestraHubApp() {
             />
           </div>
           <div className="overflow-x-auto">
-            <PurchasesTable onEdit={(item) => setEditTarget({ kind: "purchase", item })} purchases={filteredPurchases} />
+            <PurchasesTable
+              onDeleteBoleto={canWrite ? removeBoletoAttachment : undefined}
+              onDeleteInvoice={canWrite ? removeInvoiceAttachment : undefined}
+              onEdit={canWrite ? (item) => setEditTarget({ kind: "purchase", item }) : undefined}
+              onReplaceInvoice={canWrite ? replaceInvoiceAttachment : undefined}
+              purchases={filteredPurchases}
+            />
           </div>
         </Section>
 
@@ -617,23 +677,23 @@ export function OrquestraHubApp() {
           <div className="overflow-x-auto">
             <AccountsPayableTable
               accounts={filteredAccounts}
-              onEdit={(item) => setEditTarget({ kind: "account", item })}
-              onMarkPaid={requestMarkPaid}
-              onReceiptSelected={handleReceiptSelected}
+              onEdit={canWrite ? (item) => setEditTarget({ kind: "account", item }) : undefined}
+              onMarkPaid={canWrite ? requestMarkPaid : undefined}
+              onReceiptSelected={canWrite ? handleReceiptSelected : undefined}
               onWhatsApp={sendWhatsApp}
             />
           </div>
         </Section>
 
         <Section description="Cadastre despesas recorrentes e gere automaticamente a conta do mês com antecedência de alerta." id="despesas-fixas" title="Despesas fixas">
-          <FixedExpensesPanel expenses={fixedExpenses} form={fixedExpenseForm} onChange={setFixedExpenseForm} onSubmit={addFixedExpense} storeOptions={storeList.map((store) => store.name)} />
+          <FixedExpensesPanel canWrite={canWrite} expenses={fixedExpenses} form={fixedExpenseForm} onChange={setFixedExpenseForm} onSubmit={addFixedExpense} storeOptions={storeList.map((store) => store.name)} />
         </Section>
 
         <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
         <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile user={user} /></Section>
-        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings />{user.role === "Dono" ? <div className="mt-5 space-y-5"><UsersPanel onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
+        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings />{user.role === "Dono" ? <div className="mt-5 space-y-5"><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
       </div>
       <PaymentConfirmModal
         account={paymentToConfirm}

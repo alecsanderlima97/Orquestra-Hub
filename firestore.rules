@@ -26,7 +26,9 @@ service cloud.firestore {
         allow create: if signedIn() && request.auth.uid == userId
           && (get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
             || (exists(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode))
-              && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.tenantId == tenantId));
+              && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.tenantId == tenantId
+              && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.status == 'Ativo'
+              && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.expiresAt > request.time));
         allow update: if isOwner(tenantId) || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
       }
 
@@ -46,9 +48,17 @@ service cloud.firestore {
     }
 
     match /invites/{code} {
-      allow read: if signedIn();
+      allow read: if signedIn() && (resource.data.tenantId == null || isOwner(resource.data.tenantId) || resource.data.status == 'Ativo');
       allow create: if signedIn() && isOwner(request.resource.data.tenantId);
-      allow update, delete: if false;
+      allow update: if signedIn() && (
+        isOwner(resource.data.tenantId)
+        || (resource.data.status == 'Ativo'
+          && request.resource.data.status == 'Usado'
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.tenantId == resource.data.tenantId
+          && request.resource.data.role == resource.data.role)
+      );
+      allow delete: if false;
     }
   }
 }

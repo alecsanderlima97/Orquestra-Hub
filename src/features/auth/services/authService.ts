@@ -4,7 +4,7 @@ import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
 import { defaultTenantId } from "@/lib/tenant/tenant";
 import type { AppUser, CompanyMembership } from "../types/authTypes";
-import { getInvite } from "@/features/users/services/inviteService";
+import { consumeInvite, getInvite } from "@/features/users/services/inviteService";
 
 const platformOwnerEmails = new Set(["limaalecsander@gmail.com"]);
 
@@ -80,6 +80,7 @@ export async function registerWithEmail(name: string, companyName: string, email
     try {
       await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), { email, inviteCode: normalizedInviteCode, name: name.trim(), role, userId: credential.user.uid, createdAt: serverTimestamp() });
       await setDoc(doc(db, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: finalCompanyName, role, createdAt: serverTimestamp() });
+      if (invite) await consumeInvite(normalizedInviteCode, credential.user.uid);
     } catch (error) {
       if (!invite) await deleteDoc(doc(db, tenantPath(tenantId))).catch(() => undefined);
       throw error;
