@@ -37,7 +37,7 @@ function cachedUser(user: User) {
 async function mapUserWithRole(user: User) {
   if (!db) return mapFirebaseUser(user);
   const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
-  if (!memberships.empty) { const membership = memberships.docs[0]; const data = membership.data(); const access = await getDoc(doc(db, `${tenantPath(membership.id)}/users/${user.uid}`)); const role = platformOwnerEmails.has((user.email || "").toLowerCase()) ? "Proprietário" : access.data()?.role || data.role || "Consulta"; return mapFirebaseUser(user, role, membership.id, data.companyName || "Empresa"); }
+  if (!memberships.empty) { const membership = memberships.docs[0]; const data = membership.data(); const access = await getDoc(doc(db, `${tenantPath(membership.id)}/users/${user.uid}`)); const tenant = await getDoc(doc(db, tenantPath(membership.id))); const isOwner = tenant.data()?.ownerId === user.uid; const role = platformOwnerEmails.has((user.email || "").toLowerCase()) || isOwner ? "Proprietário" : access.data()?.role || data.role || "Consulta"; const mapped = mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa"); return mapped.companyName.startsWith("Empresa de ") ? { ...mapped, needsOnboarding: true } : mapped; }
   const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
   if (legacy.exists()) return mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub");
   return mapFirebaseUser(user);
@@ -96,8 +96,22 @@ export async function registerWithEmail(name: string, companyName: string, email
 export async function loginWithGoogle() {
   if (!firebaseReady || !auth) return null;
   const credential = await signInWithPopup(auth, new GoogleAuthProvider());
-  await ensureTenantAccess(credential.user);
+  if (db) {
+    const memberships = await getDocs(collection(db, `userTenants/${credential.user.uid}/memberships`));
+    const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${credential.user.uid}`));
+    if (memberships.empty && !legacy.exists()) return cacheUser({ ...mapFirebaseUser(credential.user, "Proprietário", "", ""), needsOnboarding: true });
+  }
   return mapUserWithRole(credential.user);
+}
+
+export async function completeGoogleOnboarding(user: AppUser, companyName: string) {
+  if (!db || !auth?.currentUser) return user;
+  const tenantId = user.tenantId || crypto.randomUUID();
+  const finalCompanyName = companyName.trim() || "Meu Negócio";
+  await setDoc(doc(db, tenantPath(tenantId)), { name: finalCompanyName, ownerId: user.id, status: "Ativo", updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, name: user.name, role: "Proprietário", userId: user.id, updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: finalCompanyName, role: "Proprietário", updatedAt: serverTimestamp() }, { merge: true });
+  return cacheUser({ ...user, companyName: finalCompanyName, needsOnboarding: false, role: "Proprietário", tenantId });
 }
 
 export async function resetPassword(email: string) {

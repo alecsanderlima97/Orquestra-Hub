@@ -17,7 +17,7 @@ import { PaymentConfirmModal } from "@/features/accounts-payable/components/Paym
 import { createAccountPayable, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
-import { listenAuth, listUserCompanies, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
+import { completeGoogleOnboarding, listenAuth, listUserCompanies, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import type { CompanyMembership } from "@/features/auth/types/authTypes";
 import { AuditPanel } from "@/features/audit/components/AuditPanel";
@@ -45,6 +45,8 @@ import { FinancialReports } from "@/features/reports/components/FinancialReports
 import { PrivacyPanel } from "@/features/privacy/components/PrivacyPanel";
 import { UserProfile } from "@/features/profile/components/UserProfile";
 import { SystemSettings } from "@/features/settings/components/SystemSettings";
+import { GettingStartedPanel } from "@/features/settings/components/GettingStartedPanel";
+import { FirstAccessOnboarding } from "@/features/onboarding/components/FirstAccessOnboarding";
 import { StoreForm } from "@/features/stores/components/StoreForm";
 import type { StoreFormState } from "@/features/stores/components/StoreForm";
 import { StoresPanel } from "@/features/stores/components/StoresPanel";
@@ -81,10 +83,10 @@ export function OrquestraHubApp() {
   const [companies, setCompanies] = useState<CompanyMembership[]>([]);
   const defaultTenantId = user?.tenantId || legacyTenantId;
   const [authChecked, setAuthChecked] = useState(!firebaseReady);
-  const [storeList, setStoreList] = useState<Store[]>(stores);
-  const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers);
-  const [purchaseList, setPurchaseList] = useState<Purchase[]>(purchases);
-  const [accountList, setAccountList] = useState<AccountPayable[]>(accountsPayable);
+  const [storeList, setStoreList] = useState<Store[]>([]);
+  const [supplierList, setSupplierList] = useState<Supplier[]>([]);
+  const [purchaseList, setPurchaseList] = useState<Purchase[]>([]);
+  const [accountList, setAccountList] = useState<AccountPayable[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [tenantUsers, setTenantUsers] = useState<AppUser[]>([]);
@@ -146,6 +148,12 @@ export function OrquestraHubApp() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (user?.id !== demoUserId) return;
+    const demoTimer = window.setTimeout(() => { setStoreList(stores); setSupplierList(suppliers); setPurchaseList(purchases); setAccountList(accountsPayable); }, 0);
+    return () => window.clearTimeout(demoTimer);
+  }, [user]);
 
   useEffect(() => {
     if (!firebaseReady || !user || user.id === demoUserId) return;
@@ -593,6 +601,8 @@ export function OrquestraHubApp() {
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
+  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName) => { const completed = await completeGoogleOnboarding(user, companyName); setUser(completed); setCompanies([{ companyName: completed.companyName, role: completed.role, tenantId: completed.tenantId }]); }} user={user} />;
+
   const canWrite = roleCanWrite(user.role);
 
   return (
@@ -724,7 +734,7 @@ export function OrquestraHubApp() {
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
         <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile user={user} /></Section>
-        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings /><div className="mt-5"><PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} /></div>{canManageUsers(user.role) ? <div className="mt-5 space-y-5"><CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} /><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
+        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings /><div className="mt-5"><GettingStartedPanel /></div><div className="mt-5"><PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} /></div>{canManageUsers(user.role) ? <div className="mt-5 space-y-5"><CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} /><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
       </div>
       <PaymentConfirmModal
         account={paymentToConfirm}

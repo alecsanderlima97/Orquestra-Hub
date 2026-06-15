@@ -5,6 +5,7 @@ export type AppUser = {
   role: "Proprietário" | "Dono" | "Financeiro" | "Consulta";
   tenantId: string;
   companyName: string;
+  needsOnboarding?: boolean;
 };
 
 export type CompanyMembership = { companyName: string; role: AppUser["role"]; tenantId: string };
