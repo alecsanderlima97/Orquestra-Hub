@@ -71,7 +71,7 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
   return (
     <>
       <button
-        className="fixed bottom-24 right-5 z-[110] flex size-14 items-center justify-center rounded-full border border-cyan-200/70 bg-slate-950 text-cyan-200 shadow-2xl shadow-cyan-500/25 transition hover:scale-105 hover:text-white"
+        className="fixed bottom-24 right-5 z-[110] flex size-13 items-center justify-center rounded-full bg-cyan-500 text-slate-950 shadow-2xl shadow-cyan-500/30 transition hover:scale-105 hover:bg-cyan-300"
         onClick={() => setOpen(true)}
         title="Abrir assistente IA financeiro"
         type="button"
@@ -79,15 +79,15 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
         <Sparkles size={24} />
       </button>
       {open ? (
-        <aside className="fixed bottom-5 right-5 z-[120] flex max-h-[calc(100vh-2.5rem)] w-[calc(100%-2.5rem)] max-w-md flex-col overflow-hidden rounded-lg border border-cyan-200 bg-white shadow-2xl shadow-slate-900/20">
-          <header className="flex items-center justify-between bg-slate-950 px-4 py-4 text-white">
+        <aside className="fixed bottom-5 right-5 z-[120] flex max-h-[calc(100vh-2.5rem)] w-[calc(100%-2.5rem)] max-w-md flex-col overflow-hidden rounded-lg border border-cyan-200 bg-white shadow-2xl">
+          <header className="flex items-center justify-between bg-slate-950 px-4 py-3 text-white">
             <div className="flex items-center gap-3">
-              <span className="premium-ring flex size-10 items-center justify-center rounded-md bg-cyan-400/15 text-cyan-200">
+              <span className="flex size-9 items-center justify-center rounded-md bg-cyan-400 text-slate-950">
                 <Bot size={22} />
               </span>
               <div>
-                <strong className="block text-sm">IA Financeira Executiva</strong>
-                <span className="text-xs text-slate-300">Análises com créditos controlados</span>
+                <strong className="block text-sm">IA Financeira</strong>
+                <span className="text-xs text-slate-300">Orquestra Hub conectado</span>
               </div>
             </div>
             <button className="rounded-md p-2 hover:bg-white/10" onClick={() => setOpen(false)} title="Fechar IA" type="button">
