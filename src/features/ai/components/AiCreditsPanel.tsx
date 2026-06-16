@@ -4,7 +4,7 @@ import { Bot, CreditCard, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getAiCreditBalance, type AiCreditBalance } from "../services/aiCreditService";
 
-const salesWhatsapp = "5511999999999";
+const salesWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5511999999999").replace(/\D/g, "");
 
 const packages = [
   { credits: 100, label: "Recarga Inicial", price: "R$ 29,90" },
