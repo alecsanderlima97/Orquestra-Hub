@@ -12,8 +12,12 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid));
     }
     function role(tenantId) { return get(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid)).data.role; }
-    function canWrite(tenantId) { return isPlatformOwner() || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono', 'Financeiro']); }
-    function isOwner(tenantId) { return isPlatformOwner() || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono']); }
+    function isTenantOwner(tenantId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid;
+    }
+    function canWrite(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono', 'Financeiro']); }
+    function isOwner(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono']); }
 
     match /tenants/{tenantId} {
       allow read: if belongsToTenant(tenantId);

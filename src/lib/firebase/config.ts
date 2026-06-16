@@ -5,7 +5,10 @@ import { getStorage } from "firebase/storage";
 
 function clean(value?: string) {
   value = value?.trim() || "";
-  return value.replace(/^['"]|['"]$/g, "").replace(/\\n/g, "").trim();
+  return value
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\\r|\\n|\r|\n/g, "")
+    .trim();
 }
 
 const firebaseConfig = {
