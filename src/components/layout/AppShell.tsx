@@ -2,7 +2,6 @@
 
 import {
   BarChart3,
-  Building2,
   CreditCard,
   CalendarClock,
   FileText,
@@ -78,12 +77,12 @@ export function AppShell({
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white px-5 py-6 lg:block">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-slate-950 text-white">
-            <Building2 size={22} />
+          <div className="flex size-11 items-center justify-center rounded-lg bg-slate-950 text-3xl font-black text-cyan-100 shadow-[0_0_24px_rgba(56,189,248,.35)]">
+            <span className="drop-shadow-[0_0_9px_rgba(103,216,251,.9)]">O</span>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Orquestra.cs</p>
-            <h1 className="text-2xl font-bold"><span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(103,216,251,.75)]">O</span>rquestra Hub</h1>
+            <h1 className="text-2xl font-bold">Orquestra Hub</h1>
           </div>
         </div>
         <nav className="mt-8 space-y-1">
