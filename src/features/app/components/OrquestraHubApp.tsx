@@ -16,6 +16,7 @@ import { AccountsPayableTable } from "@/features/accounts-payable/components/Acc
 import { PaymentConfirmModal } from "@/features/accounts-payable/components/PaymentConfirmModal";
 import { createAccountPayable, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
+import { FinancialAssistant } from "@/features/ai/components/FinancialAssistant";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
 import { completeGoogleOnboarding, listenAuth, listUserCompanies, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
 import type { AppUser } from "@/features/auth/types/authTypes";
@@ -737,6 +738,9 @@ export function OrquestraHubApp() {
         <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings /><div className="mt-5"><PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} /></div>{canManageUsers(user.role) ? <div className="mt-5 space-y-5"><CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} /><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
       </div>
       {user.id !== demoUserId ? <GuideAssistant userId={user.id} /> : null}
+      {user.id !== demoUserId ? (
+        <FinancialAssistant context={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} />
+      ) : null}
       <PaymentConfirmModal
         account={paymentToConfirm}
         onCancel={() => setPaymentToConfirm(null)}
