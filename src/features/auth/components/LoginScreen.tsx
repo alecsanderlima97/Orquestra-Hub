@@ -15,6 +15,7 @@ function registrationError(error: unknown) {
   const code = firebaseError?.code || firebaseError?.message || "";
   if (code.includes("email-already-in-use")) return "Este e-mail já possui uma conta.";
   if (code.includes("invalid-email")) return "Informe um e-mail válido.";
+  if (code === "email-required") return "Informe o e-mail.";
   if (code.includes("weak-password")) return "A senha deve ter pelo menos 6 caracteres.";
   if (code === "invite-invalid") return "O código de convite é inválido.";
   if (code === "name-required") return "Informe seu nome.";
