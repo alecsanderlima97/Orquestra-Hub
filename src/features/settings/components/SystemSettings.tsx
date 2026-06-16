@@ -18,7 +18,7 @@ function applyTheme(theme: ThemeId) {
   window.localStorage.setItem("orquestra-theme", theme);
 }
 
-export function SystemSettings({ tenantId }: { tenantId: string }) {
+export function SystemSettings({ companyName, tenantId }: { companyName: string; tenantId: string }) {
   const [theme, setTheme] = useState<ThemeId>(() => {
     if (typeof window === "undefined") return "claro";
     const saved = (window.localStorage.getItem("orquestra-theme") || "claro") as ThemeId;
@@ -49,7 +49,7 @@ export function SystemSettings({ tenantId }: { tenantId: string }) {
         ))}
       </div>
 
-      <AiCreditsPanel tenantId={tenantId} />
+      <AiCreditsPanel companyName={companyName} tenantId={tenantId} />
 
       <section className="theme-surface rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">

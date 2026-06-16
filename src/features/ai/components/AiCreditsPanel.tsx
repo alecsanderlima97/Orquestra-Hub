@@ -4,13 +4,27 @@ import { Bot, CreditCard, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getAiCreditBalance, type AiCreditBalance } from "../services/aiCreditService";
 
+const salesWhatsapp = "5511999999999";
+
 const packages = [
   { credits: 100, label: "Recarga Inicial", price: "R$ 29,90" },
   { credits: 300, label: "Mais vendido", price: "R$ 69,90" },
   { credits: 1000, label: "Equipe", price: "R$ 189,90" },
 ];
 
-export function AiCreditsPanel({ tenantId }: { tenantId: string }) {
+function requestPackage(companyName: string, item: { credits: number; price: string }) {
+  const message = [
+    "Olá, quero contratar créditos para a IA Financeira do Orquestra Hub.",
+    "",
+    `Empresa: ${companyName}`,
+    `Pacote: ${item.credits} créditos - ${item.price}`,
+    "",
+    "Pode me enviar as informações para pagamento?",
+  ].join("\n");
+  window.open(`https://wa.me/${salesWhatsapp}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+}
+
+export function AiCreditsPanel({ companyName, tenantId }: { companyName: string; tenantId: string }) {
   const [credits, setCredits] = useState<AiCreditBalance>({ balance: 20, included: 20, status: "Ativo", used: 0 });
 
   useEffect(() => {
@@ -71,15 +85,15 @@ export function AiCreditsPanel({ tenantId }: { tenantId: string }) {
                 <p className="text-sm text-slate-500">créditos IA</p>
                 <div className="mt-4 flex items-center justify-between">
                   <span className="font-semibold text-slate-950">{item.price}</span>
-                  <button className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" title="Pagamento será conectado na próxima etapa" type="button">
+                  <button className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" onClick={() => requestPackage(companyName, item)} title="Solicitar recarga pelo WhatsApp" type="button">
                     <CreditCard size={15} />
-                    Solicitar
+                    WhatsApp
                   </button>
                 </div>
               </article>
             ))}
           </div>
-          <p className="mt-3 text-xs text-slate-500">Próxima etapa comercial: conectar recarga ao pagamento e registrar recibo automaticamente.</p>
+          <p className="mt-3 text-xs text-slate-500">A solicitação abre no WhatsApp para aprovação manual, evitando consumo sem pagamento confirmado.</p>
         </div>
       </div>
     </section>

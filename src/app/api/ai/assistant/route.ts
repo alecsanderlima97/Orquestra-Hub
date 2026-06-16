@@ -37,7 +37,7 @@ async function authorizeCompany(request: Request, tenantId: string) {
   const decoded = await admin.auth.verifyIdToken(token);
   const member = await admin.db.doc(`tenants/${tenantId}/users/${decoded.uid}`).get();
   if (!member.exists) return null;
-  return admin;
+  return { admin, user: decoded };
 }
 
 async function reserveCredit(db: Firestore, tenantId: string) {
@@ -87,8 +87,9 @@ export async function POST(request: Request) {
     tenantId = String(body.tenantId || "").trim();
     if (!question) return NextResponse.json({ error: "Pergunta obrigatória." }, { status: 400 });
     if (!tenantId) return NextResponse.json({ error: "Empresa obrigatória para usar a IA." }, { status: 400 });
-    admin = await authorizeCompany(request, tenantId);
-    if (!admin) return NextResponse.json({ error: "Sessão inválida ou sem acesso a esta empresa." }, { status: 401 });
+    const authorized = await authorizeCompany(request, tenantId);
+    if (!authorized) return NextResponse.json({ error: "Sessão inválida ou sem acesso a esta empresa." }, { status: 401 });
+    admin = authorized.admin;
 
     try {
       reservedCredit = await reserveCredit(admin.db, tenantId);
@@ -135,7 +136,19 @@ export async function POST(request: Request) {
       if (reservedCredit && admin) await refundCredit(admin.db, tenantId);
       return NextResponse.json({ error: "A IA respondeu, mas não retornou texto." }, { status: 502 });
     }
-    return NextResponse.json({ answer, credits: reservedCredit, model: payload.model, usage: usageCost(data.usage) });
+    const usage = usageCost(data.usage);
+    await admin.db.collection(`tenants/${tenantId}/aiUsageLogs`).add({
+      answerChars: answer.length,
+      costUsd: usage.estimatedCostUsd,
+      createdAt: new Date().toISOString(),
+      creditsCharged: 1,
+      model: payload.model,
+      questionChars: question.length,
+      totalTokens: usage.totalTokens,
+      userEmail: authorized.user.email || "",
+      userId: authorized.user.uid,
+    });
+    return NextResponse.json({ answer, credits: reservedCredit, model: payload.model, usage });
   } catch (error) {
     if (reservedCredit && admin && tenantId) await refundCredit(admin.db, tenantId);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Erro interno no assistente." }, { status: 500 });
