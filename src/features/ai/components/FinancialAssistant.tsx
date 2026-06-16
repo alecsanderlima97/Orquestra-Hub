@@ -2,8 +2,9 @@
 
 import { Bot, Loader2, Send, Sparkles, X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
+import { auth } from "@/lib/firebase/config";
 import { buildAssistantSnapshot } from "../utils/assistantContext";
-import type { AssistantContext, AssistantUsage } from "../types/assistantTypes";
+import type { AssistantContext, AssistantCredits, AssistantUsage } from "../types/assistantTypes";
 
 type Message = { role: "assistant" | "user"; text: string };
 
@@ -19,10 +20,11 @@ function formatUsage(usage?: AssistantUsage) {
   return `US$ ${usage.estimatedCostUsd.toFixed(4)}`;
 }
 
-export function FinancialAssistant({ context }: { context: AssistantContext }) {
+export function FinancialAssistant({ context, tenantId }: { context: AssistantContext; tenantId: string }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
+  const [credits, setCredits] = useState<AssistantCredits>();
   const [usage, setUsage] = useState<AssistantUsage>();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -39,13 +41,16 @@ export function FinancialAssistant({ context }: { context: AssistantContext }) {
     setLoading(true);
     setMessages((items) => [...items, { role: "user", text: prompt }]);
     try {
+      const token = await auth?.currentUser?.getIdToken();
+      if (!token) throw new Error("Sessão expirada. Entre novamente para usar a IA.");
       const response = await fetch("/api/ai/assistant", {
-        body: JSON.stringify({ context: snapshot, question: prompt }),
-        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: snapshot, question: prompt, tenantId }),
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         method: "POST",
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Não foi possível consultar a IA.");
+      setCredits(data.credits);
       setUsage(data.usage);
       setMessages((items) => [...items, { role: "assistant", text: data.answer }]);
     } catch (error) {
@@ -66,7 +71,7 @@ export function FinancialAssistant({ context }: { context: AssistantContext }) {
   return (
     <>
       <button
-        className="fixed bottom-5 right-5 z-[110] flex size-13 items-center justify-center rounded-full bg-cyan-500 text-slate-950 shadow-2xl shadow-cyan-500/30 transition hover:scale-105 hover:bg-cyan-300"
+        className="fixed bottom-24 right-5 z-[110] flex size-13 items-center justify-center rounded-full bg-cyan-500 text-slate-950 shadow-2xl shadow-cyan-500/30 transition hover:scale-105 hover:bg-cyan-300"
         onClick={() => setOpen(true)}
         title="Abrir assistente IA financeiro"
         type="button"
@@ -90,7 +95,7 @@ export function FinancialAssistant({ context }: { context: AssistantContext }) {
             </button>
           </header>
 
-          <div className="grid grid-cols-3 gap-2 border-b border-slate-200 bg-slate-50 p-3 text-xs">
+          <div className="grid grid-cols-4 gap-2 border-b border-slate-200 bg-slate-50 p-3 text-xs">
             <div className="rounded-md bg-white p-2">
               <strong className="block text-slate-950">{snapshot.totals.openAccounts}</strong>
               <span className="text-slate-500">Abertas</span>
@@ -103,6 +108,14 @@ export function FinancialAssistant({ context }: { context: AssistantContext }) {
               <strong className="block text-slate-950">{formatUsage(usage)}</strong>
               <span className="text-slate-500">Uso estimado</span>
             </div>
+            <div className="rounded-md bg-white p-2">
+              <strong className="block text-cyan-800">{credits?.balance ?? 20}</strong>
+              <span className="text-slate-500">Créditos IA</span>
+            </div>
+          </div>
+
+          <div className="border-b border-cyan-100 bg-cyan-50 px-4 py-3 text-xs leading-5 text-cyan-950">
+            A empresa ganha 20 créditos iniciais. Cada pergunta consome 1 crédito. Ao acabar, contrate uma recarga para continuar usando a IA.
           </div>
 
           <div className="flex flex-wrap gap-2 border-b border-slate-200 p-3">

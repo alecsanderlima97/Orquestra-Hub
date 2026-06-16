@@ -22,7 +22,8 @@ service cloud.firestore {
     match /tenants/{tenantId} {
       allow read: if belongsToTenant(tenantId);
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isOwner(tenantId);
+      allow update: if isOwner(tenantId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['aiCredits']);
       allow delete: if false;
 
       match /users/{userId} {

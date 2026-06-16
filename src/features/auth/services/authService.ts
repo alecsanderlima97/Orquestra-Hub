@@ -83,7 +83,7 @@ async function ensureTenantAccess(user: User) {
 
   const tenantId = crypto.randomUUID();
   const companyName = `Empresa de ${user.displayName || "Novo usuário"}`;
-  await setDoc(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, status: "Ativo" });
+  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: 20, included: 20, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, status: "Ativo" });
   await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.uid}`), { createdAt: serverTimestamp(), email: user.email || "", name: user.displayName || user.email || "Usuário", role: ownerRole(), userId: user.uid });
   await setDoc(doc(db, `userTenants/${user.uid}/memberships/${tenantId}`), { companyName, createdAt: serverTimestamp(), role: ownerRole() });
 }
@@ -113,7 +113,7 @@ export async function registerWithEmail(name: string, companyName: string, email
     const tenantName = invite?.companyName || finalCompanyName;
     const role: AppUser["role"] = invite?.role || ownerRole();
 
-    if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: tenantName, ownerId: credential.user.uid, status: "Ativo" });
+    if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: 20, included: 20, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: tenantName, ownerId: credential.user.uid, status: "Ativo" });
     try {
       await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), {
         consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" },

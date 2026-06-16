@@ -11,7 +11,7 @@ export async function createCompany(user: AppUser, name: string): Promise<Compan
   const membership: CompanyMembership = { companyName, role: "Proprietário", tenantId };
   if (!firebaseReady || !db || user.id === "demo-user") return membership;
 
-  await setDoc(doc(db, tenantPath(tenantId)), { createdAt: serverTimestamp(), name: companyName, ownerId: user.id, status: "Ativo" });
+  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: 20, included: 20, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.id, status: "Ativo" });
   try {
     await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { createdAt: serverTimestamp(), email: user.email, name: user.name, role: "Proprietário", userId: user.id });
     await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName, createdAt: serverTimestamp(), role: "Proprietário" });

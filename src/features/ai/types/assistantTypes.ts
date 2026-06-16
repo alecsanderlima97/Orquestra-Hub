@@ -18,3 +18,8 @@ export type AssistantUsage = {
   outputTokens: number;
   totalTokens: number;
 };
+
+export type AssistantCredits = {
+  balance: number;
+  used: number;
+};

@@ -739,7 +739,7 @@ export function OrquestraHubApp() {
       </div>
       {user.id !== demoUserId ? <GuideAssistant userId={user.id} /> : null}
       {user.id !== demoUserId ? (
-        <FinancialAssistant context={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} />
+        <FinancialAssistant context={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} tenantId={defaultTenantId} />
       ) : null}
       <PaymentConfirmModal
         account={paymentToConfirm}

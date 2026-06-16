@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
+import type { Firestore } from "firebase-admin/firestore";
+import { firebaseAdmin } from "@/lib/firebase/admin";
+
+export const runtime = "nodejs";
 
 const OPENAI_INPUT_USD_PER_1M = 0.05;
 const OPENAI_OUTPUT_USD_PER_1M = 0.4;
+const INITIAL_AI_CREDITS = 20;
 
 function extractText(data: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) {
   if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
@@ -25,14 +30,71 @@ function usageCost(usage?: { input_tokens?: number; output_tokens?: number; tota
   };
 }
 
+async function authorizeCompany(request: Request, tenantId: string) {
+  const admin = firebaseAdmin();
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!admin || !token || !tenantId) return null;
+  const decoded = await admin.auth.verifyIdToken(token);
+  const member = await admin.db.doc(`tenants/${tenantId}/users/${decoded.uid}`).get();
+  if (!member.exists) return null;
+  return admin;
+}
+
+async function reserveCredit(db: Firestore, tenantId: string) {
+  const tenantRef = db.doc(`tenants/${tenantId}`);
+  return db.runTransaction(async (transaction) => {
+    const tenant = await transaction.get(tenantRef);
+    if (!tenant.exists) throw new Error("Empresa não encontrada.");
+    const aiCredits = tenant.data()?.aiCredits || {};
+    const currentBalance = Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : INITIAL_AI_CREDITS;
+    const currentUsed = Number(aiCredits.used || 0);
+    if (currentBalance < 1) throw new Error("IA sem créditos disponíveis. Contrate uma recarga para continuar usando.");
+    const nextBalance = currentBalance - 1;
+    transaction.update(tenantRef, {
+      "aiCredits.balance": nextBalance,
+      "aiCredits.included": Number(aiCredits.included || INITIAL_AI_CREDITS),
+      "aiCredits.lastUsedAt": new Date().toISOString(),
+      "aiCredits.status": "Ativo",
+      "aiCredits.used": currentUsed + 1,
+    });
+    return { balance: nextBalance, used: currentUsed + 1 };
+  });
+}
+
+async function refundCredit(db: Firestore, tenantId: string) {
+  const tenantRef = db.doc(`tenants/${tenantId}`);
+  await db.runTransaction(async (transaction) => {
+    const tenant = await transaction.get(tenantRef);
+    if (!tenant.exists) return;
+    const aiCredits = tenant.data()?.aiCredits || {};
+    transaction.update(tenantRef, {
+      "aiCredits.balance": Number(aiCredits.balance || 0) + 1,
+      "aiCredits.used": Math.max(Number(aiCredits.used || 0) - 1, 0),
+    });
+  });
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "OPENAI_API_KEY não configurada na Vercel." }, { status: 500 });
 
+  let reservedCredit: { balance: number; used: number } | null = null;
+  let admin: ReturnType<typeof firebaseAdmin> = null;
+  let tenantId = "";
   try {
     const body = await request.json();
     const question = String(body.question || "").trim();
+    tenantId = String(body.tenantId || "").trim();
     if (!question) return NextResponse.json({ error: "Pergunta obrigatória." }, { status: 400 });
+    if (!tenantId) return NextResponse.json({ error: "Empresa obrigatória para usar a IA." }, { status: 400 });
+    admin = await authorizeCompany(request, tenantId);
+    if (!admin) return NextResponse.json({ error: "Sessão inválida ou sem acesso a esta empresa." }, { status: 401 });
+
+    try {
+      reservedCredit = await reserveCredit(admin.db, tenantId);
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Não foi possível validar os créditos da IA." }, { status: 402 });
+    }
 
     const payload = {
       input: [
@@ -63,12 +125,19 @@ export async function POST(request: Request) {
     });
     const rawText = await response.text();
     const data = rawText ? JSON.parse(rawText) : {};
-    if (!response.ok) return NextResponse.json({ error: data.error?.message || "Falha ao consultar a OpenAI." }, { status: response.status });
+    if (!response.ok) {
+      if (reservedCredit && admin) await refundCredit(admin.db, tenantId);
+      return NextResponse.json({ error: data.error?.message || "Falha ao consultar a OpenAI." }, { status: response.status });
+    }
 
     const answer = extractText(data);
-    if (!answer) return NextResponse.json({ error: "A IA respondeu, mas não retornou texto." }, { status: 502 });
-    return NextResponse.json({ answer, model: payload.model, usage: usageCost(data.usage) });
+    if (!answer) {
+      if (reservedCredit && admin) await refundCredit(admin.db, tenantId);
+      return NextResponse.json({ error: "A IA respondeu, mas não retornou texto." }, { status: 502 });
+    }
+    return NextResponse.json({ answer, credits: reservedCredit, model: payload.model, usage: usageCost(data.usage) });
   } catch (error) {
+    if (reservedCredit && admin && tenantId) await refundCredit(admin.db, tenantId);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Erro interno no assistente." }, { status: 500 });
   }
 }
