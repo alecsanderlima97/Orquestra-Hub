@@ -25,7 +25,7 @@ function requestPackage(companyName: string, item: { credits: number; price: str
 }
 
 export function AiCreditsPanel({ companyName, tenantId }: { companyName: string; tenantId: string }) {
-  const [credits, setCredits] = useState<AiCreditBalance>({ balance: 20, included: 20, status: "Ativo", used: 0 });
+  const [credits, setCredits] = useState<AiCreditBalance>({ balance: 5, included: 5, status: "Ativo", used: 0 });
 
   useEffect(() => {
     let alive = true;

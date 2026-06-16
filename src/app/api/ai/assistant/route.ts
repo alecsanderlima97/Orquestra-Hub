@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 const OPENAI_INPUT_USD_PER_1M = 0.05;
 const OPENAI_OUTPUT_USD_PER_1M = 0.4;
-const INITIAL_AI_CREDITS = 20;
+const INITIAL_AI_CREDITS = 5;
 
 function extractText(data: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) {
   if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text.trim();

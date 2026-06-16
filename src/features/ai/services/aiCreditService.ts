@@ -10,12 +10,12 @@ export type AiCreditBalance = {
 };
 
 export async function getAiCreditBalance(tenantId: string): Promise<AiCreditBalance> {
-  if (!firebaseReady || !db || !tenantId) return { balance: 20, included: 20, status: "Ativo", used: 0 };
+  if (!firebaseReady || !db || !tenantId) return { balance: 5, included: 5, status: "Ativo", used: 0 };
   const snapshot = await getDoc(doc(db, tenantPath(tenantId)));
   const aiCredits = snapshot.data()?.aiCredits || {};
   return {
-    balance: Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : 20,
-    included: Number(aiCredits.included || 20),
+    balance: Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : 5,
+    included: Number(aiCredits.included || 5),
     status: String(aiCredits.status || "Ativo"),
     used: Number(aiCredits.used || 0),
   };
