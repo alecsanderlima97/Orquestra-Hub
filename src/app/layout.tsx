@@ -15,6 +15,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Orquestra Hub | SaaS modular",
   description: "Sistema SaaS modular para gestao financeira, operacional e comercial.",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Orquestra Hub" },
+  icons: {
+    apple: "/icons/orquestra-icon-192.png",
+    icon: [
+      { sizes: "32x32", url: "/icons/orquestra-icon-192.png" },
+      { sizes: "192x192", url: "/icons/orquestra-icon-192.png" },
+      { sizes: "512x512", url: "/icons/orquestra-icon-512.png" },
+      { type: "image/svg+xml", url: "/icons/orquestra-icon.svg" },
+    ],
+    shortcut: "/icons/orquestra-icon-192.png",
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({

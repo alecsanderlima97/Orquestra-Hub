@@ -1,0 +1,38 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#061827"/>
+  <rect x="24" y="24" width="464" height="464" rx="92" fill="url(#bg)" stroke="url(#stroke)" stroke-width="2"/>
+  <circle cx="256" cy="256" r="166" fill="#083552" opacity=".72"/>
+  <circle cx="256" cy="256" r="196" stroke="#67D8FB" stroke-opacity=".18" stroke-width="2"/>
+  <circle cx="256" cy="256" r="142" stroke="#D9F5FF" stroke-opacity=".14" stroke-width="1.5" stroke-dasharray="12 16"/>
+  <text x="256" y="332" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="218" font-weight="900" fill="#D9F5FF">O</text>
+  <text x="256" y="332" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="218" font-weight="900" fill="url(#crystal)">O</text>
+  <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+    <feGaussianBlur stdDeviation="16" result="blur"/>
+    <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.15 0 0 0 0 0.75 0 0 0 0 1 0 0 0 .85 0"/>
+    <feMerge>
+      <feMergeNode/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+  <g filter="url(#glow)">
+    <path d="M155 256c0-69 38-112 101-112s101 43 101 112-38 112-101 112-101-43-101-112Zm64 0c0 37 12 58 37 58s37-21 37-58-12-58-37-58-37 21-37 58Z" fill="url(#crystal)"/>
+  </g>
+  <path d="M119 411c43 27 91 40 137 40 55 0 101-16 138-43" stroke="#67D8FB" stroke-opacity=".22" stroke-width="2" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="bg" x1="82" y1="42" x2="424" y2="478" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#092C45"/>
+      <stop offset=".48" stop-color="#061827"/>
+      <stop offset="1" stop-color="#0B2034"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="92" y1="56" x2="426" y2="452" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67D8FB" stop-opacity=".72"/>
+      <stop offset="1" stop-color="#0891B2" stop-opacity=".08"/>
+    </linearGradient>
+    <linearGradient id="crystal" x1="172" y1="126" x2="338" y2="374" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".28" stop-color="#D9F5FF"/>
+      <stop offset=".62" stop-color="#67D8FB"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+</svg>
