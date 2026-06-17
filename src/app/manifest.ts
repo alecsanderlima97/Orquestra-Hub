@@ -9,7 +9,6 @@ export default function manifest(): MetadataRoute.Manifest {
       { purpose: "any", sizes: "192x192", src: "/icons/orquestra-icon-192.png", type: "image/png" },
       { purpose: "any", sizes: "512x512", src: "/icons/orquestra-icon-512.png", type: "image/png" },
       { purpose: "maskable", sizes: "512x512", src: "/icons/orquestra-icon-maskable-512.png", type: "image/png" },
-      { purpose: "any", sizes: "512x512", src: "/icons/orquestra-icon.svg", type: "image/svg+xml" },
     ],
     name: "Orquestra Hub",
     short_name: "Orquestra Hub",

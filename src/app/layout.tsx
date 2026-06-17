@@ -22,7 +22,6 @@ export const metadata: Metadata = {
       { sizes: "32x32", url: "/icons/orquestra-icon-192.png" },
       { sizes: "192x192", url: "/icons/orquestra-icon-192.png" },
       { sizes: "512x512", url: "/icons/orquestra-icon-512.png" },
-      { type: "image/svg+xml", url: "/icons/orquestra-icon.svg" },
     ],
     shortcut: "/icons/orquestra-icon-192.png",
   },
