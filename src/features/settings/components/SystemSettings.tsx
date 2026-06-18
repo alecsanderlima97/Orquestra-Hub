@@ -3,6 +3,7 @@
 import { Bell, Check, Clock3, Database, Palette, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { AiCreditsPanel } from "@/features/ai/components/AiCreditsPanel";
+import { firebaseReady } from "@/lib/firebase/config";
 
 const themes = [
   { id: "claro", label: "Claro", colors: ["#f1f5f9", "#ffffff", "#0891b2"] },
@@ -28,7 +29,7 @@ export function SystemSettings({ companyName, tenantId }: { companyName: string;
 
   const settings = [
     { icon: Clock3, title: "Região e horário", value: "Português (Brasil) · Brasília" },
-    { icon: Database, title: "Banco de dados", value: "Firebase Firestore conectado" },
+    { icon: Database, title: "Banco de dados", value: firebaseReady ? "Firebase Firestore conectado" : "Firebase não configurado neste ambiente" },
     { icon: ShieldCheck, title: "Segurança", value: "Autenticação e regras por empresa" },
     { icon: Bell, title: "Alertas financeiros", value: "Lembretes de vencimento habilitados" },
   ];

@@ -12,12 +12,12 @@ export async function listStores(tenantId: string): Promise<Store[]> {
 }
 
 export async function updateStore(tenantId: string, storeId: string, store: Partial<Store>) {
-  if (!firebaseReady || !db) return;
+  if (!firebaseReady || !db) throw new Error("Firebase não está pronto para atualizar a loja.");
   await updateDoc(doc(db, tenantCollectionPath(tenantId, collectionName), storeId), { ...store, updatedAt: serverTimestamp() });
 }
 
 export async function createStore(tenantId: string, store: Omit<Store, "id">) {
-  if (!firebaseReady || !db) return null;
+  if (!firebaseReady || !db) throw new Error("Firebase não está pronto para salvar a loja.");
   return addDoc(collection(db, tenantCollectionPath(tenantId, collectionName)), {
     ...store,
     createdAt: serverTimestamp(),

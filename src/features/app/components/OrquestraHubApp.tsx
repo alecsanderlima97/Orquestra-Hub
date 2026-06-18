@@ -99,7 +99,7 @@ export function OrquestraHubApp() {
   const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
   const [paymentDateTime, setPaymentDateTime] = useState("");
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
-  const [formErrors, setFormErrors] = useState({ purchase: "", store: "", supplier: "" });
+  const [formErrors, setFormErrors] = useState({ fixedExpense: "", purchase: "", store: "", supplier: "" });
   const [purchaseSearch, setPurchaseSearch] = useState("");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [boletoFiles, setBoletoFiles] = useState<File[]>([]);
@@ -339,22 +339,23 @@ export function OrquestraHubApp() {
       phone: storeForm.phone,
       state: storeForm.state.toUpperCase(),
     };
-    const persist = user.id !== demoUserId;
-    const created = persist ? await createStore(defaultTenantId, newStore) : null;
-    if (persist && !created) {
+    try {
+      const persist = user.id !== demoUserId;
+      const created = persist ? await createStore(defaultTenantId, newStore) : null;
+      if (persist && !created) throw new Error("A loja não retornou confirmação de salvamento.");
+      const storeId = created?.id || crypto.randomUUID();
+      const photo = storePhoto ? await uploadPurchaseAttachment(defaultTenantId, storeId, "lojas", storePhoto) : null;
+      if (created && photo) await updateStore(defaultTenantId, storeId, { photoUrl: photo.url });
+      setStoreList((current) => [{ id: storeId, ...newStore, photoUrl: photo?.url }, ...current]);
+      setPurchaseForm((form) => ({ ...form, store: newStore.name }));
+      setStoreForm({ address: "", balance: "R$ 0,00", cep: "", city: "", manager: "", mapsUrl: "", monthlyGoal: "R$ 0,00", name: "", phone: "", state: "" });
+      setStorePhoto(null);
+      setFormErrors((errors) => ({ ...errors, store: "" }));
+      await recordAudit(defaultTenantId, user, "criou", "loja", storeId);
+      setShowStoreForm(false);
+    } catch {
       setFormErrors((errors) => ({ ...errors, store: "Não foi possível salvar a loja. Verifique sua conexão e tente novamente." }));
-      return;
     }
-    const storeId = created?.id || crypto.randomUUID();
-    const photo = storePhoto ? await uploadPurchaseAttachment(defaultTenantId, storeId, "lojas", storePhoto) : null;
-    if (created && photo) await updateStore(defaultTenantId, storeId, { photoUrl: photo.url });
-    setStoreList((current) => [{ id: storeId, ...newStore, photoUrl: photo?.url }, ...current]);
-    setPurchaseForm((form) => ({ ...form, store: newStore.name }));
-    setStoreForm({ address: "", balance: "R$ 0,00", cep: "", city: "", manager: "", mapsUrl: "", monthlyGoal: "R$ 0,00", name: "", phone: "", state: "" });
-    setStorePhoto(null);
-    setFormErrors((errors) => ({ ...errors, store: "" }));
-    await recordAudit(defaultTenantId, user, "criou", "loja", storeId);
-    setShowStoreForm(false);
   }
 
   async function addPurchase() {
@@ -457,25 +458,39 @@ export function OrquestraHubApp() {
   }
 
   async function addFixedExpense() {
-    if (!user) return;
-    if (user.id !== demoUserId && !firebaseReady) return;
+    if (!user) {
+      setFormErrors((errors) => ({ ...errors, fixedExpense: "Entre novamente antes de cadastrar uma despesa fixa." }));
+      return;
+    }
+    if (user.id !== demoUserId && !firebaseReady) {
+      setFormErrors((errors) => ({ ...errors, fixedExpense: "Banco de dados ainda não conectado. Aguarde alguns segundos e tente novamente." }));
+      return;
+    }
     const amount = parseMoney(fixedExpenseForm.amount);
     const dueDay = Math.min(Math.max(Number(fixedExpenseForm.dueDay), 1), 28);
-    if (!fixedExpenseForm.name.trim() || !fixedExpenseForm.payee.trim() || amount <= 0) return;
+    if (!fixedExpenseForm.name.trim() || !fixedExpenseForm.payee.trim() || amount <= 0) {
+      setFormErrors((errors) => ({ ...errors, fixedExpense: "Informe despesa, favorecido e valor mensal maior que R$ 0,00." }));
+      return;
+    }
     const expense: Omit<FixedExpense, "id"> = { active: true, alertDays: Math.max(Number(fixedExpenseForm.alertDays), 0), amount: money.format(amount), category: toTitleCaseBR(fixedExpenseForm.category || "Outros"), dueDay, name: toTitleCaseBR(fixedExpenseForm.name), payee: toTitleCaseBR(fixedExpenseForm.payee), store: fixedExpenseForm.store };
-    const persist = user.id !== demoUserId;
-    const saved = persist ? await createFixedExpense(defaultTenantId, expense) : null;
-    if (persist && !saved) return;
-    const id = saved?.id || crypto.randomUUID();
-    const now = new Date();
-    const dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay).toLocaleDateString("pt-BR");
-    const account: Omit<AccountPayable, "id"> = { amount: expense.amount, dueDate, fixedExpenseId: id, installment: "Mensal", referenceMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, status: "Aberto", store: expense.store, supplier: expense.payee };
-    const savedAccount = persist ? await createAccountPayable(defaultTenantId, account) : null;
-    if (persist && !savedAccount) return;
-    setFixedExpenses((items) => [{ id, ...expense }, ...items]);
-    setAccountList((items) => [{ id: savedAccount?.id || crypto.randomUUID(), ...account }, ...items]);
-    setFixedExpenseForm({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: storeList[0]?.name || "" });
-    await recordAudit(defaultTenantId, user, "criou", "despesa fixa", id);
+    try {
+      const persist = user.id !== demoUserId;
+      const saved = persist ? await createFixedExpense(defaultTenantId, expense) : null;
+      if (persist && !saved) throw new Error("A despesa fixa não retornou confirmação de salvamento.");
+      const id = saved?.id || crypto.randomUUID();
+      const now = new Date();
+      const dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay).toLocaleDateString("pt-BR");
+      const account: Omit<AccountPayable, "id"> = { amount: expense.amount, dueDate, fixedExpenseId: id, installment: "Mensal", referenceMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, status: "Aberto", store: expense.store, supplier: expense.payee };
+      const savedAccount = persist ? await createAccountPayable(defaultTenantId, account) : null;
+      if (persist && !savedAccount) throw new Error("A conta da despesa fixa não retornou confirmação de salvamento.");
+      setFixedExpenses((items) => [{ id, ...expense }, ...items]);
+      setAccountList((items) => [{ id: savedAccount?.id || crypto.randomUUID(), ...account }, ...items]);
+      setFixedExpenseForm({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: storeList[0]?.name || "" });
+      setFormErrors((errors) => ({ ...errors, fixedExpense: "" }));
+      await recordAudit(defaultTenantId, user, "criou", "despesa fixa", id);
+    } catch {
+      setFormErrors((errors) => ({ ...errors, fixedExpense: "Não foi possível salvar a despesa fixa. Verifique sua conexão e tente novamente." }));
+    }
   }
 
   function requestMarkPaid(id: string) {
@@ -603,27 +618,32 @@ export function OrquestraHubApp() {
 
   async function saveEdit(values: Record<string, string>, password: string) {
     if (!editTarget) return;
-    const persist = firebaseReady && user?.id !== demoUserId;
-    if (editTarget.kind === "account" && editTarget.item.status === "Pago") await verifyCurrentPassword(password);
-    if (editTarget.kind === "store") {
-      const updates = { name: toTitleCaseBR(values.name), manager: toTitleCaseBR(values.manager), phone: formatPhone(values.phone), cep: values.cep, address: toTitleCaseBR(values.address), city: toTitleCaseBR(values.city), state: values.state.toUpperCase(), mapsUrl: values.mapsUrl, monthlyGoal: values.monthlyGoal, balance: values.balance };
-      if (persist) await updateStore(defaultTenantId, editTarget.item.id, updates);
-      setStoreList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
-    } else if (editTarget.kind === "supplier") {
-      const updates = { name: toTitleCaseBR(values.name), document: formatCnpj(values.document), contactName: toTitleCaseBR(values.contactName), phone: formatPhone(values.phone), email: values.email.toLowerCase(), address: toTitleCaseBR(values.address), paymentMethod: values.paymentMethod as Supplier["paymentMethod"], pixKey: values.pixKey, bank: toTitleCaseBR(values.bank), agency: values.agency, account: values.account, paymentTerms: values.paymentTerms, notes: values.notes };
-      if (persist) await updateSupplier(defaultTenantId, editTarget.item.id, updates);
-      setSupplierList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
-    } else if (editTarget.kind === "purchase") {
-      const updates = { invoiceNumber: values.invoiceNumber.toUpperCase(), description: values.description.trim(), supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), issueDate: values.issueDate, total: values.total, installments: Number(values.installments) };
-      if (persist) await updatePurchase(defaultTenantId, editTarget.item.id, updates);
-      setPurchaseList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
-    } else {
-      const updates = { supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, dailyInterestAmount: values.dailyInterestAmount, dailyInterestPercent: values.dailyInterestPercent, lateFeeAmount: values.lateFeeAmount, lateFeePercent: values.lateFeePercent, protestAfterDays: values.protestAfterDays, installment: values.installment };
-      if (persist) await updateAccountPayable(defaultTenantId, editTarget.item.id, updates);
-      setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+    try {
+      const persist = firebaseReady && user?.id !== demoUserId;
+      if (user?.id !== demoUserId && !firebaseReady) throw new Error("Firebase não está pronto para salvar a edição.");
+      if (editTarget.kind === "account" && editTarget.item.status === "Pago") await verifyCurrentPassword(password);
+      if (editTarget.kind === "store") {
+        const updates = { name: toTitleCaseBR(values.name), manager: toTitleCaseBR(values.manager), phone: formatPhone(values.phone), cep: values.cep, address: toTitleCaseBR(values.address), city: toTitleCaseBR(values.city), state: values.state.toUpperCase(), mapsUrl: values.mapsUrl, monthlyGoal: values.monthlyGoal, balance: values.balance };
+        if (persist) await updateStore(defaultTenantId, editTarget.item.id, updates);
+        setStoreList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+      } else if (editTarget.kind === "supplier") {
+        const updates = { name: toTitleCaseBR(values.name), document: formatCnpj(values.document), contactName: toTitleCaseBR(values.contactName), phone: formatPhone(values.phone), email: values.email.toLowerCase(), address: toTitleCaseBR(values.address), paymentMethod: values.paymentMethod as Supplier["paymentMethod"], pixKey: values.pixKey, bank: toTitleCaseBR(values.bank), agency: values.agency, account: values.account, paymentTerms: values.paymentTerms, notes: values.notes };
+        if (persist) await updateSupplier(defaultTenantId, editTarget.item.id, updates);
+        setSupplierList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+      } else if (editTarget.kind === "purchase") {
+        const updates = { invoiceNumber: values.invoiceNumber.toUpperCase(), description: values.description.trim(), supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), issueDate: values.issueDate, total: values.total, installments: Number(values.installments) };
+        if (persist) await updatePurchase(defaultTenantId, editTarget.item.id, updates);
+        setPurchaseList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+      } else {
+        const updates = { supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, dailyInterestAmount: values.dailyInterestAmount, dailyInterestPercent: values.dailyInterestPercent, lateFeeAmount: values.lateFeeAmount, lateFeePercent: values.lateFeePercent, protestAfterDays: values.protestAfterDays, installment: values.installment };
+        if (persist) await updateAccountPayable(defaultTenantId, editTarget.item.id, updates);
+        setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+      }
+      setEditTarget(null);
+      await recordAudit(defaultTenantId, user, "editou", editTarget.kind, editTarget.item.id);
+    } catch {
+      throw new Error("Não foi possível salvar a edição. Verifique sua conexão e tente novamente.");
     }
-    setEditTarget(null);
-    await recordAudit(defaultTenantId, user, "editou", editTarget.kind, editTarget.item.id);
   }
 
   async function handleLogout() {
@@ -821,7 +841,7 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Cadastre despesas recorrentes e gere automaticamente a conta do mês com antecedência de alerta." id="despesas-fixas" title="Despesas fixas">
-          <FixedExpensesPanel canWrite={canWrite} expenses={fixedExpenses} form={fixedExpenseForm} onChange={setFixedExpenseForm} onSubmit={addFixedExpense} storeOptions={storeList.map((store) => store.name)} />
+          <FixedExpensesPanel canWrite={canWrite} error={formErrors.fixedExpense} expenses={fixedExpenses} form={fixedExpenseForm} onChange={setFixedExpenseForm} onSubmit={addFixedExpense} storeOptions={storeList.map((store) => store.name)} />
         </Section>
 
         <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">

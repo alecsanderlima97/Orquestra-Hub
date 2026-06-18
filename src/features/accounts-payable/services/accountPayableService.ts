@@ -12,7 +12,7 @@ export async function listAccountsPayable(tenantId: string): Promise<AccountPaya
 }
 
 export async function markAccountAsPaid(tenantId: string, accountId: string) {
-  if (!firebaseReady || !db) return;
+  if (!firebaseReady || !db) throw new Error("Firebase não está pronto para salvar a baixa.");
   await updateDoc(doc(db, tenantCollectionPath(tenantId, collectionName), accountId), {
     paidAt: serverTimestamp(),
     status: "Pago",
@@ -21,11 +21,11 @@ export async function markAccountAsPaid(tenantId: string, accountId: string) {
 }
 
 export async function updateAccountPayable(tenantId: string, accountId: string, account: Partial<AccountPayable>) {
-  if (!firebaseReady || !db) return;
+  if (!firebaseReady || !db) throw new Error("Firebase não está pronto para atualizar a conta.");
   await updateDoc(doc(db, tenantCollectionPath(tenantId, collectionName), accountId), { ...account, updatedAt: serverTimestamp() });
 }
 
 export async function createAccountPayable(tenantId: string, account: Omit<AccountPayable, "id">) {
-  if (!firebaseReady || !db) return null;
+  if (!firebaseReady || !db) throw new Error("Firebase não está pronto para salvar a conta.");
   return addDoc(collection(db, tenantCollectionPath(tenantId, collectionName)), { ...account, createdAt: serverTimestamp() });
 }

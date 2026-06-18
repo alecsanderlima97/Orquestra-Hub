@@ -34,17 +34,6 @@ function cacheUser(user: AppUser) {
   return user;
 }
 
-function cachedUser(user: User) {
-  if (typeof window === "undefined") return null;
-  try {
-    const cached = JSON.parse(window.localStorage.getItem("orquestra-user") || "null") as AppUser | null;
-    if (cached?.id !== user.uid) return null;
-    return platformOwnerEmails.has((user.email || "").toLowerCase()) || cached.role === "Dono" ? { ...cached, role: ownerRole() } : cached;
-  } catch {
-    return null;
-  }
-}
-
 async function mapUserWithRole(user: User) {
   if (!db) return mapFirebaseUser(user);
   const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
@@ -63,7 +52,7 @@ async function mapUserWithRole(user: User) {
 
   const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
   if (legacy.exists()) return mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub");
-  return mapFirebaseUser(user);
+  throw new Error("tenant-access-missing");
 }
 
 export async function loginWithEmail(email: string, password: string) {
@@ -181,12 +170,13 @@ export function listenAuth(callback: (user: AppUser | null) => void) {
       callback(null);
       return;
     }
-    const timeout = new Promise<AppUser>((resolve) => {
-      window.setTimeout(() => resolve(cachedUser(user) || mapFirebaseUser(user)), 8000);
-    });
-    void Promise.race([mapUserWithRole(user), timeout])
+    void ensureTenantAccess(user)
+      .then(() => mapUserWithRole(user))
       .then((mapped) => callback(cacheUser(mapped)))
-      .catch(() => callback(cachedUser(user) || mapFirebaseUser(user)));
+      .catch(() => {
+        window.localStorage.removeItem("orquestra-user");
+        callback(null);
+      });
   }, () => callback(null));
 }
 

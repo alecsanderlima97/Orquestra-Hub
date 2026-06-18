@@ -33,7 +33,7 @@ export async function createPurchaseWithAccounts(
 }
 
 export async function updatePurchase(tenantId: string, purchaseId: string, purchase: Partial<Purchase>) {
-  if (!firebaseReady || !db) return;
+  if (!firebaseReady || !db) throw new Error("Firebase não está pronto para atualizar a compra.");
   await updateDoc(doc(db, tenantCollectionPath(tenantId, "purchases"), purchaseId), { ...purchase, updatedAt: serverTimestamp() });
 }
 
