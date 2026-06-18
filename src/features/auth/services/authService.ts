@@ -1,4 +1,4 @@
-import { createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from "firebase/auth";
+import { createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from "firebase/auth";
 import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { consumeInvite, getInvite } from "@/features/users/services/inviteService";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
@@ -128,7 +128,17 @@ export async function registerWithEmail(name: string, companyName: string, email
 
 export async function loginWithGoogle() {
   if (!firebaseReady || !auth) return null;
-  const credential = await signInWithPopup(auth, new GoogleAuthProvider());
+  const activeAuth = auth;
+  const provider = new GoogleAuthProvider();
+  const credential = await signInWithPopup(activeAuth, provider).catch(async (error) => {
+    const code = String((error as { code?: string })?.code || "");
+    if (code.includes("popup-blocked") || code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request")) {
+      await signInWithRedirect(activeAuth, provider);
+      return null;
+    }
+    throw error;
+  });
+  if (!credential) return null;
   await ensureTenantAccess(credential.user);
   return mapUserWithRole(credential.user);
 }
