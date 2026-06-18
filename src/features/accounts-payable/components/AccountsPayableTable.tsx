@@ -1,5 +1,5 @@
 import { CheckCircle2, MessageCircle, Paperclip, Pencil } from "lucide-react";
-import { parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
+import { brCurrencyFormatter, parseBRL, parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
 import type { AccountPayable } from "../types/accountPayableTypes";
 
 const statusStyles: Record<AccountPayable["status"], string> = {
@@ -22,6 +22,11 @@ function rowStyle(account: AccountPayable) {
   if (label === "Vencido") return "bg-rose-50";
   if (label === "Vence hoje") return "bg-amber-50";
   return "";
+}
+
+function lateCharge(account: AccountPayable) {
+  if (account.status === "Pago" || dueLabel(account) !== "Vencido") return 0;
+  return parseBRL(account.interestAmount || "R$ 0,00") + parseBRL(account.lateFeeAmount || "R$ 0,00");
 }
 
 export function AccountsPayableTable({
@@ -47,6 +52,7 @@ export function AccountsPayableTable({
             <th className="px-5 py-3 font-medium">Parcela</th>
             <th className="px-5 py-3 font-medium">Vencimento</th>
             <th className="px-5 py-3 font-medium">Valor</th>
+            <th className="px-5 py-3 font-medium">Juros/Mora</th>
             <th className="px-5 py-3 font-medium">Status</th>
             <th className="px-5 py-3 font-medium">Ações</th>
           </tr>
@@ -55,6 +61,7 @@ export function AccountsPayableTable({
           {accounts.length ? (
             accounts.map((account) => {
               const label = dueLabel(account);
+              const charges = lateCharge(account);
               return (
                 <tr className={rowStyle(account)} key={account.id}>
                   <td className="px-5 py-4 font-medium text-slate-950">{account.supplier}</td>
@@ -66,7 +73,18 @@ export function AccountsPayableTable({
                       {label ? <span className="text-xs font-semibold text-rose-700">{label}</span> : null}
                     </div>
                   </td>
-                  <td className="px-5 py-4 font-medium text-slate-950">{account.amount}</td>
+                  <td className="px-5 py-4 font-medium text-slate-950">
+                    <div className="flex flex-col gap-1">
+                      <span>{account.amount}</span>
+                      {charges > 0 ? <span className="text-xs font-semibold text-rose-700">Total com atraso: {brCurrencyFormatter.format(parseBRL(account.amount) + charges)}</span> : null}
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 text-slate-700">
+                    <div className="flex flex-col gap-1">
+                      <span>{charges > 0 ? brCurrencyFormatter.format(charges) : "R$ 0,00"}</span>
+                      {charges > 0 ? <span className="text-xs text-slate-500">Juros {account.interestAmount || "R$ 0,00"} · Mora {account.lateFeeAmount || "R$ 0,00"}</span> : <span className="text-xs text-slate-500">Sem atraso calculado</span>}
+                    </div>
+                  </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-col gap-1">
                       <span className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[account.status]}`}>
@@ -115,7 +133,7 @@ export function AccountsPayableTable({
             })
           ) : (
             <tr>
-              <td className="px-5 py-8 text-center text-slate-500" colSpan={7}>
+              <td className="px-5 py-8 text-center text-slate-500" colSpan={8}>
                 Nenhuma conta encontrada com os filtros selecionados.
               </td>
             </tr>

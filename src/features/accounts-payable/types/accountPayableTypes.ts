@@ -4,7 +4,9 @@ export type AccountPayable = {
   store: string;
   dueDate: string;
   amount: string;
+  interestAmount?: string;
   installment: string;
+  lateFeeAmount?: string;
   paidAt?: string;
   receiptName?: string;
   receiptPath?: string;

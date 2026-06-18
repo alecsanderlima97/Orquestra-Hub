@@ -123,8 +123,10 @@ export function OrquestraHubApp() {
     description: "",
     dueDate: "2026-06-10",
     installments: "3",
+    interestAmount: "R$ 0,00",
     invoiceNumber: "NF 1003",
     issueDate: "2026-06-08",
+    lateFeeAmount: "R$ 0,00",
     store: "Loja de Baixo",
     supplier: "Mister Multimarcas",
     total: "R$ 15.000,00",
@@ -318,6 +320,8 @@ export function OrquestraHubApp() {
 
   async function addPurchase() {
     const installments = Math.max(Number(purchaseForm.installments), 1);
+    const interestAmount = parseMoney(purchaseForm.interestAmount);
+    const lateFeeAmount = parseMoney(purchaseForm.lateFeeAmount);
     const total = parseMoney(purchaseForm.total);
     if (!purchaseForm.supplier || !supplierList.some((supplier) => supplier.name === purchaseForm.supplier)) {
       setFormErrors((errors) => ({ ...errors, purchase: "Selecione um fornecedor cadastrado." }));
@@ -361,7 +365,9 @@ export function OrquestraHubApp() {
     const newAccounts: Omit<AccountPayable, "id">[] = Array.from({ length: installments }, (_, index) => ({
       amount: money.format(installmentAmount),
       dueDate: addMonths(purchaseForm.dueDate, index),
+      interestAmount: money.format(interestAmount),
       installment: `${index + 1}/${installments}`,
+      lateFeeAmount: money.format(lateFeeAmount),
       status: "Aberto" as const,
       store: toTitleCaseBR(purchaseForm.store),
       supplier: toTitleCaseBR(purchaseForm.supplier),
@@ -526,7 +532,7 @@ export function OrquestraHubApp() {
     if (target.kind === "store") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "manager", label: "Responsável", mask: "title", value: target.item.manager }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone || "" }, { key: "cep", label: "CEP", mask: "cep", value: target.item.cep || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "city", label: "Cidade", mask: "title", value: target.item.city || "" }, { key: "state", label: "Estado", mask: "upper", value: target.item.state || "" }, { key: "mapsUrl", label: "Google Maps", value: target.item.mapsUrl || "" }, { key: "monthlyGoal", label: "Meta mensal", mask: "currency", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", mask: "currency", value: target.item.balance }];
     if (target.kind === "supplier") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "document", label: "CNPJ", mask: "cnpj", value: target.item.document }, { key: "contactName", label: "Contato", mask: "title", value: target.item.contactName || "" }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone }, { key: "email", label: "E-mail", value: target.item.email || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "paymentMethod", label: "Forma de pagamento", value: target.item.paymentMethod || "" }, { key: "pixKey", label: "Chave PIX", value: target.item.pixKey || "" }, { key: "bank", label: "Banco", mask: "title", value: target.item.bank || "" }, { key: "agency", label: "Agência", value: target.item.agency || "" }, { key: "account", label: "Conta", value: target.item.account || "" }, { key: "paymentTerms", label: "Condição de pagamento", value: target.item.paymentTerms || "" }, { key: "notes", label: "Observações", value: target.item.notes || "" }];
     if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", mask: "upper", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", mask: "currency", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
-    return [{ key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "installment", label: "Parcela", value: target.item.installment }];
+    return [{ key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "interestAmount", label: "Juros por atraso", mask: "currency", value: target.item.interestAmount || "R$ 0,00" }, { key: "lateFeeAmount", label: "Mora por atraso", mask: "currency", value: target.item.lateFeeAmount || "R$ 0,00" }, { key: "installment", label: "Parcela", value: target.item.installment }];
   }
 
   async function saveEdit(values: Record<string, string>, password: string) {
@@ -546,7 +552,7 @@ export function OrquestraHubApp() {
       if (persist) await updatePurchase(defaultTenantId, editTarget.item.id, updates);
       setPurchaseList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
     } else {
-      const updates = { supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, installment: values.installment };
+      const updates = { supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, interestAmount: values.interestAmount, lateFeeAmount: values.lateFeeAmount, installment: values.installment };
       if (persist) await updateAccountPayable(defaultTenantId, editTarget.item.id, updates);
       setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
     }

@@ -4,7 +4,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { formatBRL } from "@/lib/formatters/br";
 
-export type PurchaseFormState = { description: string; dueDate: string; installments: string; invoiceNumber: string; issueDate: string; store: string; supplier: string; total: string };
+export type PurchaseFormState = { description: string; dueDate: string; installments: string; interestAmount: string; invoiceNumber: string; issueDate: string; lateFeeAmount: string; store: string; supplier: string; total: string };
 const accept = "application/pdf,image/jpeg,image/png,image/webp";
 
 export function PurchaseForm({ boletoFiles, error, form, invoiceFile, onBoletoFilesChange, onChange, onInvoiceFileChange, onSubmit, storeOptions, supplierOptions }: { boletoFiles: File[]; error?: string; form: PurchaseFormState; invoiceFile: File | null; onBoletoFilesChange: (files: File[]) => void; onChange: (form: PurchaseFormState) => void; onInvoiceFileChange: (file: File | null) => void; onSubmit: () => void; storeOptions: string[]; supplierOptions: string[] }) {
@@ -15,6 +15,8 @@ export function PurchaseForm({ boletoFiles, error, form, invoiceFile, onBoletoFi
       <TextField label="Número da nota" onChange={(event) => onChange({ ...form, invoiceNumber: event.target.value.toLocaleUpperCase("pt-BR") })} placeholder="NF 0000" value={form.invoiceNumber} />
       <TextField label="Descrição dos produtos" onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ex.: Vestidos, calças e acessórios" value={form.description} />
       <TextField label="Valor total" onBlur={() => onChange({ ...form, total: formatBRL(form.total) })} onChange={(event) => onChange({ ...form, total: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.total} />
+      <TextField label="Juros por atraso" onBlur={() => onChange({ ...form, interestAmount: formatBRL(form.interestAmount) })} onChange={(event) => onChange({ ...form, interestAmount: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.interestAmount} />
+      <TextField label="Mora por atraso" onBlur={() => onChange({ ...form, lateFeeAmount: formatBRL(form.lateFeeAmount) })} onChange={(event) => onChange({ ...form, lateFeeAmount: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.lateFeeAmount} />
       <TextField label="Data da compra" onChange={(event) => onChange({ ...form, issueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.issueDate} />
       <TextField label="Parcelas" onChange={(event) => onChange({ ...form, installments: event.target.value })} placeholder="1" type="number" value={form.installments} />
       <TextField label="Primeiro vencimento" onChange={(event) => onChange({ ...form, dueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.dueDate} />
