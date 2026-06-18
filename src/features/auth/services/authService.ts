@@ -34,7 +34,7 @@ function cacheUser(user: AppUser) {
   return user;
 }
 
-async function mapUserWithRole(user: User) {
+async function mapUserWithRole(user: User, allowOnboarding = false) {
   if (!db) return mapFirebaseUser(user);
   const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
   if (!memberships.empty) {
@@ -52,6 +52,7 @@ async function mapUserWithRole(user: User) {
 
   const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
   if (legacy.exists()) return mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub");
+  if (allowOnboarding) return cacheUser({ ...mapFirebaseUser(user, ownerRole(), "", "Nova empresa"), needsOnboarding: true });
   throw new Error("tenant-access-missing");
 }
 
@@ -139,8 +140,7 @@ export async function loginWithGoogle() {
     throw error;
   });
   if (!credential) return null;
-  await ensureTenantAccess(credential.user);
-  return mapUserWithRole(credential.user);
+  return mapUserWithRole(credential.user, true);
 }
 
 export async function completeGoogleOnboarding(user: AppUser, companyName: string) {
@@ -180,8 +180,7 @@ export function listenAuth(callback: (user: AppUser | null) => void) {
       callback(null);
       return;
     }
-    void ensureTenantAccess(user)
-      .then(() => mapUserWithRole(user))
+    void mapUserWithRole(user, true)
       .then((mapped) => callback(cacheUser(mapped)))
       .catch(() => {
         window.localStorage.removeItem("orquestra-user");
