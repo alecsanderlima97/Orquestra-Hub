@@ -133,7 +133,13 @@ export async function loginWithGoogle() {
   const provider = new GoogleAuthProvider();
   const credential = await signInWithPopup(activeAuth, provider).catch(async (error) => {
     const code = String((error as { code?: string })?.code || "");
-    if (code.includes("popup-blocked") || code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request")) {
+    if (
+      code.includes("popup-blocked")
+      || code.includes("popup-closed-by-user")
+      || code.includes("cancelled-popup-request")
+      || code.includes("web-storage-unsupported")
+      || code.includes("internal-error")
+    ) {
       await signInWithRedirect(activeAuth, provider);
       return null;
     }
