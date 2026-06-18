@@ -9,7 +9,7 @@ export async function createPurchaseWithAccounts(
   purchase: Omit<Purchase, "id">,
   accounts: Omit<AccountPayable, "id">[],
 ) {
-  if (!firebaseReady || !db) return null;
+  if (!firebaseReady || !db) throw new Error("Firebase não está pronto para salvar a compra.");
   const firestore = db;
 
   const purchaseRef = await addDoc(collection(firestore, tenantCollectionPath(tenantId, "purchases")), {

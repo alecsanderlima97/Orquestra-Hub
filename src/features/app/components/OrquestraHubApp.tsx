@@ -42,6 +42,7 @@ import { PurchasesTable } from "@/features/purchases/components/PurchasesTable";
 import { createPurchaseWithAccounts, listPurchases, updatePurchase } from "@/features/purchases/services/purchaseService";
 import { deletePurchaseAttachment, uploadPurchaseAttachment } from "@/features/purchases/services/purchaseAttachmentService";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
+import type { PurchaseAttachment } from "@/features/purchases/types/purchaseTypes";
 import { FinancialReports } from "@/features/reports/components/FinancialReports";
 import { PrivacyPanel } from "@/features/privacy/components/PrivacyPanel";
 import { UserProfile } from "@/features/profile/components/UserProfile";
@@ -322,6 +323,14 @@ export function OrquestraHubApp() {
   }
 
   async function addPurchase() {
+    if (!user) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Entre novamente antes de lançar uma compra." }));
+      return;
+    }
+    if (user.id !== demoUserId && !firebaseReady) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Banco de dados ainda não conectado. Aguarde alguns segundos e tente novamente." }));
+      return;
+    }
     const installments = Math.max(Number(purchaseForm.installments), 1);
     const dailyInterestAmount = parseMoney(purchaseForm.dailyInterestAmount);
     const lateFeeAmount = parseMoney(purchaseForm.lateFeeAmount);
@@ -379,10 +388,19 @@ export function OrquestraHubApp() {
       supplier: toTitleCaseBR(purchaseForm.supplier),
     }));
     try {
-      const saved = firebaseReady && user?.id !== demoUserId ? await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts) : null;
+      const persist = firebaseReady && user.id !== demoUserId;
+      const saved = persist ? await createPurchaseWithAccounts(defaultTenantId, newPurchase, newAccounts) : null;
+      if (persist && !saved) throw new Error("A compra não retornou confirmação de salvamento.");
       const finalId = saved?.purchaseId || purchaseId;
-      const invoiceAttachment = invoiceFile ? await uploadPurchaseAttachment(defaultTenantId, finalId, "notas-fiscais", invoiceFile) : undefined;
-      const boletoAttachments = await Promise.all(boletoFiles.map((file) => uploadPurchaseAttachment(defaultTenantId, finalId, "boletos", file)));
+      let attachmentError = false;
+      let invoiceAttachment: PurchaseAttachment | undefined;
+      let boletoAttachments: PurchaseAttachment[] = [];
+      try {
+        invoiceAttachment = invoiceFile ? await uploadPurchaseAttachment(defaultTenantId, finalId, "notas-fiscais", invoiceFile) : undefined;
+        boletoAttachments = await Promise.all(boletoFiles.map((file) => uploadPurchaseAttachment(defaultTenantId, finalId, "boletos", file)));
+      } catch {
+        attachmentError = true;
+      }
       const attachments = { invoiceAttachment, boletoAttachments };
       if (saved?.purchaseId && (invoiceAttachment || boletoAttachments.length)) await updatePurchase(defaultTenantId, saved.purchaseId, attachments);
       setPurchaseList((current) => [{ id: finalId, ...newPurchase, ...attachments }, ...current]);
@@ -392,6 +410,8 @@ export function OrquestraHubApp() {
       ]);
       setInvoiceFile(null);
       setBoletoFiles([]);
+      setFormErrors((errors) => ({ ...errors, purchase: attachmentError ? "Compra salva. Alguns anexos não foram enviados; tente anexar novamente pela nota." : "" }));
+      if (attachmentError) return;
     } catch {
       setFormErrors((errors) => ({ ...errors, purchase: "A nota foi validada, mas não foi possível salvar os dados ou anexos." }));
       return;
