@@ -4,7 +4,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { formatBRL } from "@/lib/formatters/br";
 
-export type PurchaseFormState = { description: string; dueDate: string; installments: string; interestAmount: string; invoiceNumber: string; issueDate: string; lateFeeAmount: string; store: string; supplier: string; total: string };
+export type PurchaseFormState = { dailyInterestAmount: string; dailyInterestPercent: string; description: string; dueDate: string; installments: string; invoiceNumber: string; issueDate: string; lateFeeAmount: string; lateFeePercent: string; protestAfterDays: string; store: string; supplier: string; total: string };
 const accept = "application/pdf,image/jpeg,image/png,image/webp";
 
 export function PurchaseForm({ boletoFiles, error, form, invoiceFile, onBoletoFilesChange, onChange, onInvoiceFileChange, onSubmit, storeOptions, supplierOptions }: { boletoFiles: File[]; error?: string; form: PurchaseFormState; invoiceFile: File | null; onBoletoFilesChange: (files: File[]) => void; onChange: (form: PurchaseFormState) => void; onInvoiceFileChange: (file: File | null) => void; onSubmit: () => void; storeOptions: string[]; supplierOptions: string[] }) {
@@ -15,11 +15,20 @@ export function PurchaseForm({ boletoFiles, error, form, invoiceFile, onBoletoFi
       <TextField label="Número da nota" onChange={(event) => onChange({ ...form, invoiceNumber: event.target.value.toLocaleUpperCase("pt-BR") })} placeholder="NF 0000" value={form.invoiceNumber} />
       <TextField label="Descrição dos produtos" onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ex.: Vestidos, calças e acessórios" value={form.description} />
       <TextField label="Valor total" onBlur={() => onChange({ ...form, total: formatBRL(form.total) })} onChange={(event) => onChange({ ...form, total: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.total} />
-      <TextField label="Juros por atraso" onBlur={() => onChange({ ...form, interestAmount: formatBRL(form.interestAmount) })} onChange={(event) => onChange({ ...form, interestAmount: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.interestAmount} />
-      <TextField label="Mora por atraso" onBlur={() => onChange({ ...form, lateFeeAmount: formatBRL(form.lateFeeAmount) })} onChange={(event) => onChange({ ...form, lateFeeAmount: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.lateFeeAmount} />
       <TextField label="Data da compra" onChange={(event) => onChange({ ...form, issueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.issueDate} />
       <TextField label="Parcelas" onChange={(event) => onChange({ ...form, installments: event.target.value })} placeholder="1" type="number" value={form.installments} />
       <TextField label="Primeiro vencimento" onChange={(event) => onChange({ ...form, dueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.dueDate} />
+    </div>
+    <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">Regras do boleto em atraso</h3>
+      <p className="mt-1 text-xs text-slate-500">Preencha conforme o texto do boleto. Pode usar valor em reais, porcentagem ou ambos.</p>
+      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <TextField label="Mora diaria (R$)" onBlur={() => onChange({ ...form, dailyInterestAmount: formatBRL(form.dailyInterestAmount) })} onChange={(event) => onChange({ ...form, dailyInterestAmount: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.dailyInterestAmount} />
+        <TextField label="Mora diaria (%)" onChange={(event) => onChange({ ...form, dailyInterestPercent: event.target.value.replace(/[^0-9,.]/g, "") })} placeholder="0,33" value={form.dailyInterestPercent} />
+        <TextField label="Multa (R$)" onBlur={() => onChange({ ...form, lateFeeAmount: formatBRL(form.lateFeeAmount) })} onChange={(event) => onChange({ ...form, lateFeeAmount: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.lateFeeAmount} />
+        <TextField label="Multa (%)" onChange={(event) => onChange({ ...form, lateFeePercent: event.target.value.replace(/[^0-9,.]/g, "") })} placeholder="2,00" value={form.lateFeePercent} />
+        <TextField label="Protesto apos dias" onChange={(event) => onChange({ ...form, protestAfterDays: event.target.value.replace(/\D/g, "") })} placeholder="Ex.: 5" type="number" value={form.protestAfterDays} />
+      </div>
     </div>
     <div className="mt-5 grid gap-4 md:grid-cols-2">
       <label className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-700"><span className="flex items-center gap-2 font-semibold"><FileText size={18} />Nota fiscal</span><span className="mt-1 block text-xs text-slate-500">PDF ou imagem, até 10 MB.</span><input accept={accept} className="mt-3 block w-full text-xs" onChange={(event) => onInvoiceFileChange(event.target.files?.[0] || null)} type="file" />{invoiceFile ? <strong className="mt-2 block text-xs text-cyan-700">{invoiceFile.name}</strong> : null}</label>

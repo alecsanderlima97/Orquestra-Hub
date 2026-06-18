@@ -24,9 +24,26 @@ function rowStyle(account: AccountPayable) {
   return "";
 }
 
-function lateCharge(account: AccountPayable) {
+function parsePercent(value?: string) {
+  return Number(String(value || "0").replace(",", ".")) / 100;
+}
+
+function overdueDays(account: AccountPayable) {
   if (account.status === "Pago" || dueLabel(account) !== "Vencido") return 0;
-  return parseBRL(account.interestAmount || "R$ 0,00") + parseBRL(account.lateFeeAmount || "R$ 0,00");
+  const today = todaySaoPaulo().getTime();
+  const dueDate = parseDateBR(account.dueDate).getTime();
+  return Math.max(Math.floor((today - dueDate) / 86400000), 0);
+}
+
+function lateCharge(account: AccountPayable) {
+  const days = overdueDays(account);
+  if (!days) return 0;
+  const amount = parseBRL(account.amount);
+  const dailyFixed = parseBRL(account.dailyInterestAmount || "R$ 0,00") * days;
+  const dailyPercent = amount * parsePercent(account.dailyInterestPercent) * days;
+  const feeFixed = parseBRL(account.lateFeeAmount || "R$ 0,00");
+  const feePercent = amount * parsePercent(account.lateFeePercent);
+  return dailyFixed + dailyPercent + feeFixed + feePercent;
 }
 
 export function AccountsPayableTable({
@@ -62,6 +79,7 @@ export function AccountsPayableTable({
             accounts.map((account) => {
               const label = dueLabel(account);
               const charges = lateCharge(account);
+              const days = overdueDays(account);
               return (
                 <tr className={rowStyle(account)} key={account.id}>
                   <td className="px-5 py-4 font-medium text-slate-950">{account.supplier}</td>
@@ -82,7 +100,8 @@ export function AccountsPayableTable({
                   <td className="px-5 py-4 text-slate-700">
                     <div className="flex flex-col gap-1">
                       <span>{charges > 0 ? brCurrencyFormatter.format(charges) : "R$ 0,00"}</span>
-                      {charges > 0 ? <span className="text-xs text-slate-500">Juros {account.interestAmount || "R$ 0,00"} · Mora {account.lateFeeAmount || "R$ 0,00"}</span> : <span className="text-xs text-slate-500">Sem atraso calculado</span>}
+                      {charges > 0 ? <span className="text-xs text-slate-500">Mora {account.dailyInterestAmount || "R$ 0,00"} / {account.dailyInterestPercent || "0"}% ao dia · Multa {account.lateFeeAmount || "R$ 0,00"} / {account.lateFeePercent || "0"}%</span> : <span className="text-xs text-slate-500">Sem atraso calculado</span>}
+                      {days && account.protestAfterDays ? <span className={`text-xs font-semibold ${days >= Number(account.protestAfterDays) ? "text-rose-700" : "text-slate-500"}`}>Protesto apos {account.protestAfterDays} dia(s)</span> : null}
                     </div>
                   </td>
                   <td className="px-5 py-4">
