@@ -24,6 +24,7 @@ export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", 
     email: user.email || "",
     id: user.uid,
     name: user.displayName || user.email || "Usuário",
+    photoUrl: user.photoURL || "",
     role: effectiveRole,
     tenantId,
   };
@@ -47,12 +48,12 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
     const role = platformOwnerEmails.has((user.email || "").toLowerCase()) || tenant.data()?.ownerId === user.uid
       ? ownerRole()
       : access.data()?.role || data.role || "Consulta";
-    return mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa");
+    return { ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa"), name: access.data()?.name || user.displayName || user.email || "Usuário", photoUrl: access.data()?.photoUrl || user.photoURL || "" };
   }
 
   if (allowOnboarding) return cacheUser({ ...mapFirebaseUser(user, ownerRole(), "", "Nova empresa"), needsOnboarding: true });
   const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
-  if (legacy.exists()) return mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub");
+  if (legacy.exists()) return { ...mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub"), name: legacy.data().name || user.displayName || user.email || "Usuário", photoUrl: legacy.data().photoUrl || user.photoURL || "" };
   throw new Error("tenant-access-missing");
 }
 

@@ -47,6 +47,7 @@ import type { PurchaseAttachment } from "@/features/purchases/types/purchaseType
 import { FinancialReports } from "@/features/reports/components/FinancialReports";
 import { PrivacyPanel } from "@/features/privacy/components/PrivacyPanel";
 import { UserProfile } from "@/features/profile/components/UserProfile";
+import { updateCompanyName, updateUserProfile } from "@/features/profile/services/profileService";
 import { SystemSettings } from "@/features/settings/components/SystemSettings";
 import { FirstAccessOnboarding } from "@/features/onboarding/components/FirstAccessOnboarding";
 import { GuideAssistant } from "@/features/onboarding/components/GuideAssistant";
@@ -705,6 +706,25 @@ export function OrquestraHubApp() {
     await recordAudit(defaultTenantId, user, mode === "replace" ? "editou" : "criou", "backup", defaultTenantId);
   }
 
+  async function saveProfile(name: string, photoUrl: string) {
+    if (!user) return;
+    const updated = await updateUserProfile(user, name, photoUrl);
+    setUser(updated);
+    setTenantUsers((items) => items.map((item) => item.id === updated.id ? { ...item, name: updated.name, photoUrl: updated.photoUrl } : item));
+    window.localStorage.setItem("orquestra-user", JSON.stringify(updated));
+    await recordAudit(defaultTenantId, updated, "editou", "perfil", updated.id);
+  }
+
+  async function saveCompanyName(companyName: string) {
+    if (!user) return;
+    const updated = await updateCompanyName(user, companyName);
+    setUser(updated);
+    setCompanies((items) => items.map((item) => item.tenantId === updated.tenantId ? { ...item, companyName: updated.companyName } : item));
+    setTenantUsers((items) => items.map((item) => item.tenantId === updated.tenantId ? { ...item, companyName: updated.companyName } : item));
+    window.localStorage.setItem("orquestra-user", JSON.stringify(updated));
+    await recordAudit(defaultTenantId, updated, "editou", "empresa", updated.tenantId);
+  }
+
   if (!authChecked) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100 text-sm font-medium text-slate-600">
@@ -847,7 +867,7 @@ export function OrquestraHubApp() {
         <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
-        <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile user={user} /></Section>
+        <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile onCompanySave={saveCompanyName} onProfileSave={saveProfile} user={user} /></Section>
         <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings companyName={user.companyName} tenantId={defaultTenantId} /><div className="mt-5"><PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} /></div>{canManageUsers(user.role) ? <div className="mt-5 space-y-5"><CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} /><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} onImport={importBackup} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
       </div>
       {user.id !== demoUserId ? <GuideAssistant userId={user.id} /> : null}

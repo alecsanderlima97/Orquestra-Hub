@@ -50,7 +50,11 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == userId;
       allow create: if signedIn() && request.auth.uid == userId
         && exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(userId));
-      allow update, delete: if false;
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && isOwner(tenantId)
+        && request.resource.data.role == resource.data.role;
+      allow delete: if false;
     }
 
     match /invites/{code} {

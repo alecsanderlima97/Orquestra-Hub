@@ -5,6 +5,7 @@ export type AppUser = {
   role: "Proprietário" | "Dono" | "Financeiro" | "Consulta";
   tenantId: string;
   companyName: string;
+  photoUrl?: string;
   needsOnboarding?: boolean;
 };
 
