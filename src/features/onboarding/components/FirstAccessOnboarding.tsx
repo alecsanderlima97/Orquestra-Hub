@@ -5,21 +5,23 @@ import { useState } from "react";
 import { TextField } from "@/components/ui/TextField";
 import type { AppUser } from "@/features/auth/types/authTypes";
 
-export function FirstAccessOnboarding({ onComplete, user }: { onComplete: (companyName: string) => Promise<void>; user: AppUser }) {
+export function FirstAccessOnboarding({ onComplete }: { onComplete: (companyName: string, userName: string) => Promise<void>; user: AppUser }) {
   const [companyName, setCompanyName] = useState("");
+  const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function finish() {
-    const finalName = companyName.trim();
-    if (!finalName) {
-      setError("Informe o nome da empresa para iniciar o uso.");
+    const finalCompanyName = companyName.trim();
+    const finalUserName = userName.trim();
+    if (!finalUserName || !finalCompanyName) {
+      setError("Informe seu nome e o nome da empresa para iniciar o uso.");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      await onComplete(finalName);
+      await onComplete(finalCompanyName, finalUserName);
     } catch {
       setError("Nao foi possivel preparar seu ambiente. Tente novamente.");
     } finally {
@@ -35,18 +37,19 @@ export function FirstAccessOnboarding({ onComplete, user }: { onComplete: (compa
             <Sparkles size={22} />
             <span className="text-sm font-semibold uppercase">Primeiro acesso obrigatorio</span>
           </div>
-          <h1 className="mt-3 text-3xl font-bold">Bem-vindo ao Orquestra Hub, {user.name.split(" ")[0]}.</h1>
-          <p className="mt-2 text-slate-300">Antes de usar o sistema, cadastre a empresa onde seus lancamentos serao salvos.</p>
+          <h1 className="mt-3 text-3xl font-bold">Bem-vindo ao Orquestra Hub.</h1>
+          <p className="mt-2 text-slate-300">Antes de usar o sistema, cadastre seu nome e a empresa onde seus lancamentos serao salvos.</p>
         </header>
         <div className="grid gap-7 p-7 md:grid-cols-2">
           <section>
             <h2 className="font-semibold">Cadastre sua primeira empresa</h2>
             <p className="mt-1 text-sm text-slate-600">Esse cadastro cria seu ambiente online exclusivo. Depois voce podera convidar outros usuarios.</p>
-            <div className="mt-5">
-              <TextField label="Nome da empresa" onChange={(event) => setCompanyName(event.target.value)} placeholder="Ex.: Caixa Moda" value={companyName} />
+            <div className="mt-5 space-y-4">
+              <TextField label="Seu nome" onChange={(event) => setUserName(event.target.value)} placeholder="Ex.: Alecsander Lima" value={userName} />
+              <TextField label="Nome da empresa" onChange={(event) => setCompanyName(event.target.value)} placeholder="Ex.: Orquestra Hub" value={companyName} />
             </div>
             {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
-            <button className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={loading || !companyName.trim()} onClick={finish} type="button">
+            <button className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={loading || !userName.trim() || !companyName.trim()} onClick={finish} type="button">
               <Building2 size={18} />
               {loading ? "Criando..." : "Criar empresa e continuar"}
             </button>

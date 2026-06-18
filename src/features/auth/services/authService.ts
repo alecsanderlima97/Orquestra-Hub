@@ -149,14 +149,17 @@ export async function loginWithGoogle() {
   return mapUserWithRole(credential.user, true);
 }
 
-export async function completeGoogleOnboarding(user: AppUser, companyName: string) {
+export async function completeGoogleOnboarding(user: AppUser, companyName: string, userName: string) {
   if (!db || !auth?.currentUser) return user;
   const tenantId = user.tenantId || crypto.randomUUID();
-  const finalCompanyName = companyName.trim() || "Meu Negócio";
+  const finalCompanyName = companyName.trim();
+  const finalUserName = userName.trim();
+  if (!finalCompanyName || !finalUserName) throw new Error("onboarding-required");
+  await updateProfile(auth.currentUser, { displayName: finalUserName }).catch(() => undefined);
   await setDoc(doc(db, tenantPath(tenantId)), { name: finalCompanyName, ownerId: user.id, status: "Ativo", updatedAt: serverTimestamp() }, { merge: true });
-  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, name: user.name, role: ownerRole(), updatedAt: serverTimestamp(), userId: user.id }, { merge: true });
+  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, name: finalUserName, role: ownerRole(), updatedAt: serverTimestamp(), userId: user.id }, { merge: true });
   await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: finalCompanyName, role: ownerRole(), updatedAt: serverTimestamp() }, { merge: true });
-  return cacheUser({ ...user, companyName: finalCompanyName, needsOnboarding: false, role: ownerRole(), tenantId });
+  return cacheUser({ ...user, companyName: finalCompanyName, name: finalUserName, needsOnboarding: false, role: ownerRole(), tenantId });
 }
 
 export async function resetPassword(email: string) {

@@ -715,7 +715,7 @@ export function OrquestraHubApp() {
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
-  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName) => { const completed = await completeGoogleOnboarding(user, companyName); setUser(completed); setCompanies([{ companyName: completed.companyName, role: completed.role, tenantId: completed.tenantId }]); }} user={user} />;
+  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName) => { const completed = await completeGoogleOnboarding(user, companyName, userName); setUser(completed); setCompanies([{ companyName: completed.companyName, role: completed.role, tenantId: completed.tenantId }]); }} user={user} />;
 
   const canWrite = roleCanWrite(user.role);
 
