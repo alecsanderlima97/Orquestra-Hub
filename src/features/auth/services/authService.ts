@@ -50,9 +50,9 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
     return mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa");
   }
 
+  if (allowOnboarding) return cacheUser({ ...mapFirebaseUser(user, ownerRole(), "", "Nova empresa"), needsOnboarding: true });
   const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
   if (legacy.exists()) return mapFirebaseUser(user, legacy.data().role || "Consulta", defaultTenantId, "Orquestra Hub");
-  if (allowOnboarding) return cacheUser({ ...mapFirebaseUser(user, ownerRole(), "", "Nova empresa"), needsOnboarding: true });
   throw new Error("tenant-access-missing");
 }
 
