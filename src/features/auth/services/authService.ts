@@ -124,7 +124,7 @@ export async function registerWithEmail(name: string, companyName: string, email
   if (!emailPattern.test(normalizedEmail)) throw new Error("invalid-email");
   if (cleanPassword.length < 6) throw new Error("weak-password");
 
-  const invite = await getInvite(normalizedInviteCode);
+  const invite = await runFirebaseStep("Falha ao validar convite", () => getInvite(normalizedInviteCode));
   if (!invite) throw new Error("invite-invalid");
 
   const createsCompany = inviteCreatesCompany(invite);
@@ -185,7 +185,7 @@ export async function completeGoogleOnboarding(user: AppUser, companyName: strin
   const finalCompanyName = companyName.trim();
   const finalUserName = userName.trim();
   const normalizedInviteCode = inviteCode.trim().toUpperCase();
-  const invite = await getInvite(normalizedInviteCode);
+  const invite = await runFirebaseStep("Falha ao validar convite", () => getInvite(normalizedInviteCode));
   if (!finalCompanyName || !finalUserName || !invite) throw new Error("onboarding-required");
 
   const createsCompany = inviteCreatesCompany(invite);

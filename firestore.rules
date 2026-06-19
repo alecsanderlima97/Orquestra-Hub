@@ -65,7 +65,7 @@ service cloud.firestore {
     }
 
     match /invites/{code} {
-      allow read: if signedIn() && (resource.data.tenantId == null || isOwner(resource.data.tenantId) || resource.data.status == 'Ativo');
+      allow read: if signedIn() && (resource.data.status == 'Ativo' || resource.data.tenantId == null || isOwner(resource.data.tenantId));
       allow create: if signedIn() && (isPlatformOwner() || isOwner(request.resource.data.tenantId));
       allow update: if signedIn() && (
         isPlatformOwner()
