@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Bot, Cpu, Loader2, Send, Sparkles, X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { auth } from "@/lib/firebase/config";
 import { buildAssistantSnapshot } from "../utils/assistantContext";
@@ -71,12 +71,15 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
   return (
     <>
       <button
-        className="fixed bottom-24 right-5 z-[110] flex size-13 items-center justify-center rounded-full bg-cyan-500 text-slate-950 shadow-2xl shadow-cyan-500/30 transition hover:scale-105 hover:bg-cyan-300"
+        className="fixed bottom-24 right-5 z-[110] flex size-14 items-center justify-center rounded-full border border-cyan-200 bg-slate-950 text-cyan-200 shadow-2xl shadow-cyan-500/25 transition hover:scale-105 hover:bg-cyan-950 hover:text-white"
         onClick={() => setOpen(true)}
         title="Abrir assistente IA financeiro"
         type="button"
       >
-        <Sparkles size={24} />
+        <span className="relative flex size-9 items-center justify-center rounded-full bg-cyan-400/15">
+          <Cpu size={24} />
+          <Sparkles className="absolute -right-1 -top-1 text-cyan-300" size={13} />
+        </span>
       </button>
       {open ? (
         <aside className="fixed bottom-5 right-5 z-[120] flex max-h-[calc(100vh-2.5rem)] w-[calc(100%-2.5rem)] max-w-md flex-col overflow-hidden rounded-lg border border-cyan-200 bg-white shadow-2xl">

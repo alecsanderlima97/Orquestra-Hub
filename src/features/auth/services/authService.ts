@@ -1,4 +1,4 @@
-import { createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from "firebase/auth";
+import { browserLocalPersistence, createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from "firebase/auth";
 import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { consumeInvite, getInvite } from "@/features/users/services/inviteService";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
@@ -59,6 +59,7 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
 
 export async function loginWithEmail(email: string, password: string) {
   if (!firebaseReady || !auth) return null;
+  await setPersistence(auth, browserLocalPersistence);
   const credential = await signInWithEmailAndPassword(auth, normalizeEmail(email), password);
   await ensureTenantAccess(credential.user);
   return mapUserWithRole(credential.user);
@@ -81,6 +82,7 @@ async function ensureTenantAccess(user: User) {
 
 export async function registerWithEmail(name: string, companyName: string, email: string, password: string, inviteCode = "", acceptedTerms = false) {
   if (!firebaseReady || !auth || !db) return null;
+  await setPersistence(auth, browserLocalPersistence);
   const normalizedInviteCode = inviteCode.trim().toUpperCase();
   const normalizedEmail = normalizeEmail(email);
   const cleanPassword = password.trim();
@@ -131,6 +133,7 @@ export async function registerWithEmail(name: string, companyName: string, email
 export async function loginWithGoogle() {
   if (!firebaseReady || !auth) return null;
   const activeAuth = auth;
+  await setPersistence(activeAuth, browserLocalPersistence);
   const provider = new GoogleAuthProvider();
   const credential = await signInWithPopup(activeAuth, provider).catch(async (error) => {
     const code = String((error as { code?: string })?.code || "");

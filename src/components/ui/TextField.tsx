@@ -2,6 +2,7 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import { useState, type ChangeEvent, type FocusEvent } from "react";
+import { toTitleCaseBR } from "@/lib/formatters/br";
 
 export function TextField({
   label,
@@ -11,17 +12,28 @@ export function TextField({
   name,
   type = "text",
   onChange,
+  autoCapitalizeWords = true,
 }: {
   label: string;
   placeholder: string;
   value?: string;
   name?: string;
   type?: string;
+  autoCapitalizeWords?: boolean;
   onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
+  const shouldCapitalize = autoCapitalizeWords && ["text", "search"].includes(type);
+
+  function handleBlur(event: FocusEvent<HTMLInputElement>) {
+    if (shouldCapitalize && event.target.value) {
+      event.target.value = toTitleCaseBR(event.target.value);
+      onChange?.(event as unknown as ChangeEvent<HTMLInputElement>);
+    }
+    onBlur?.(event);
+  }
 
   return (
     <label className="block">
@@ -30,7 +42,7 @@ export function TextField({
         <input
           className={`h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200 ${isPassword ? "pr-11" : ""}`}
           name={name}
-          onBlur={onBlur}
+          onBlur={handleBlur}
           onChange={onChange}
           placeholder={placeholder}
           type={isPassword && showPassword ? "text" : type}

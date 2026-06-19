@@ -17,6 +17,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import type { CompanyMembership } from "@/features/auth/types/authTypes";
+import { UtilityDock } from "./UtilityDock";
 
 const navigation = [
   { description: "Visão geral dos indicadores e próximos vencimentos.", id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -150,6 +151,7 @@ export function AppShell({
         </header>
         {children}
       </section>
+      <UtilityDock />
     </main>
   );
 }

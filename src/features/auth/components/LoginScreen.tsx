@@ -44,6 +44,13 @@ function googleLoginError(error: unknown) {
   return `Nao foi possivel concluir o acesso pelo Google. Detalhe: ${detail}`;
 }
 
+function loginError(error: unknown) {
+  const firebaseError = error as { code?: string; message?: string };
+  const detail = firebaseError?.code || firebaseError?.message || "sem-codigo";
+  if (String(detail).includes("invalid-credential") || String(detail).includes("wrong-password") || String(detail).includes("user-not-found")) return `E-mail ou senha invalidos. Detalhe: ${detail}`;
+  return `Nao foi possivel entrar. Detalhe: ${detail}`;
+}
+
 export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
   const [email, setEmail] = useState(firebaseReady ? "" : "demo@orquestrahub.com");
   const [password, setPassword] = useState(firebaseReady ? "" : "123456");
@@ -75,7 +82,7 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
         : await loginWithEmail(email, password);
       if (user) await finishLogin(user);
     } catch (error) {
-      setMessage(mode === "login" ? "E-mail ou senha invalidos." : registrationError(error));
+      setMessage(mode === "login" ? loginError(error) : registrationError(error));
     } finally {
       setLoading(false);
     }
