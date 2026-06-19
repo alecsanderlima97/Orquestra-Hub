@@ -61,7 +61,15 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.tenantId == null || isOwner(resource.data.tenantId) || resource.data.status == 'Ativo');
       allow create: if signedIn() && (isPlatformOwner() || isOwner(request.resource.data.tenantId));
       allow update: if signedIn() && (
-        isOwner(resource.data.tenantId)
+        isPlatformOwner()
+        || (resource.data.tenantId != null && isOwner(resource.data.tenantId))
+        || (resource.data.inviteType == 'commercial'
+          && resource.data.status == 'Ativo'
+          && request.resource.data.status == 'Usado'
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.inviteType == resource.data.inviteType
+          && request.resource.data.planId == resource.data.planId
+          && request.resource.data.role == resource.data.role)
         || (resource.data.status == 'Ativo'
           && request.resource.data.status == 'Usado'
           && request.resource.data.usedBy == request.auth.uid
