@@ -26,10 +26,11 @@ body {
 }
 .theme-surface, [data-theme] main .bg-white { background-color: var(--surface) !important; border-color: var(--border) !important; }
 [data-theme] main.bg-slate-100, [data-theme] main .bg-slate-100 { background-color: var(--background) !important; }
-[data-theme] main .text-slate-950, [data-theme] main .text-slate-900, [data-theme] main h1, [data-theme] main h2, [data-theme] main h3, [data-theme] main strong { color: var(--foreground) !important; }
+[data-theme] main .text-slate-950, [data-theme] main .text-slate-900 { color: var(--foreground) !important; }
 [data-theme] main .text-slate-700, [data-theme] main .text-slate-600, [data-theme] main .text-slate-500, .theme-muted { color: var(--muted) !important; }
 .theme-accent { color: var(--accent); }
 .theme-accent-soft { background-color: var(--accent-soft) !important; color: var(--accent) !important; }
+[data-theme="escuro"] main h1, [data-theme="escuro"] main h2, [data-theme="escuro"] main h3, [data-theme="escuro"] main strong { color: var(--foreground) !important; }
 [data-theme="escuro"] main .dark\:bg-slate-800 { background-color: #202734 !important; }
 [data-theme="escuro"] main .dark\:bg-slate-700 { background-color: #2d3747 !important; }
 [data-theme="escuro"] main .dark\:text-slate-50, [data-theme="escuro"] main .dark\:text-slate-100 { color: #f4f7fb !important; }

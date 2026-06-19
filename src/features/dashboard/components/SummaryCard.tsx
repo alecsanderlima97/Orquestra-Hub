@@ -10,9 +10,9 @@ const toneStyles: Record<FinancialSummary["tone"], string> = {
 export function SummaryCard({ item }: { item: FinancialSummary }) {
   return (
     <article className={`rounded-lg border p-5 shadow-sm ${toneStyles[item.tone]}`}>
-      <p className="text-sm font-medium opacity-80">{item.label}</p>
+      <p className="text-sm font-medium text-slate-600">{item.label}</p>
       <strong className="mt-3 block text-2xl font-semibold">{item.value}</strong>
-      <span className="mt-2 block text-sm opacity-80">{item.helper}</span>
+      <span className="mt-2 block text-sm text-slate-600">{item.helper}</span>
     </article>
   );
 }
