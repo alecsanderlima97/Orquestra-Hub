@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Building2, LogIn, PackageCheck, ReceiptText } from "lucide-react";
+import { ArrowLeft, BarChart3, Building2, LogIn, PackageCheck, ReceiptText } from "lucide-react";
 import { useState } from "react";
 import { TextField } from "@/components/ui/TextField";
 import { firebaseReady } from "@/lib/firebase/config";
@@ -148,8 +148,8 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
           <p className="mt-2 text-sm text-slate-600">{mode === "login" ? "Entre com seu usuario para acessar o ambiente financeiro." : "Cadastre seu acesso ao Orquestra Hub."}</p>
           <div className="mt-6 space-y-4">
             {mode === "register" ? <>
-              <TextField label="Nome da empresa" onChange={(event) => setCompanyName(event.target.value)} placeholder="Deixe vazio somente se tiver convite" value={companyName} />
-              <TextField label="Codigo de convite" onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="Opcional" value={inviteCode} />
+              <TextField label="Nome da empresa" onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" value={companyName} />
+              <TextField label="Codigo de convite" onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="Codigo enviado pela Orquestra.cs" value={inviteCode} />
               <TextField label="Seu nome" onChange={(event) => setName(event.target.value)} placeholder="Seu nome" value={name} />
             </> : null}
             <TextField label="E-mail" onChange={(event) => setEmail(event.target.value)} placeholder="email@empresa.com" type="email" value={email} />
@@ -165,7 +165,13 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
               Continuar com Google
               <span className="absolute inset-x-6 bottom-0 h-0.5 bg-gradient-to-r from-[#4285f4] via-[#fbbc05] to-[#34a853] opacity-80 transition group-hover:inset-x-3" />
             </button>
-            <button className="login-glow-link w-full text-sm font-semibold text-cyan-700" onClick={() => { setMode(mode === "login" ? "register" : "login"); setMessage(""); }} type="button">{mode === "login" ? "Ainda nao tenho uma conta" : "Ja tenho uma conta"}</button>
+            {mode === "login" ? (
+              <button className="login-glow-link w-full text-sm font-semibold text-cyan-700" onClick={() => { setMode("register"); setMessage(""); }} type="button">Ainda nao tenho uma conta</button>
+            ) : (
+              <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 text-sm font-semibold text-cyan-800 hover:bg-cyan-100" onClick={() => { setMode("login"); setMessage(""); }} type="button">
+                <ArrowLeft size={16} />Voltar para o login
+              </button>
+            )}
             <button className="h-11 w-full rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => finishLogin(demoUser)} type="button">Entrar em modo demo</button>
           </div>
         </div>
