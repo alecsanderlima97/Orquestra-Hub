@@ -40,6 +40,19 @@ function tenantPayload(name: string, ownerId: string, invite: Invite) {
   };
 }
 
+function firebaseStepError(step: string, error: unknown) {
+  const detail = (error as { code?: string; message?: string })?.code || (error as { message?: string })?.message || String(error);
+  return new Error(`${step}. Detalhe: ${detail}`);
+}
+
+async function runFirebaseStep<T>(step: string, action: () => Promise<T>) {
+  try {
+    return await action();
+  } catch (error) {
+    throw firebaseStepError(step, error);
+  }
+}
+
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo"): AppUser {
   const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) || role === "Dono" ? ownerRole() : role;
   return {
@@ -95,6 +108,7 @@ export async function loginWithEmail(email: string, password: string) {
 
 export async function registerWithEmail(name: string, companyName: string, email: string, password: string, inviteCode = "", acceptedTerms = false) {
   if (!firebaseReady || !auth || !db) return null;
+  const firestore = db;
   await setPersistence(auth, browserLocalPersistence);
   const normalizedInviteCode = inviteCode.trim().toUpperCase();
   const normalizedEmail = normalizeEmail(email);
@@ -124,9 +138,9 @@ export async function registerWithEmail(name: string, companyName: string, email
   const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, cleanPassword);
   try {
     await updateProfile(credential.user, { displayName: finalName });
-    if (createsCompany) await setDoc(doc(db, tenantPath(tenantId)), tenantPayload(tenantName, credential.user.uid, invite));
+    if (createsCompany) await runFirebaseStep("Falha ao criar empresa", () => setDoc(doc(firestore, tenantPath(tenantId)), tenantPayload(tenantName, credential.user.uid, invite)));
     try {
-      await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), {
+      await runFirebaseStep("Falha ao criar usuário da empresa", () => setDoc(doc(firestore, `${tenantPath(tenantId)}/users/${credential.user.uid}`), {
         consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" },
         createdAt: serverTimestamp(),
         email: normalizedEmail,
@@ -134,11 +148,11 @@ export async function registerWithEmail(name: string, companyName: string, email
         name: finalName,
         role,
         userId: credential.user.uid,
-      });
-      await setDoc(doc(db, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: tenantName, createdAt: serverTimestamp(), role });
-      await consumeInvite(normalizedInviteCode, credential.user.uid);
+      }));
+      await runFirebaseStep("Falha ao vincular usuário à empresa", () => setDoc(doc(firestore, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: tenantName, createdAt: serverTimestamp(), inviteCode: normalizedInviteCode, role }));
+      await runFirebaseStep("Falha ao marcar convite como usado", () => consumeInvite(normalizedInviteCode, credential.user.uid));
     } catch (error) {
-      if (createsCompany) await deleteDoc(doc(db, tenantPath(tenantId))).catch(() => undefined);
+      if (createsCompany) await deleteDoc(doc(firestore, tenantPath(tenantId))).catch(() => undefined);
       throw error;
     }
     return cacheUser(mapFirebaseUser(credential.user, role, tenantId, tenantName, plan.id, subscriptionStatus));
@@ -167,6 +181,7 @@ export async function loginWithGoogle() {
 
 export async function completeGoogleOnboarding(user: AppUser, companyName: string, userName: string, inviteCode: string) {
   if (!db || !auth?.currentUser) return user;
+  const firestore = db;
   const finalCompanyName = companyName.trim();
   const finalUserName = userName.trim();
   const normalizedInviteCode = inviteCode.trim().toUpperCase();
@@ -182,10 +197,10 @@ export async function completeGoogleOnboarding(user: AppUser, companyName: strin
   const subscriptionStatus = invite.subscriptionStatus || "trial";
 
   await updateProfile(auth.currentUser, { displayName: finalUserName }).catch(() => undefined);
-  if (createsCompany) await setDoc(doc(db, tenantPath(tenantId)), tenantPayload(tenantName, user.id, invite), { merge: true });
-  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, inviteCode: normalizedInviteCode, name: finalUserName, role, updatedAt: serverTimestamp(), userId: user.id }, { merge: true });
-  await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: tenantName, role, updatedAt: serverTimestamp() }, { merge: true });
-  await consumeInvite(normalizedInviteCode, user.id);
+  if (createsCompany) await runFirebaseStep("Falha ao criar empresa", () => setDoc(doc(firestore, tenantPath(tenantId)), tenantPayload(tenantName, user.id, invite), { merge: true }));
+  await runFirebaseStep("Falha ao criar usuário da empresa", () => setDoc(doc(firestore, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, inviteCode: normalizedInviteCode, name: finalUserName, role, updatedAt: serverTimestamp(), userId: user.id }, { merge: true }));
+  await runFirebaseStep("Falha ao vincular usuário à empresa", () => setDoc(doc(firestore, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: tenantName, inviteCode: normalizedInviteCode, role, updatedAt: serverTimestamp() }, { merge: true }));
+  await runFirebaseStep("Falha ao marcar convite como usado", () => consumeInvite(normalizedInviteCode, user.id));
   return cacheUser({ ...user, companyName: tenantName, name: finalUserName, needsOnboarding: false, planId: plan.id, role, subscriptionStatus, tenantId });
 }
 

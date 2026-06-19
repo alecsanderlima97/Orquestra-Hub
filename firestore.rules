@@ -16,6 +16,13 @@ service cloud.firestore {
       return signedIn()
         && get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid;
     }
+    function hasActiveInvite(code, tenantId) {
+      return exists(/databases/$(database)/documents/invites/$(code))
+        && get(/databases/$(database)/documents/invites/$(code)).data.status == 'Ativo'
+        && get(/databases/$(database)/documents/invites/$(code)).data.expiresAt > request.time
+        && (get(/databases/$(database)/documents/invites/$(code)).data.inviteType == 'commercial'
+          || get(/databases/$(database)/documents/invites/$(code)).data.tenantId == tenantId);
+    }
     function canWrite(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono', 'Financeiro']); }
     function isOwner(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono']); }
 
@@ -31,10 +38,7 @@ service cloud.firestore {
         allow create: if signedIn() && request.auth.uid == userId
           && (isPlatformOwner()
             || get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
-            || (exists(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode))
-              && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.tenantId == tenantId
-              && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.status == 'Ativo'
-              && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.expiresAt > request.time));
+            || hasActiveInvite(request.resource.data.inviteCode, tenantId));
         allow update: if isOwner(tenantId) || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
       }
 
@@ -51,7 +55,8 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == userId;
       allow create: if signedIn() && request.auth.uid == userId
         && (exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(userId))
-          || get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid);
+          || get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
+          || hasActiveInvite(request.resource.data.inviteCode, tenantId));
       allow update: if signedIn()
         && request.auth.uid == userId
         && isOwner(tenantId)
