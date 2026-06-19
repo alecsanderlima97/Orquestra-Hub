@@ -158,7 +158,13 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
             {message ? <p className="rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">{message}</p> : null}
             {mode === "login" ? <button className="login-glow-link text-sm font-semibold text-cyan-700" onClick={handleReset} type="button">Esqueci minha senha</button> : null}
             <button className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#087ec1] px-4 text-sm font-semibold text-white hover:bg-[#066da8] disabled:opacity-70" disabled={loading || (mode === "register" && !acceptedTerms)} onClick={handleSubmit} type="button"><LogIn size={18} />{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}</button>
-            <button className="h-11 w-full rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100" disabled={loading} onClick={handleGoogle} type="button">Continuar com Google</button>
+            <button className="group relative flex h-12 w-full items-center justify-center gap-3 overflow-hidden rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 shadow-md shadow-slate-200/70 transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-100 disabled:opacity-70" disabled={loading} onClick={handleGoogle} type="button">
+              <span className="flex size-7 items-center justify-center rounded-full bg-white shadow-sm">
+                <span className="text-[18px] font-black leading-none text-[#4285f4]">G</span>
+              </span>
+              Continuar com Google
+              <span className="absolute inset-x-6 bottom-0 h-0.5 bg-gradient-to-r from-[#4285f4] via-[#fbbc05] to-[#34a853] opacity-80 transition group-hover:inset-x-3" />
+            </button>
             <button className="login-glow-link w-full text-sm font-semibold text-cyan-700" onClick={() => { setMode(mode === "login" ? "register" : "login"); setMessage(""); }} type="button">{mode === "login" ? "Ainda nao tenho uma conta" : "Ja tenho uma conta"}</button>
             <button className="h-11 w-full rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => finishLogin(demoUser)} type="button">Entrar em modo demo</button>
           </div>

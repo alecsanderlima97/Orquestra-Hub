@@ -6,10 +6,10 @@ import { AiCreditsPanel } from "@/features/ai/components/AiCreditsPanel";
 import { firebaseReady } from "@/lib/firebase/config";
 
 const themes = [
-  { id: "claro", label: "Claro", colors: ["#f1f5f9", "#ffffff", "#0891b2"] },
-  { id: "escuro", label: "Escuro", colors: ["#0b1220", "#111827", "#38bdf8"] },
-  { id: "cristal", label: "Azul Cristal", colors: ["#eaf7ff", "#f8fdff", "#0284c7"] },
-  { id: "salvia", label: "Verde Sálvia", colors: ["#edf2ec", "#fbfdf9", "#66856b"] },
+  { id: "claro", label: "Claro", colors: ["#e8edf3", "#fbfcfe", "#087ea4"] },
+  { id: "escuro", label: "Escuro", colors: ["#151b24", "#202734", "#7cc7e8"] },
+  { id: "cristal", label: "Azul Cristal", colors: ["#dcecf4", "#f5fbff", "#087fb5"] },
+  { id: "salvia", label: "Verde Sálvia", colors: ["#e4ebe3", "#f8fbf5", "#607d66"] },
 ] as const;
 
 const supportPhone = "15 99847 8705";
