@@ -868,7 +868,18 @@ export function OrquestraHubApp() {
           <FinancialReports accounts={accountList} purchases={purchaseList} />
         </Section>
         <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile onCompanySave={saveCompanyName} onProfileSave={saveProfile} user={user} /></Section>
-        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações"><SystemSettings companyName={user.companyName} tenantId={defaultTenantId} /><div className="mt-5"><PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} /></div>{canManageUsers(user.role) ? <div className="mt-5 space-y-5"><CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} /><UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} /><BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} onImport={importBackup} /><AuditPanel logs={auditLogs} /></div> : null}</Section>
+        <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações">
+          <div className="space-y-5">
+            {canManageUsers(user.role) ? <>
+              <CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} />
+              <UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} />
+              <BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} onImport={importBackup} />
+            </> : null}
+            <PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} />
+            <SystemSettings companyName={user.companyName} tenantId={defaultTenantId} />
+            {canManageUsers(user.role) ? <AuditPanel logs={auditLogs} /> : null}
+          </div>
+        </Section>
       </div>
       {user.id !== demoUserId ? <GuideAssistant userId={user.id} /> : null}
       {user.id !== demoUserId ? (
