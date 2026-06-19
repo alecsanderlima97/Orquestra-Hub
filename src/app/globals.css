@@ -31,15 +31,20 @@ body {
 .theme-accent { color: var(--accent); }
 .theme-accent-soft { background-color: var(--accent-soft) !important; color: var(--accent) !important; }
 [data-theme="escuro"] main h1, [data-theme="escuro"] main h2, [data-theme="escuro"] main h3, [data-theme="escuro"] main strong { color: var(--foreground) !important; }
-[data-theme="escuro"] main .dark\:bg-slate-800 { background-color: #202734 !important; }
-[data-theme="escuro"] main .dark\:bg-slate-700 { background-color: #2d3747 !important; }
-[data-theme="escuro"] main .dark\:text-slate-50, [data-theme="escuro"] main .dark\:text-slate-100 { color: #f4f7fb !important; }
-[data-theme="escuro"] main .dark\:border-slate-600 { border-color: #46566b !important; }
-[data-theme="escuro"] main .dark\:divide-slate-700 > :not([hidden]) ~ :not([hidden]) { border-color: #46566b !important; }
-[data-theme="escuro"] main .dark\:bg-emerald-950\/35 { background-color: rgba(6, 78, 59, .35) !important; }
-[data-theme="escuro"] main .dark\:bg-rose-950\/35 { background-color: rgba(76, 5, 25, .38) !important; }
-[data-theme="escuro"] main .dark\:bg-amber-950\/35 { background-color: rgba(69, 26, 3, .38) !important; }
-[data-theme="escuro"] main .dark\:text-emerald-50, [data-theme="escuro"] main .dark\:text-rose-50, [data-theme="escuro"] main .dark\:text-amber-50 { color: #f8fafc !important; }
+[data-theme="escuro"] main .dashboard-card-neutral { background-color: #202734 !important; border-color: #46566b !important; color: #f4f7fb !important; }
+[data-theme="escuro"] main .dashboard-card-success { background-color: rgba(6, 78, 59, .35) !important; border-color: #047857 !important; color: #ecfdf5 !important; }
+[data-theme="escuro"] main .dashboard-card-danger { background-color: rgba(76, 5, 25, .38) !important; border-color: #be123c !important; color: #fff1f2 !important; }
+[data-theme="escuro"] main .dashboard-card-warning { background-color: rgba(69, 26, 3, .38) !important; border-color: #b45309 !important; color: #fffbeb !important; }
+[data-theme="escuro"] main .dashboard-panel-header, [data-theme="escuro"] main .dashboard-subcard { border-color: #46566b !important; }
+[data-theme="escuro"] main .dashboard-table-head { background-color: #2d3747 !important; color: #f4f7fb !important; }
+[data-theme="escuro"] main .dashboard-table-body { color: #f4f7fb !important; }
+[data-theme="escuro"] main .dashboard-table-body > :not([hidden]) ~ :not([hidden]) { border-color: #46566b !important; }
+[data-theme="escuro"] main .payment-status-open { background-color: #334155 !important; color: #f1f5f9 !important; }
+[data-theme="escuro"] main .payment-status-late { background-color: rgba(127, 29, 29, .65) !important; color: #fee2e2 !important; }
+[data-theme="escuro"] main .payment-status-paid { background-color: rgba(6, 95, 70, .65) !important; color: #d1fae5 !important; }
+[data-theme="escuro"] main .payment-status-today { background-color: rgba(146, 64, 14, .65) !important; color: #fef3c7 !important; }
+[data-theme="escuro"] main .dashboard-paid { color: #6ee7b7 !important; }
+[data-theme="escuro"] main .dashboard-open { color: #fcd34d !important; }
 .login-glow-link { border-radius: 6px; padding: 4px 7px; transition: color .2s, background .2s, box-shadow .2s, transform .2s; }
 .login-glow-link:hover { color:#0369a1; background:#ecfeff; box-shadow:0 0 8px rgba(34,211,238,.55),0 0 20px rgba(14,165,233,.3); transform:translateY(-1px); }
 

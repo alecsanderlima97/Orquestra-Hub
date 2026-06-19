@@ -1,10 +1,10 @@
 import type { FinancialSummary } from "../types/dashboardTypes";
 
 const toneStyles: Record<FinancialSummary["tone"], string> = {
-  neutral: "border-slate-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-50",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-50",
-  danger: "border-rose-200 bg-rose-50 text-rose-950 dark:border-rose-700 dark:bg-rose-950/35 dark:text-rose-50",
-  warning: "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/35 dark:text-amber-50",
+  neutral: "dashboard-card-neutral border-slate-200 bg-white text-slate-900",
+  success: "dashboard-card-success border-emerald-200 bg-emerald-50 text-emerald-950",
+  danger: "dashboard-card-danger border-rose-200 bg-rose-50 text-rose-950",
+  warning: "dashboard-card-warning border-amber-200 bg-amber-50 text-amber-950",
 };
 
 export function SummaryCard({ item }: { item: FinancialSummary }) {
