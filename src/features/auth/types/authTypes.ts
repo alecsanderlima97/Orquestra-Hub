@@ -5,8 +5,10 @@ export type AppUser = {
   role: "Proprietário" | "Dono" | "Financeiro" | "Consulta";
   tenantId: string;
   companyName: string;
+  planId?: "inicial" | "medio" | "premium";
+  subscriptionStatus?: "trial" | "ativo" | "vencido" | "bloqueado" | "cancelado";
   photoUrl?: string;
   needsOnboarding?: boolean;
 };
 
-export type CompanyMembership = { companyName: string; role: AppUser["role"]; tenantId: string };
+export type CompanyMembership = { companyName: string; planId?: AppUser["planId"]; role: AppUser["role"]; subscriptionStatus?: AppUser["subscriptionStatus"]; tenantId: string };

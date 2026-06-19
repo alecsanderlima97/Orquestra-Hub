@@ -16,6 +16,8 @@ import { AccountsPayableTable } from "@/features/accounts-payable/components/Acc
 import { PaymentConfirmModal } from "@/features/accounts-payable/components/PaymentConfirmModal";
 import { createAccountPayable, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
+import { PlatformAdminPanel } from "@/features/admin/components/PlatformAdminPanel";
+import { isPlatformAdmin } from "@/features/admin/services/platformAdminService";
 import { FinancialAssistant } from "@/features/ai/components/FinancialAssistant";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
 import { completeGoogleOnboarding, listenAuth, listUserCompanies, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
@@ -46,6 +48,7 @@ import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import type { PurchaseAttachment } from "@/features/purchases/types/purchaseTypes";
 import { FinancialReports } from "@/features/reports/components/FinancialReports";
 import { PrivacyPanel } from "@/features/privacy/components/PrivacyPanel";
+import { getPlanRules } from "@/features/plans/planRules";
 import { UserProfile } from "@/features/profile/components/UserProfile";
 import { updateCompanyName, updateUserProfile } from "@/features/profile/services/profileService";
 import { SystemSettings } from "@/features/settings/components/SystemSettings";
@@ -70,6 +73,7 @@ import { defaultTenantId as legacyTenantId } from "@/lib/tenant/tenant";
 
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 const demoUserId = "demo-user";
+const salesWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
 type EditTarget = { kind: "store"; item: Store } | { kind: "supplier"; item: Supplier } | { kind: "purchase"; item: Purchase } | { kind: "account"; item: AccountPayable };
 
 function parseMoney(value: string) {
@@ -80,6 +84,20 @@ function addMonths(date: string, months: number) {
   const [year, month, day] = date.split("-").map(Number);
   const next = new Date(year, month - 1 + months, day);
   return next.toLocaleDateString("pt-BR");
+}
+
+function SubscriptionBlocked({ user }: { user: AppUser }) {
+  const status = user.subscriptionStatus || "ativo";
+  const message = `Olá, preciso regularizar a assinatura do Orquestra Hub. Empresa: ${user.companyName}. Status: ${status}.`;
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 p-5">
+      <section className="w-full max-w-lg rounded-lg border border-amber-200 bg-white p-7 text-center shadow-xl">
+        <h1 className="text-2xl font-bold text-slate-950">Acesso pendente</h1>
+        <p className="mt-3 text-slate-600">Sua assinatura está com status <strong>{status}</strong>. Regularize para continuar usando o sistema.</p>
+        <a className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-slate-950 px-5 text-sm font-semibold text-white" href={`https://wa.me/${salesWhatsapp}?text=${encodeURIComponent(message)}`} target="_blank">Regularizar pelo WhatsApp</a>
+      </section>
+    </main>
+  );
 }
 
 export function OrquestraHubApp() {
@@ -320,6 +338,11 @@ export function OrquestraHubApp() {
       setFormErrors((errors) => ({ ...errors, store: "Banco de dados ainda não conectado. Aguarde alguns segundos e tente novamente." }));
       return;
     }
+    const currentPlan = getPlanRules(user.planId);
+    if (storeList.length >= currentPlan.storeLimit) {
+      setFormErrors((errors) => ({ ...errors, store: `Seu ${currentPlan.label} permite cadastrar até ${currentPlan.storeLimit} unidade(s).` }));
+      return;
+    }
     if (!storeForm.name.trim()) {
       setFormErrors((errors) => ({ ...errors, store: "Informe o nome da loja." }));
       return;
@@ -551,6 +574,10 @@ export function OrquestraHubApp() {
   }
 
   function sendWhatsApp(account: AccountPayable) {
+    if (!getPlanRules(user?.planId).whatsappEnabled) {
+      window.alert("WhatsApp não está disponível no Plano Inicial. Faça upgrade para o Plano Médio ou Premium.");
+      return;
+    }
     const supplier = supplierList.find((item) => item.name === account.supplier);
     const phone = supplier?.phone.replace(/\D/g, "");
     if (!phone) {
@@ -735,9 +762,12 @@ export function OrquestraHubApp() {
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
-  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName) => { const completed = await completeGoogleOnboarding(user, companyName, userName); setUser(completed); setCompanies([{ companyName: completed.companyName, role: completed.role, tenantId: completed.tenantId }]); }} user={user} />;
+  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName) => { const completed = await completeGoogleOnboarding(user, companyName, userName); setUser(completed); setCompanies([{ companyName: completed.companyName, planId: completed.planId, role: completed.role, subscriptionStatus: completed.subscriptionStatus, tenantId: completed.tenantId }]); }} user={user} />;
+
+  if (user.id !== demoUserId && !isPlatformAdmin(user) && ["vencido", "bloqueado", "cancelado"].includes(user.subscriptionStatus || "")) return <SubscriptionBlocked user={user} />;
 
   const canWrite = roleCanWrite(user.role);
+  const plan = getPlanRules(user.planId);
 
   return (
     <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} user={user}>
@@ -756,8 +786,9 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
+          <p className="mb-3 text-sm text-slate-500">{plan.label}: {storeList.length}/{plan.storeLimit} unidade(s) cadastrada(s).</p>
           {canWrite ? <div className="mb-4 flex justify-end">
-            <button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowStoreForm((visible) => !visible)} type="button">
+            <button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50" disabled={storeList.length >= plan.storeLimit} onClick={() => setShowStoreForm((visible) => !visible)} type="button">
               {showStoreForm ? <X size={18} /> : <Plus size={18} />}
               {showStoreForm ? "Cancelar cadastro" : "Cadastrar nova unidade"}
             </button>
@@ -876,13 +907,14 @@ export function OrquestraHubApp() {
               <BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} onImport={importBackup} />
             </> : null}
             <PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} />
-            <SystemSettings companyName={user.companyName} tenantId={defaultTenantId} />
+            <SystemSettings companyName={user.companyName} planId={user.planId} tenantId={defaultTenantId} />
+            {isPlatformAdmin(user) ? <div className="mt-5"><PlatformAdminPanel /></div> : null}
             {canManageUsers(user.role) ? <AuditPanel logs={auditLogs} /> : null}
           </div>
         </Section>
       </div>
       {user.id !== demoUserId ? <GuideAssistant userId={user.id} /> : null}
-      {user.id !== demoUserId ? (
+      {user.id !== demoUserId && plan.aiEnabled ? (
         <FinancialAssistant context={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} tenantId={defaultTenantId} />
       ) : null}
       <PaymentConfirmModal

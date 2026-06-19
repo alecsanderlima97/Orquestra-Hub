@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import type { Firestore } from "firebase-admin/firestore";
+import { currentRenewalMonth, getPlanRules } from "@/features/plans/planRules";
 import { firebaseAdmin } from "@/lib/firebase/admin";
 
 export const runtime = "nodejs";
 
 const OPENAI_INPUT_USD_PER_1M = 0.05;
 const OPENAI_OUTPUT_USD_PER_1M = 0.4;
-const INITIAL_AI_CREDITS = 8;
 
 function extractText(data: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) {
   if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
@@ -45,17 +45,20 @@ async function reserveCredit(db: Firestore, tenantId: string) {
   return db.runTransaction(async (transaction) => {
     const tenant = await transaction.get(tenantRef);
     if (!tenant.exists) throw new Error("Empresa não encontrada.");
+    const plan = getPlanRules(tenant.data()?.planId);
+    if (!plan.aiEnabled) throw new Error("Assistente IA não está disponível no plano atual.");
     const aiCredits = tenant.data()?.aiCredits || {};
-    const currentIncluded = Number(aiCredits.included || INITIAL_AI_CREDITS);
-    const bonus = Math.max(INITIAL_AI_CREDITS - currentIncluded, 0);
-    const currentBalance = (Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : INITIAL_AI_CREDITS) + bonus;
-    const currentUsed = Number(aiCredits.used || 0);
+    const month = currentRenewalMonth();
+    const shouldRenew = aiCredits.renewalMonth !== month;
+    const currentBalance = shouldRenew ? plan.monthlyAiCredits : Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : plan.initialAiCredits;
+    const currentUsed = shouldRenew ? 0 : Number(aiCredits.used || 0);
     if (currentBalance < 1) throw new Error("IA sem créditos disponíveis. Contrate uma recarga para continuar usando.");
     const nextBalance = currentBalance - 1;
     transaction.update(tenantRef, {
       "aiCredits.balance": nextBalance,
-      "aiCredits.included": Math.max(currentIncluded, INITIAL_AI_CREDITS),
+      "aiCredits.included": plan.monthlyAiCredits,
       "aiCredits.lastUsedAt": new Date().toISOString(),
+      "aiCredits.renewalMonth": month,
       "aiCredits.status": "Ativo",
       "aiCredits.used": currentUsed + 1,
     });

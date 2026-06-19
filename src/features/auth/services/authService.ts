@@ -4,11 +4,12 @@ import { consumeInvite, getInvite } from "@/features/users/services/inviteServic
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
 import { defaultTenantId } from "@/lib/tenant/tenant";
+import { defaultPlanId, getPlanRules, normalizePlanId } from "@/features/plans/planRules";
 import type { AppUser, CompanyMembership } from "../types/authTypes";
 
 const platformOwnerEmails = new Set(["limaalecsander@gmail.com"]);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const initialAiCredits = 8;
+const defaultPlan = getPlanRules(defaultPlanId);
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -18,7 +19,7 @@ function ownerRole(): AppUser["role"] {
   return "Proprietário";
 }
 
-export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub"): AppUser {
+export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo"): AppUser {
   const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) || role === "Dono" ? ownerRole() : role;
   return {
     companyName,
@@ -26,7 +27,9 @@ export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", 
     id: user.uid,
     name: user.displayName || user.email || "Usuário",
     photoUrl: user.photoURL || "",
+    planId: normalizePlanId(planId),
     role: effectiveRole,
+    subscriptionStatus,
     tenantId,
   };
 }
@@ -49,7 +52,7 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
     const role = platformOwnerEmails.has((user.email || "").toLowerCase()) || tenant.data()?.ownerId === user.uid
       ? ownerRole()
       : access.data()?.role || data.role || "Consulta";
-    return { ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa"), name: access.data()?.name || user.displayName || user.email || "Usuário", photoUrl: access.data()?.photoUrl || user.photoURL || "" };
+    return { ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo"), name: access.data()?.name || user.displayName || user.email || "Usuário", photoUrl: access.data()?.photoUrl || user.photoURL || "" };
   }
 
   if (allowOnboarding) return cacheUser({ ...mapFirebaseUser(user, ownerRole(), "", "Nova empresa"), needsOnboarding: true });
@@ -76,7 +79,7 @@ async function ensureTenantAccess(user: User) {
 
   const tenantId = crypto.randomUUID();
   const companyName = `Empresa de ${user.displayName || "Novo usuário"}`;
-  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: initialAiCredits, included: initialAiCredits, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, status: "Ativo" });
+  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: defaultPlan.initialAiCredits, included: defaultPlan.initialAiCredits, renewalMonth: new Date().toISOString().slice(0, 7), status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, planId: defaultPlanId, status: "Ativo", subscriptionStatus: "ativo" });
   await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.uid}`), { createdAt: serverTimestamp(), email: user.email || "", name: user.displayName || user.email || "Usuário", role: ownerRole(), userId: user.uid });
   await setDoc(doc(db, `userTenants/${user.uid}/memberships/${tenantId}`), { companyName, createdAt: serverTimestamp(), role: ownerRole() });
 }
@@ -92,7 +95,8 @@ export async function registerWithEmail(name: string, companyName: string, email
 
   if (!finalName) throw new Error("name-required");
   if (!acceptedTerms) throw new Error("consent-required");
-  if (!normalizedInviteCode && !finalCompanyName) throw new Error("company-required");
+  if (!normalizedInviteCode) throw new Error("invite-required");
+  if (!finalCompanyName) throw new Error("company-required");
   if (!normalizedEmail) throw new Error("email-required");
   if (!emailPattern.test(normalizedEmail)) throw new Error("invalid-email");
   if (cleanPassword.length < 6) throw new Error("weak-password");
@@ -107,7 +111,7 @@ export async function registerWithEmail(name: string, companyName: string, email
     const tenantName = invite?.companyName || finalCompanyName;
     const role: AppUser["role"] = invite?.role || ownerRole();
 
-    if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: initialAiCredits, included: initialAiCredits, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: tenantName, ownerId: credential.user.uid, status: "Ativo" });
+    if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: defaultPlan.initialAiCredits, included: defaultPlan.initialAiCredits, renewalMonth: new Date().toISOString().slice(0, 7), status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: tenantName, ownerId: credential.user.uid, planId: defaultPlanId, status: "Ativo", subscriptionStatus: "ativo" });
     try {
       await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), {
         consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" },
@@ -151,7 +155,7 @@ export async function loginWithGoogle() {
     throw error;
   });
   if (!credential) return null;
-  return mapUserWithRole(credential.user, true);
+  return mapUserWithRole(credential.user, false);
 }
 
 export async function completeGoogleOnboarding(user: AppUser, companyName: string, userName: string) {
@@ -161,10 +165,10 @@ export async function completeGoogleOnboarding(user: AppUser, companyName: strin
   const finalUserName = userName.trim();
   if (!finalCompanyName || !finalUserName) throw new Error("onboarding-required");
   await updateProfile(auth.currentUser, { displayName: finalUserName }).catch(() => undefined);
-  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: initialAiCredits, included: initialAiCredits, status: "Ativo", used: 0 }, name: finalCompanyName, ownerId: user.id, status: "Ativo", updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: defaultPlan.initialAiCredits, included: defaultPlan.initialAiCredits, renewalMonth: new Date().toISOString().slice(0, 7), status: "Ativo", used: 0 }, name: finalCompanyName, ownerId: user.id, planId: defaultPlanId, status: "Ativo", subscriptionStatus: "ativo", updatedAt: serverTimestamp() }, { merge: true });
   await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, name: finalUserName, role: ownerRole(), updatedAt: serverTimestamp(), userId: user.id }, { merge: true });
   await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: finalCompanyName, role: ownerRole(), updatedAt: serverTimestamp() }, { merge: true });
-  return cacheUser({ ...user, companyName: finalCompanyName, name: finalUserName, needsOnboarding: false, role: ownerRole(), tenantId });
+  return cacheUser({ ...user, companyName: finalCompanyName, name: finalUserName, needsOnboarding: false, planId: defaultPlanId, role: ownerRole(), subscriptionStatus: "ativo", tenantId });
 }
 
 export async function resetPassword(email: string) {
@@ -214,6 +218,6 @@ export async function listUserCompanies(userId: string): Promise<CompanyMembersh
       getDoc(doc(firestore, tenantPath(membership.id))),
     ]);
     const role = platformOwnerEmails.has(currentEmail) || tenant.data()?.ownerId === userId ? ownerRole() : access.data()?.role || membership.data().role || "Consulta";
-    return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", role: role === "Dono" ? ownerRole() : role, tenantId: membership.id };
+    return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", planId: normalizePlanId(tenant.data()?.planId), role: role === "Dono" ? ownerRole() : role, subscriptionStatus: tenant.data()?.subscriptionStatus || "ativo", tenantId: membership.id };
   }));
 }

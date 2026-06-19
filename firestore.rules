@@ -20,9 +20,9 @@ service cloud.firestore {
     function isOwner(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono']); }
 
     match /tenants/{tenantId} {
-      allow read: if belongsToTenant(tenantId);
+      allow read: if isPlatformOwner() || belongsToTenant(tenantId);
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isOwner(tenantId)
+      allow update: if (isPlatformOwner() || isOwner(tenantId))
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['aiCredits']);
       allow delete: if false;
 
