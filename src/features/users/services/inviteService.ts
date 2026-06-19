@@ -1,13 +1,18 @@
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { db, firebaseReady } from "@/lib/firebase/config";
 import type { AppUser } from "@/features/auth/types/authTypes";
+import type { PlanId } from "@/features/plans/planRules";
 import { isInviteAvailable } from "../utils/accessRules";
 
 export type Invite = {
   code: string;
-  companyName: string;
+  companyName?: string;
+  inviteType?: "commercial" | "user";
+  nextBillingDate?: string;
+  planId?: PlanId;
   role: Exclude<AppUser["role"], "Dono">;
-  tenantId: string;
+  subscriptionStatus?: AppUser["subscriptionStatus"];
+  tenantId?: string;
   status: "Ativo" | "Usado" | "Cancelado" | "Expirado";
   expiresAt?: Timestamp;
   createdAt?: Timestamp;
@@ -18,6 +23,14 @@ export async function createInvite(tenantId: string, companyName: string, role: 
   if (!firebaseReady || !db) return { code: "DEMO1234", companyName, role, tenantId, status: "Ativo" as const };
   const code = crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
   const invite: Invite = { code, companyName, role, tenantId, status: "Ativo", expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) };
+  await setDoc(doc(db, "invites", code), { ...invite, createdAt: serverTimestamp() });
+  return invite;
+}
+
+export async function createCommercialInvite(planId: PlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "trial", nextBillingDate = "") {
+  if (!firebaseReady || !db) return { code: "DEMO1234", inviteType: "commercial" as const, planId, role: "Proprietário" as const, status: "Ativo" as const, subscriptionStatus };
+  const code = crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
+  const invite: Invite = { code, inviteType: "commercial", nextBillingDate, planId, role: "Proprietário", status: "Ativo", subscriptionStatus, expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) };
   await setDoc(doc(db, "invites", code), { ...invite, createdAt: serverTimestamp() });
   return invite;
 }

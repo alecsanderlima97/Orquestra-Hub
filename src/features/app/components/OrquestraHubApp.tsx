@@ -762,7 +762,7 @@ export function OrquestraHubApp() {
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
-  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName) => { const completed = await completeGoogleOnboarding(user, companyName, userName); setUser(completed); setCompanies([{ companyName: completed.companyName, planId: completed.planId, role: completed.role, subscriptionStatus: completed.subscriptionStatus, tenantId: completed.tenantId }]); }} user={user} />;
+  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName, inviteCode) => { const completed = await completeGoogleOnboarding(user, companyName, userName, inviteCode); setUser(completed); setCompanies([{ companyName: completed.companyName, planId: completed.planId, role: completed.role, subscriptionStatus: completed.subscriptionStatus, tenantId: completed.tenantId }]); }} user={user} />;
 
   if (user.id !== demoUserId && !isPlatformAdmin(user) && ["vencido", "bloqueado", "cancelado"].includes(user.subscriptionStatus || "")) return <SubscriptionBlocked user={user} />;
 

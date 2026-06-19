@@ -1,15 +1,14 @@
 import { browserLocalPersistence, createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from "firebase/auth";
 import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
-import { consumeInvite, getInvite } from "@/features/users/services/inviteService";
+import { defaultPlanId, getPlanRules, normalizePlanId } from "@/features/plans/planRules";
+import { consumeInvite, getInvite, type Invite } from "@/features/users/services/inviteService";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
 import { defaultTenantId } from "@/lib/tenant/tenant";
-import { defaultPlanId, getPlanRules, normalizePlanId } from "@/features/plans/planRules";
 import type { AppUser, CompanyMembership } from "../types/authTypes";
 
 const platformOwnerEmails = new Set(["limaalecsander@gmail.com"]);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const defaultPlan = getPlanRules(defaultPlanId);
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -17,6 +16,28 @@ function normalizeEmail(email: string) {
 
 function ownerRole(): AppUser["role"] {
   return "Proprietário";
+}
+
+function inviteCreatesCompany(invite: Invite) {
+  return invite.inviteType === "commercial" || !invite.tenantId;
+}
+
+function renewalMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function tenantPayload(name: string, ownerId: string, invite: Invite) {
+  const plan = getPlanRules(invite.planId || defaultPlanId);
+  return {
+    aiCredits: { balance: plan.initialAiCredits, included: plan.initialAiCredits, renewalMonth: renewalMonth(), status: "Ativo", used: 0 },
+    createdAt: serverTimestamp(),
+    name,
+    nextBillingDate: invite.nextBillingDate || "",
+    ownerId,
+    planId: plan.id,
+    status: "Ativo",
+    subscriptionStatus: invite.subscriptionStatus || "trial",
+  };
 }
 
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo"): AppUser {
@@ -52,7 +73,11 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
     const role = platformOwnerEmails.has((user.email || "").toLowerCase()) || tenant.data()?.ownerId === user.uid
       ? ownerRole()
       : access.data()?.role || data.role || "Consulta";
-    return { ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo"), name: access.data()?.name || user.displayName || user.email || "Usuário", photoUrl: access.data()?.photoUrl || user.photoURL || "" };
+    return {
+      ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo"),
+      name: access.data()?.name || user.displayName || user.email || "Usuário",
+      photoUrl: access.data()?.photoUrl || user.photoURL || "",
+    };
   }
 
   if (allowOnboarding) return cacheUser({ ...mapFirebaseUser(user, ownerRole(), "", "Nova empresa"), needsOnboarding: true });
@@ -65,23 +90,7 @@ export async function loginWithEmail(email: string, password: string) {
   if (!firebaseReady || !auth) return null;
   await setPersistence(auth, browserLocalPersistence);
   const credential = await signInWithEmailAndPassword(auth, normalizeEmail(email), password);
-  await ensureTenantAccess(credential.user);
   return mapUserWithRole(credential.user);
-}
-
-async function ensureTenantAccess(user: User) {
-  if (!db) return;
-  const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
-  if (!memberships.empty) return;
-
-  const legacy = await getDoc(doc(db, `${tenantPath(defaultTenantId)}/users/${user.uid}`));
-  if (legacy.exists()) return;
-
-  const tenantId = crypto.randomUUID();
-  const companyName = `Empresa de ${user.displayName || "Novo usuário"}`;
-  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: defaultPlan.initialAiCredits, included: defaultPlan.initialAiCredits, renewalMonth: new Date().toISOString().slice(0, 7), status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, planId: defaultPlanId, status: "Ativo", subscriptionStatus: "ativo" });
-  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.uid}`), { createdAt: serverTimestamp(), email: user.email || "", name: user.displayName || user.email || "Usuário", role: ownerRole(), userId: user.uid });
-  await setDoc(doc(db, `userTenants/${user.uid}/memberships/${tenantId}`), { companyName, createdAt: serverTimestamp(), role: ownerRole() });
 }
 
 export async function registerWithEmail(name: string, companyName: string, email: string, password: string, inviteCode = "", acceptedTerms = false) {
@@ -101,17 +110,21 @@ export async function registerWithEmail(name: string, companyName: string, email
   if (!emailPattern.test(normalizedEmail)) throw new Error("invalid-email");
   if (cleanPassword.length < 6) throw new Error("weak-password");
 
+  const invite = await getInvite(normalizedInviteCode);
+  if (!invite) throw new Error("invite-invalid");
+
+  const createsCompany = inviteCreatesCompany(invite);
+  const plan = getPlanRules(invite.planId || defaultPlanId);
+  const tenantId = createsCompany ? crypto.randomUUID() : invite.tenantId;
+  if (!tenantId) throw new Error("invite-invalid");
+  const tenantName = createsCompany ? finalCompanyName : invite.companyName || finalCompanyName;
+  const role: AppUser["role"] = createsCompany ? ownerRole() : invite.role;
+  const subscriptionStatus = invite.subscriptionStatus || "trial";
+
   const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, cleanPassword);
   try {
     await updateProfile(credential.user, { displayName: finalName });
-    const invite = await getInvite(normalizedInviteCode);
-    if (normalizedInviteCode && !invite) throw new Error("invite-invalid");
-
-    const tenantId = invite?.tenantId || crypto.randomUUID();
-    const tenantName = invite?.companyName || finalCompanyName;
-    const role: AppUser["role"] = invite?.role || ownerRole();
-
-    if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: defaultPlan.initialAiCredits, included: defaultPlan.initialAiCredits, renewalMonth: new Date().toISOString().slice(0, 7), status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: tenantName, ownerId: credential.user.uid, planId: defaultPlanId, status: "Ativo", subscriptionStatus: "ativo" });
+    if (createsCompany) await setDoc(doc(db, tenantPath(tenantId)), tenantPayload(tenantName, credential.user.uid, invite));
     try {
       await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), {
         consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" },
@@ -123,12 +136,12 @@ export async function registerWithEmail(name: string, companyName: string, email
         userId: credential.user.uid,
       });
       await setDoc(doc(db, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: tenantName, createdAt: serverTimestamp(), role });
-      if (invite) await consumeInvite(normalizedInviteCode, credential.user.uid);
+      await consumeInvite(normalizedInviteCode, credential.user.uid);
     } catch (error) {
-      if (!invite) await deleteDoc(doc(db, tenantPath(tenantId))).catch(() => undefined);
+      if (createsCompany) await deleteDoc(doc(db, tenantPath(tenantId))).catch(() => undefined);
       throw error;
     }
-    return cacheUser(mapFirebaseUser(credential.user, role, tenantId, tenantName));
+    return cacheUser(mapFirebaseUser(credential.user, role, tenantId, tenantName, plan.id, subscriptionStatus));
   } catch (error) {
     await deleteUser(credential.user).catch(() => undefined);
     throw error;
@@ -142,33 +155,38 @@ export async function loginWithGoogle() {
   const provider = new GoogleAuthProvider();
   const credential = await signInWithPopup(activeAuth, provider).catch(async (error) => {
     const code = String((error as { code?: string })?.code || "");
-    if (
-      code.includes("popup-blocked")
-      || code.includes("popup-closed-by-user")
-      || code.includes("cancelled-popup-request")
-      || code.includes("web-storage-unsupported")
-      || code.includes("internal-error")
-    ) {
+    if (code.includes("popup-blocked") || code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request") || code.includes("web-storage-unsupported") || code.includes("internal-error")) {
       await signInWithRedirect(activeAuth, provider);
       return null;
     }
     throw error;
   });
   if (!credential) return null;
-  return mapUserWithRole(credential.user, false);
+  return mapUserWithRole(credential.user, true);
 }
 
-export async function completeGoogleOnboarding(user: AppUser, companyName: string, userName: string) {
+export async function completeGoogleOnboarding(user: AppUser, companyName: string, userName: string, inviteCode: string) {
   if (!db || !auth?.currentUser) return user;
-  const tenantId = user.tenantId || crypto.randomUUID();
   const finalCompanyName = companyName.trim();
   const finalUserName = userName.trim();
-  if (!finalCompanyName || !finalUserName) throw new Error("onboarding-required");
+  const normalizedInviteCode = inviteCode.trim().toUpperCase();
+  const invite = await getInvite(normalizedInviteCode);
+  if (!finalCompanyName || !finalUserName || !invite) throw new Error("onboarding-required");
+
+  const createsCompany = inviteCreatesCompany(invite);
+  const plan = getPlanRules(invite.planId || defaultPlanId);
+  const tenantId = createsCompany ? crypto.randomUUID() : invite.tenantId;
+  if (!tenantId) throw new Error("onboarding-required");
+  const tenantName = createsCompany ? finalCompanyName : invite.companyName || finalCompanyName;
+  const role: AppUser["role"] = createsCompany ? ownerRole() : invite.role;
+  const subscriptionStatus = invite.subscriptionStatus || "trial";
+
   await updateProfile(auth.currentUser, { displayName: finalUserName }).catch(() => undefined);
-  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: defaultPlan.initialAiCredits, included: defaultPlan.initialAiCredits, renewalMonth: new Date().toISOString().slice(0, 7), status: "Ativo", used: 0 }, name: finalCompanyName, ownerId: user.id, planId: defaultPlanId, status: "Ativo", subscriptionStatus: "ativo", updatedAt: serverTimestamp() }, { merge: true });
-  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, name: finalUserName, role: ownerRole(), updatedAt: serverTimestamp(), userId: user.id }, { merge: true });
-  await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: finalCompanyName, role: ownerRole(), updatedAt: serverTimestamp() }, { merge: true });
-  return cacheUser({ ...user, companyName: finalCompanyName, name: finalUserName, needsOnboarding: false, planId: defaultPlanId, role: ownerRole(), subscriptionStatus: "ativo", tenantId });
+  if (createsCompany) await setDoc(doc(db, tenantPath(tenantId)), tenantPayload(tenantName, user.id, invite), { merge: true });
+  await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, inviteCode: normalizedInviteCode, name: finalUserName, role, updatedAt: serverTimestamp(), userId: user.id }, { merge: true });
+  await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: tenantName, role, updatedAt: serverTimestamp() }, { merge: true });
+  await consumeInvite(normalizedInviteCode, user.id);
+  return cacheUser({ ...user, companyName: tenantName, name: finalUserName, needsOnboarding: false, planId: plan.id, role, subscriptionStatus, tenantId });
 }
 
 export async function resetPassword(email: string) {

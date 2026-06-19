@@ -5,8 +5,9 @@ import { useState } from "react";
 import { TextField } from "@/components/ui/TextField";
 import type { AppUser } from "@/features/auth/types/authTypes";
 
-export function FirstAccessOnboarding({ onComplete }: { onComplete: (companyName: string, userName: string) => Promise<void>; user: AppUser }) {
+export function FirstAccessOnboarding({ onComplete }: { onComplete: (companyName: string, userName: string, inviteCode: string) => Promise<void>; user: AppUser }) {
   const [companyName, setCompanyName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -14,14 +15,14 @@ export function FirstAccessOnboarding({ onComplete }: { onComplete: (companyName
   async function finish() {
     const finalCompanyName = companyName.trim();
     const finalUserName = userName.trim();
-    if (!finalUserName || !finalCompanyName) {
-      setError("Informe seu nome e o nome da empresa para iniciar o uso.");
+    if (!finalUserName || !finalCompanyName || !inviteCode.trim()) {
+      setError("Informe seu nome, nome da empresa e codigo de convite para iniciar o uso.");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      await onComplete(finalCompanyName, finalUserName);
+      await onComplete(finalCompanyName, finalUserName, inviteCode);
     } catch {
       setError("Nao foi possivel preparar seu ambiente. Tente novamente.");
     } finally {
@@ -47,9 +48,10 @@ export function FirstAccessOnboarding({ onComplete }: { onComplete: (companyName
             <div className="mt-5 space-y-4">
               <TextField label="Seu nome" onChange={(event) => setUserName(event.target.value)} placeholder="Ex.: Alecsander Lima" value={userName} />
               <TextField label="Nome da empresa" onChange={(event) => setCompanyName(event.target.value)} placeholder="Ex.: Orquestra Hub" value={companyName} />
+              <TextField label="Codigo de convite" onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="Codigo enviado pela Orquestra.cs" value={inviteCode} />
             </div>
             {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
-            <button className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={loading || !userName.trim() || !companyName.trim()} onClick={finish} type="button">
+            <button className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={loading || !userName.trim() || !companyName.trim() || !inviteCode.trim()} onClick={finish} type="button">
               <Building2 size={18} />
               {loading ? "Criando..." : "Criar empresa e continuar"}
             </button>
