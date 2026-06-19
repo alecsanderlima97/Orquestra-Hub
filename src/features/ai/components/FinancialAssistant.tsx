@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Cpu, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Bot, Code2, Loader2, Send, Sparkles, X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { auth } from "@/lib/firebase/config";
 import { buildAssistantSnapshot } from "../utils/assistantContext";
@@ -77,7 +77,8 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
         type="button"
       >
         <span className="relative flex size-9 items-center justify-center rounded-full bg-cyan-400/15">
-          <Cpu size={24} />
+          <Code2 size={23} />
+          <span className="absolute bottom-0 right-0 rounded-sm bg-cyan-300 px-1 text-[8px] font-black leading-3 text-slate-950">O</span>
           <Sparkles className="absolute -right-1 -top-1 text-cyan-300" size={13} />
         </span>
       </button>

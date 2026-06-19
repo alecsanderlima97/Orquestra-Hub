@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Check, Clock3, Database, Palette, ShieldCheck } from "lucide-react";
+import { Bell, Check, Clock3, Code2, Database, MessageCircle, Palette, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { AiCreditsPanel } from "@/features/ai/components/AiCreditsPanel";
 import { firebaseReady } from "@/lib/firebase/config";
@@ -11,6 +11,9 @@ const themes = [
   { id: "cristal", label: "Azul Cristal", colors: ["#eaf7ff", "#f8fdff", "#0284c7"] },
   { id: "salvia", label: "Verde Sálvia", colors: ["#edf2ec", "#fbfdf9", "#66856b"] },
 ] as const;
+
+const supportPhone = "15 99847 8705";
+const supportWhatsapp = "5515998478705";
 
 type ThemeId = typeof themes[number]["id"];
 
@@ -51,6 +54,24 @@ export function SystemSettings({ companyName, tenantId }: { companyName: string;
       </div>
 
       <AiCreditsPanel companyName={companyName} tenantId={tenantId} />
+
+      <section className="theme-surface rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <span className="theme-accent-soft flex size-11 items-center justify-center rounded-md bg-slate-950 text-cyan-300">
+              <Code2 size={21} />
+            </span>
+            <div>
+              <h3 className="font-semibold">Desenvolvido por Orquestra.cs</h3>
+              <p className="theme-muted mt-1 text-sm text-slate-600">Obrigado por usar o Orquestra Hub. Suporte, melhorias e créditos IA pelo WhatsApp {supportPhone}.</p>
+            </div>
+          </div>
+          <a className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-emerald-300 px-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50" href={`https://wa.me/${supportWhatsapp}`} target="_blank" rel="noreferrer">
+            <MessageCircle size={17} />
+            Suporte
+          </a>
+        </div>
+      </section>
 
       <section className="theme-surface rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">
