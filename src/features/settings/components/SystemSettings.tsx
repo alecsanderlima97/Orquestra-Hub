@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Check, Clock3, Code2, Database, Palette, ShieldCheck, Sparkles } from "lucide-react";
+import { Bell, Check, Clock3, Code2, Database, MessageCircle, Palette, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { AiCreditsPanel } from "@/features/ai/components/AiCreditsPanel";
 import { getPlanRules, plans, type PlanId } from "@/features/plans/planRules";
@@ -20,6 +20,8 @@ const planPitch: Record<PlanId, string> = {
   medio: "O melhor equilíbrio para lojas em crescimento, com WhatsApp e IA financeira.",
   premium: "Para operações com mais unidades, automações e análise financeira avançada.",
 };
+
+const supportWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
 
 function applyTheme(theme: ThemeId) {
   document.documentElement.dataset.theme = theme;
@@ -104,7 +106,7 @@ export function SystemSettings({ companyName, planId, tenantId }: { companyName:
         </header>
         <div className="grid gap-4 p-5 lg:grid-cols-3">
           {Object.values(plans).map((item) => (
-            <article className={`relative rounded-lg border p-5 ${item.id === activePlan.id ? "border-amber-400 bg-amber-50 shadow-md" : "border-slate-200 bg-white"}`} key={item.id}>
+            <article className={`relative rounded-lg border p-5 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-[0_0_28px_rgba(34,211,238,0.22)] ${item.id === activePlan.id ? "border-amber-400 bg-amber-50 shadow-md hover:shadow-[0_0_30px_rgba(251,191,36,0.28)]" : "border-slate-200 bg-white"}`} key={item.id}>
               {item.id === activePlan.id ? <span className="absolute right-4 top-4 rounded-md bg-amber-400 px-2 py-1 text-xs font-bold text-slate-950">ATUAL</span> : null}
               <strong className="block pr-16 text-lg text-slate-950">{item.label}</strong>
               <span className="mt-2 block text-2xl font-black text-slate-950">{item.price}</span>
@@ -123,7 +125,8 @@ export function SystemSettings({ companyName, planId, tenantId }: { companyName:
       <AiCreditsPanel companyName={companyName} planId={planId} tenantId={tenantId} />
 
       <section className="theme-surface rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
           <span className="theme-accent-soft flex size-11 items-center justify-center rounded-md bg-slate-950 text-cyan-300">
             <Code2 size={21} />
           </span>
@@ -131,6 +134,16 @@ export function SystemSettings({ companyName, planId, tenantId }: { companyName:
             <h3 className="font-semibold">Desenvolvido por Orquestra.cs</h3>
             <p className="theme-muted mt-1 text-sm text-slate-600">Obrigado por usar o Orquestra Hub. Plataforma desenvolvida para gestão empresarial personalizada.</p>
           </div>
+          </div>
+          <a
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-cyan-300 bg-cyan-50 px-4 text-sm font-semibold text-cyan-900 transition hover:-translate-y-0.5 hover:bg-cyan-100 hover:shadow-[0_0_22px_rgba(34,211,238,0.25)]"
+            href={`https://wa.me/${supportWhatsapp}?text=${encodeURIComponent("Olá, preciso de suporte no sistema.")}`}
+            target="_blank"
+            title="Falar com o suporte pelo WhatsApp"
+          >
+            <MessageCircle size={17} />
+            Suporte
+          </a>
         </div>
       </section>
     </div>
