@@ -4,6 +4,8 @@ import { tenantPath } from "@/lib/firebase/paths";
 import { toTitleCaseBR } from "@/lib/formatters/br";
 import type { AppUser, CompanyMembership } from "@/features/auth/types/authTypes";
 
+const initialAiCredits = 8;
+
 export async function createCompany(user: AppUser, name: string): Promise<CompanyMembership> {
   const companyName = toTitleCaseBR(name.trim());
   if (!companyName) throw new Error("Informe o nome da empresa.");
@@ -11,7 +13,7 @@ export async function createCompany(user: AppUser, name: string): Promise<Compan
   const membership: CompanyMembership = { companyName, role: "Proprietário", tenantId };
   if (!firebaseReady || !db || user.id === "demo-user") return membership;
 
-  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: 5, included: 5, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.id, status: "Ativo" });
+  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: initialAiCredits, included: initialAiCredits, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.id, status: "Ativo" });
   try {
     await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { createdAt: serverTimestamp(), email: user.email, name: user.name, role: "Proprietário", userId: user.id });
     await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName, createdAt: serverTimestamp(), role: "Proprietário" });

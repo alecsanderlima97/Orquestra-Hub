@@ -52,6 +52,7 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
       if (!response.ok) throw new Error(data.error || "Não foi possível consultar a IA.");
       setCredits(data.credits);
       setUsage(data.usage);
+      window.dispatchEvent(new Event("orquestra-ai-credits-updated"));
       setMessages((items) => [...items, { role: "assistant", text: data.answer }]);
     } catch (error) {
       setMessages((items) => [
@@ -113,13 +114,13 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
               <span className="text-slate-500">Uso estimado</span>
             </div>
             <div className="rounded-md bg-white p-2">
-              <strong className="block text-cyan-800">{credits?.balance ?? 5}</strong>
+              <strong className="block text-cyan-800">{credits?.balance ?? 8}</strong>
               <span className="text-slate-500">Créditos IA</span>
             </div>
           </div>
 
           <div className="border-b border-cyan-100 bg-cyan-50 px-4 py-3 text-xs leading-5 text-cyan-950">
-            A empresa ganha 5 créditos iniciais. Cada pergunta consome 1 crédito. Ao acabar, contrate uma recarga para continuar usando a IA.
+            A empresa ganha 8 créditos iniciais. Cada pergunta consome 1 crédito. Ao acabar, contrate uma recarga para continuar usando a IA.
           </div>
 
           <div className="flex flex-wrap gap-2 border-b border-slate-200 p-3">

@@ -8,6 +8,7 @@ import type { AppUser, CompanyMembership } from "../types/authTypes";
 
 const platformOwnerEmails = new Set(["limaalecsander@gmail.com"]);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const initialAiCredits = 8;
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -75,7 +76,7 @@ async function ensureTenantAccess(user: User) {
 
   const tenantId = crypto.randomUUID();
   const companyName = `Empresa de ${user.displayName || "Novo usuário"}`;
-  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: 5, included: 5, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, status: "Ativo" });
+  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: initialAiCredits, included: initialAiCredits, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: companyName, ownerId: user.uid, status: "Ativo" });
   await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.uid}`), { createdAt: serverTimestamp(), email: user.email || "", name: user.displayName || user.email || "Usuário", role: ownerRole(), userId: user.uid });
   await setDoc(doc(db, `userTenants/${user.uid}/memberships/${tenantId}`), { companyName, createdAt: serverTimestamp(), role: ownerRole() });
 }
@@ -106,7 +107,7 @@ export async function registerWithEmail(name: string, companyName: string, email
     const tenantName = invite?.companyName || finalCompanyName;
     const role: AppUser["role"] = invite?.role || ownerRole();
 
-    if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: 5, included: 5, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: tenantName, ownerId: credential.user.uid, status: "Ativo" });
+    if (!invite) await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: initialAiCredits, included: initialAiCredits, status: "Ativo", used: 0 }, createdAt: serverTimestamp(), name: tenantName, ownerId: credential.user.uid, status: "Ativo" });
     try {
       await setDoc(doc(db, `${tenantPath(tenantId)}/users/${credential.user.uid}`), {
         consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" },
@@ -160,7 +161,7 @@ export async function completeGoogleOnboarding(user: AppUser, companyName: strin
   const finalUserName = userName.trim();
   if (!finalCompanyName || !finalUserName) throw new Error("onboarding-required");
   await updateProfile(auth.currentUser, { displayName: finalUserName }).catch(() => undefined);
-  await setDoc(doc(db, tenantPath(tenantId)), { name: finalCompanyName, ownerId: user.id, status: "Ativo", updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, tenantPath(tenantId)), { aiCredits: { balance: initialAiCredits, included: initialAiCredits, status: "Ativo", used: 0 }, name: finalCompanyName, ownerId: user.id, status: "Ativo", updatedAt: serverTimestamp() }, { merge: true });
   await setDoc(doc(db, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, name: finalUserName, role: ownerRole(), updatedAt: serverTimestamp(), userId: user.id }, { merge: true });
   await setDoc(doc(db, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: finalCompanyName, role: ownerRole(), updatedAt: serverTimestamp() }, { merge: true });
   return cacheUser({ ...user, companyName: finalCompanyName, name: finalUserName, needsOnboarding: false, role: ownerRole(), tenantId });

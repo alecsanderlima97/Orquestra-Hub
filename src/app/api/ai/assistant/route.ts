@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 const OPENAI_INPUT_USD_PER_1M = 0.05;
 const OPENAI_OUTPUT_USD_PER_1M = 0.4;
-const INITIAL_AI_CREDITS = 5;
+const INITIAL_AI_CREDITS = 8;
 
 function extractText(data: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) {
   if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
@@ -46,13 +46,15 @@ async function reserveCredit(db: Firestore, tenantId: string) {
     const tenant = await transaction.get(tenantRef);
     if (!tenant.exists) throw new Error("Empresa não encontrada.");
     const aiCredits = tenant.data()?.aiCredits || {};
-    const currentBalance = Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : INITIAL_AI_CREDITS;
+    const currentIncluded = Number(aiCredits.included || INITIAL_AI_CREDITS);
+    const bonus = Math.max(INITIAL_AI_CREDITS - currentIncluded, 0);
+    const currentBalance = (Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : INITIAL_AI_CREDITS) + bonus;
     const currentUsed = Number(aiCredits.used || 0);
     if (currentBalance < 1) throw new Error("IA sem créditos disponíveis. Contrate uma recarga para continuar usando.");
     const nextBalance = currentBalance - 1;
     transaction.update(tenantRef, {
       "aiCredits.balance": nextBalance,
-      "aiCredits.included": Number(aiCredits.included || INITIAL_AI_CREDITS),
+      "aiCredits.included": Math.max(currentIncluded, INITIAL_AI_CREDITS),
       "aiCredits.lastUsedAt": new Date().toISOString(),
       "aiCredits.status": "Ativo",
       "aiCredits.used": currentUsed + 1,

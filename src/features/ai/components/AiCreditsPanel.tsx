@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { getAiCreditBalance, type AiCreditBalance } from "../services/aiCreditService";
 
 const salesWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
+const initialAiCredits = 8;
 
 const packages = [
   { credits: 100, label: "Recarga Inicial", price: "R$ 29,90" },
@@ -25,15 +26,22 @@ function requestPackage(companyName: string, item: { credits: number; price: str
 }
 
 export function AiCreditsPanel({ companyName, tenantId }: { companyName: string; tenantId: string }) {
-  const [credits, setCredits] = useState<AiCreditBalance>({ balance: 5, included: 5, status: "Ativo", used: 0 });
+  const [credits, setCredits] = useState<AiCreditBalance>({ balance: initialAiCredits, included: initialAiCredits, status: "Ativo", used: 0 });
 
   useEffect(() => {
     let alive = true;
-    void getAiCreditBalance(tenantId).then((balance) => {
-      if (alive) setCredits(balance);
-    });
+    function loadCredits() {
+      void getAiCreditBalance(tenantId).then((balance) => {
+        if (alive) setCredits(balance);
+      });
+    }
+    loadCredits();
+    window.addEventListener("orquestra-ai-credits-updated", loadCredits);
+    window.addEventListener("focus", loadCredits);
     return () => {
       alive = false;
+      window.removeEventListener("orquestra-ai-credits-updated", loadCredits);
+      window.removeEventListener("focus", loadCredits);
     };
   }, [tenantId]);
 
