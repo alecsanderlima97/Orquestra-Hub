@@ -30,6 +30,15 @@ body {
 [data-theme] main .text-slate-700, [data-theme] main .text-slate-600, [data-theme] main .text-slate-500, .theme-muted { color: var(--muted) !important; }
 .theme-accent { color: var(--accent); }
 .theme-accent-soft { background-color: var(--accent-soft) !important; color: var(--accent) !important; }
+[data-theme="escuro"] main .dark\:bg-slate-800 { background-color: #202734 !important; }
+[data-theme="escuro"] main .dark\:bg-slate-700 { background-color: #2d3747 !important; }
+[data-theme="escuro"] main .dark\:text-slate-50, [data-theme="escuro"] main .dark\:text-slate-100 { color: #f4f7fb !important; }
+[data-theme="escuro"] main .dark\:border-slate-600 { border-color: #46566b !important; }
+[data-theme="escuro"] main .dark\:divide-slate-700 > :not([hidden]) ~ :not([hidden]) { border-color: #46566b !important; }
+[data-theme="escuro"] main .dark\:bg-emerald-950\/35 { background-color: rgba(6, 78, 59, .35) !important; }
+[data-theme="escuro"] main .dark\:bg-rose-950\/35 { background-color: rgba(76, 5, 25, .38) !important; }
+[data-theme="escuro"] main .dark\:bg-amber-950\/35 { background-color: rgba(69, 26, 3, .38) !important; }
+[data-theme="escuro"] main .dark\:text-emerald-50, [data-theme="escuro"] main .dark\:text-rose-50, [data-theme="escuro"] main .dark\:text-amber-50 { color: #f8fafc !important; }
 .login-glow-link { border-radius: 6px; padding: 4px 7px; transition: color .2s, background .2s, box-shadow .2s, transform .2s; }
 .login-glow-link:hover { color:#0369a1; background:#ecfeff; box-shadow:0 0 8px rgba(34,211,238,.55),0 0 20px rgba(14,165,233,.3); transform:translateY(-1px); }
 

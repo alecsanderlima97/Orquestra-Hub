@@ -11,23 +11,23 @@ function statusLabel(account: AccountPayable) {
 }
 
 const statusStyles: Record<string, string> = {
-  Aberto: "bg-slate-100 text-slate-700",
-  Atrasado: "bg-rose-100 text-rose-800",
-  Pago: "bg-emerald-100 text-emerald-800",
-  "Vence hoje": "bg-amber-100 text-amber-800",
+  Aberto: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-100",
+  Atrasado: "bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-100",
+  Pago: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-100",
+  "Vence hoje": "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-100",
 };
 
 export function PaymentsTable({ accounts }: { accounts: AccountPayable[] }) {
   const payments = accounts.filter((account) => account.status !== "Pago").slice(0, 6);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-5 py-4">
+    <div className="theme-surface overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-600">
         <h2 className="text-base font-semibold text-slate-950">Próximos vencimentos</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead className="bg-slate-50 text-slate-600">
+          <thead className="bg-slate-50 text-slate-600 dark:bg-slate-700 dark:text-slate-100">
             <tr>
               <th className="px-5 py-3 font-medium">Fornecedor</th>
               <th className="px-5 py-3 font-medium">Loja</th>
@@ -36,7 +36,7 @@ export function PaymentsTable({ accounts }: { accounts: AccountPayable[] }) {
               <th className="px-5 py-3 font-medium">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 text-slate-800">
+          <tbody className="divide-y divide-slate-100 text-slate-800 dark:divide-slate-700 dark:text-slate-100">
             {payments.length ? (
               payments.map((payment) => {
                 const status = statusLabel(payment);
