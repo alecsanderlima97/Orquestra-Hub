@@ -5,6 +5,16 @@ import { useState } from "react";
 import { TextField } from "@/components/ui/TextField";
 import type { AppUser } from "@/features/auth/types/authTypes";
 
+function onboardingError(error: unknown) {
+  const details = error as { code?: string; message?: string };
+  const raw = String(details?.code || details?.message || error || "erro-desconhecido");
+  if (raw.includes("permission-denied")) return `Permissão negada pelo Firebase. Detalhe: ${raw}`;
+  if (raw.includes("onboarding-required")) return `Convite inválido, expirado ou já usado. Detalhe: ${raw}`;
+  if (raw.includes("invite-invalid")) return `Código de convite inválido. Detalhe: ${raw}`;
+  if (raw.includes("network") || raw.includes("unavailable")) return `Falha de conexão. Detalhe: ${raw}`;
+  return `Não foi possível preparar seu ambiente. Detalhe: ${raw}`;
+}
+
 export function FirstAccessOnboarding({ onComplete, onLogout }: { onComplete: (companyName: string, userName: string, inviteCode: string) => Promise<void>; onLogout: () => Promise<void>; user: AppUser }) {
   const [companyName, setCompanyName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -23,8 +33,8 @@ export function FirstAccessOnboarding({ onComplete, onLogout }: { onComplete: (c
     setError("");
     try {
       await onComplete(finalCompanyName, finalUserName, inviteCode);
-    } catch {
-      setError("Nao foi possivel preparar seu ambiente. Tente novamente.");
+    } catch (error) {
+      setError(onboardingError(error));
     } finally {
       setLoading(false);
     }
