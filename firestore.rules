@@ -29,7 +29,8 @@ service cloud.firestore {
       match /users/{userId} {
         allow read: if belongsToTenant(tenantId);
         allow create: if signedIn() && request.auth.uid == userId
-          && (get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
+          && (isPlatformOwner()
+            || get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
             || (exists(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode))
               && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.tenantId == tenantId
               && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.status == 'Ativo'
@@ -49,7 +50,8 @@ service cloud.firestore {
     match /userTenants/{userId}/memberships/{tenantId} {
       allow read: if signedIn() && request.auth.uid == userId;
       allow create: if signedIn() && request.auth.uid == userId
-        && exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(userId));
+        && (exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(userId))
+          || get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid);
       allow update: if signedIn()
         && request.auth.uid == userId
         && isOwner(tenantId)
@@ -63,17 +65,9 @@ service cloud.firestore {
       allow update: if signedIn() && (
         isPlatformOwner()
         || (resource.data.tenantId != null && isOwner(resource.data.tenantId))
-        || (resource.data.inviteType == 'commercial'
-          && resource.data.status == 'Ativo'
-          && request.resource.data.status == 'Usado'
-          && request.resource.data.usedBy == request.auth.uid
-          && request.resource.data.inviteType == resource.data.inviteType
-          && request.resource.data.planId == resource.data.planId
-          && request.resource.data.role == resource.data.role)
         || (resource.data.status == 'Ativo'
           && request.resource.data.status == 'Usado'
           && request.resource.data.usedBy == request.auth.uid
-          && request.resource.data.tenantId == resource.data.tenantId
           && request.resource.data.role == resource.data.role)
       );
       allow delete: if false;
