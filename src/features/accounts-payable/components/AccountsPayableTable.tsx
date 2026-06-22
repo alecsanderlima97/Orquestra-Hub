@@ -61,10 +61,11 @@ export function AccountsPayableTable({
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <table className="w-full min-w-[900px] text-left text-sm">
+      <table className="w-full min-w-[980px] text-left text-sm">
         <thead className="bg-slate-50 text-slate-600">
           <tr>
             <th className="px-5 py-3 font-medium">Fornecedor</th>
+            <th className="px-5 py-3 font-medium">Categoria</th>
             <th className="px-5 py-3 font-medium">Loja</th>
             <th className="px-5 py-3 font-medium">Parcela</th>
             <th className="px-5 py-3 font-medium">Vencimento</th>
@@ -83,6 +84,9 @@ export function AccountsPayableTable({
               return (
                 <tr className={rowStyle(account)} key={account.id}>
                   <td className="px-5 py-4 font-medium text-slate-950">{account.supplier}</td>
+                  <td className="px-5 py-4 text-slate-700">
+                    {account.categoryName ? <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold"><span className="size-2 rounded-full" style={{ backgroundColor: account.categoryColor || "#0891b2" }} />{account.categoryName}</span> : <span className="text-xs text-slate-400">Sem categoria</span>}
+                  </td>
                   <td className="px-5 py-4 text-slate-700">{account.store}</td>
                   <td className="px-5 py-4 text-slate-700">{account.installment}</td>
                   <td className="px-5 py-4 text-slate-700">
@@ -152,7 +156,7 @@ export function AccountsPayableTable({
             })
           ) : (
             <tr>
-              <td className="px-5 py-8 text-center text-slate-500" colSpan={8}>
+              <td className="px-5 py-8 text-center text-slate-500" colSpan={9}>
                 Nenhuma conta encontrada com os filtros selecionados.
               </td>
             </tr>

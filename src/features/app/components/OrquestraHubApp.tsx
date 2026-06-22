@@ -39,6 +39,8 @@ import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes
 import { FixedExpensesPanel, type FixedExpenseForm } from "@/features/fixed-expenses/components/FixedExpensesPanel";
 import { createFixedExpense, listFixedExpenses } from "@/features/fixed-expenses/services/fixedExpenseService";
 import type { FixedExpense } from "@/features/fixed-expenses/types/fixedExpenseTypes";
+import { createFinancialCategory, listFinancialCategories } from "@/features/financial-categories/services/financialCategoryService";
+import type { FinancialCategory } from "@/features/financial-categories/types/financialCategoryTypes";
 import { PurchaseForm } from "@/features/purchases/components/PurchaseForm";
 import type { PurchaseFormState } from "@/features/purchases/components/PurchaseForm";
 import { PurchasesTable } from "@/features/purchases/components/PurchasesTable";
@@ -109,6 +111,7 @@ export function OrquestraHubApp() {
   const [supplierList, setSupplierList] = useState<Supplier[]>([]);
   const [purchaseList, setPurchaseList] = useState<Purchase[]>([]);
   const [accountList, setAccountList] = useState<AccountPayable[]>([]);
+  const [financialCategories, setFinancialCategories] = useState<FinancialCategory[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [tenantUsers, setTenantUsers] = useState<AppUser[]>([]);
@@ -118,7 +121,7 @@ export function OrquestraHubApp() {
   const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
   const [paymentDateTime, setPaymentDateTime] = useState("");
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
-  const [formErrors, setFormErrors] = useState({ fixedExpense: "", purchase: "", store: "", supplier: "" });
+  const [formErrors, setFormErrors] = useState({ category: "", fixedExpense: "", purchase: "", store: "", supplier: "" });
   const [purchaseSearch, setPurchaseSearch] = useState("");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [boletoFiles, setBoletoFiles] = useState<File[]>([]);
@@ -140,7 +143,9 @@ export function OrquestraHubApp() {
   const [showStoreForm, setShowStoreForm] = useState(false);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
+  const [newPurchaseCategoryName, setNewPurchaseCategoryName] = useState("");
   const [purchaseForm, setPurchaseForm] = useState<PurchaseFormState>({
+    categoryId: "",
     dailyInterestAmount: "R$ 0,00",
     dailyInterestPercent: "",
     description: "",
@@ -195,12 +200,13 @@ export function OrquestraHubApp() {
     let cancelled = false;
     async function loadFirebaseData() {
       try {
-        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseAuditLogs, firebaseUsers, firebaseInvites] = await Promise.all([
+        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseCategories, firebaseAuditLogs, firebaseUsers, firebaseInvites] = await Promise.all([
           listStores(tenantId),
           listSuppliers(tenantId),
           listAccountsPayable(tenantId),
           listPurchases(tenantId),
           listFixedExpenses(tenantId),
+          listFinancialCategories(tenantId),
           canManage ? listAuditLogs(tenantId) : Promise.resolve([]),
           canManage ? listTenantUsers(tenantId, companyName) : Promise.resolve([]),
           canManage ? listInvites(tenantId) : Promise.resolve([]),
@@ -211,6 +217,7 @@ export function OrquestraHubApp() {
         setAccountList(firebaseAccounts);
         setPurchaseList(firebasePurchases);
         setFixedExpenses(firebaseFixedExpenses);
+        setFinancialCategories(firebaseCategories);
         setAuditLogs(firebaseAuditLogs);
         setTenantUsers(firebaseUsers);
         setInvites(firebaseInvites);
@@ -425,6 +432,7 @@ export function OrquestraHubApp() {
     }
     const installmentAmount = total / installments;
     const purchaseId = crypto.randomUUID();
+    const selectedCategory = financialCategories.find((category) => category.id === purchaseForm.categoryId);
     const newPurchase: Omit<Purchase, "id"> = {
       description: purchaseForm.description.trim(),
       installments,
@@ -436,6 +444,9 @@ export function OrquestraHubApp() {
     };
     const newAccounts: Omit<AccountPayable, "id">[] = Array.from({ length: installments }, (_, index) => ({
       amount: money.format(installmentAmount),
+      categoryColor: selectedCategory?.color,
+      categoryId: selectedCategory?.id,
+      categoryName: selectedCategory?.name,
       dailyInterestAmount: money.format(dailyInterestAmount),
       dailyInterestPercent: purchaseForm.dailyInterestPercent.trim(),
       dueDate: addMonths(purchaseForm.dueDate, index),
@@ -470,6 +481,7 @@ export function OrquestraHubApp() {
       ]);
       setInvoiceFile(null);
       setBoletoFiles([]);
+      setPurchaseForm((form) => ({ ...form, categoryId: "" }));
       setFormErrors((errors) => ({ ...errors, purchase: attachmentError ? "Compra salva. Alguns anexos não foram enviados; tente anexar novamente pela nota." : "" }));
       if (attachmentError) return;
     } catch {
@@ -504,7 +516,8 @@ export function OrquestraHubApp() {
       const id = saved?.id || crypto.randomUUID();
       const now = new Date();
       const dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay).toLocaleDateString("pt-BR");
-      const account: Omit<AccountPayable, "id"> = { amount: expense.amount, dueDate, fixedExpenseId: id, installment: "Mensal", referenceMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, status: "Aberto", store: expense.store, supplier: expense.payee };
+      const matchedCategory = financialCategories.find((category) => category.name.toLocaleLowerCase("pt-BR") === expense.category.toLocaleLowerCase("pt-BR"));
+      const account: Omit<AccountPayable, "id"> = { amount: expense.amount, categoryColor: matchedCategory?.color, categoryId: matchedCategory?.id, categoryName: expense.category, dueDate, fixedExpenseId: id, installment: "Mensal", referenceMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, status: "Aberto", store: expense.store, supplier: expense.payee };
       const savedAccount = persist ? await createAccountPayable(defaultTenantId, account) : null;
       if (persist && !savedAccount) throw new Error("A conta da despesa fixa não retornou confirmação de salvamento.");
       setFixedExpenses((items) => [{ id, ...expense }, ...items]);
@@ -515,6 +528,40 @@ export function OrquestraHubApp() {
     } catch {
       setFormErrors((errors) => ({ ...errors, fixedExpense: "Não foi possível salvar a despesa fixa. Verifique sua conexão e tente novamente." }));
     }
+  }
+
+  async function addFinancialCategory(category: Omit<FinancialCategory, "id">) {
+    if (!user) return null;
+    const duplicate = financialCategories.some((item) => item.name.toLocaleLowerCase("pt-BR") === category.name.toLocaleLowerCase("pt-BR"));
+    if (duplicate) {
+      setFormErrors((errors) => ({ ...errors, category: "Essa categoria já existe." }));
+      return null;
+    }
+    try {
+      const persist = firebaseReady && user.id !== demoUserId;
+      const saved = persist ? await createFinancialCategory(defaultTenantId, category) : null;
+      const id = saved?.id || crypto.randomUUID();
+      const created = { id, ...category };
+      setFinancialCategories((items) => [created, ...items].toSorted((a, b) => a.name.localeCompare(b.name, "pt-BR")));
+      setFormErrors((errors) => ({ ...errors, category: "" }));
+      await recordAudit(defaultTenantId, user, "criou", "categoria financeira", id);
+      return created;
+    } catch {
+      setFormErrors((errors) => ({ ...errors, category: "Não foi possível salvar a categoria. Tente novamente." }));
+      return null;
+    }
+  }
+
+  async function addPurchaseCategoryFromForm() {
+    const name = toTitleCaseBR(newPurchaseCategoryName.trim());
+    if (!name) {
+      setFormErrors((errors) => ({ ...errors, category: "Informe o nome da categoria." }));
+      return;
+    }
+    const created = await addFinancialCategory({ active: true, color: "#0891b2", name });
+    if (!created) return;
+    setPurchaseForm((form) => ({ ...form, categoryId: created.id }));
+    setNewPurchaseCategoryName("");
   }
 
   function requestMarkPaid(id: string) {
@@ -616,9 +663,10 @@ export function OrquestraHubApp() {
   }
 
   function exportFilteredAccounts() {
-    const header = ["Fornecedor", "Loja", "Parcela", "Vencimento", "Valor", "Status", "Pago em", "Comprovante"];
+    const header = ["Fornecedor", "Categoria", "Loja", "Parcela", "Vencimento", "Valor", "Status", "Pago em", "Comprovante"];
     const rows = filteredAccounts.map((account) => [
       account.supplier,
+      account.categoryName || "",
       account.store,
       account.installment,
       account.dueDate,
@@ -641,7 +689,7 @@ export function OrquestraHubApp() {
     if (target.kind === "store") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "manager", label: "Responsável", mask: "title", value: target.item.manager }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone || "" }, { key: "cep", label: "CEP", mask: "cep", value: target.item.cep || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "city", label: "Cidade", mask: "title", value: target.item.city || "" }, { key: "state", label: "Estado", mask: "upper", value: target.item.state || "" }, { key: "mapsUrl", label: "Google Maps", value: target.item.mapsUrl || "" }, { key: "monthlyGoal", label: "Meta mensal", mask: "currency", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", mask: "currency", value: target.item.balance }];
     if (target.kind === "supplier") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "document", label: "CNPJ", mask: "cnpj", value: target.item.document }, { key: "contactName", label: "Contato", mask: "title", value: target.item.contactName || "" }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone }, { key: "email", label: "E-mail", value: target.item.email || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "paymentMethod", label: "Forma de pagamento", value: target.item.paymentMethod || "" }, { key: "pixKey", label: "Chave PIX", value: target.item.pixKey || "" }, { key: "bank", label: "Banco", mask: "title", value: target.item.bank || "" }, { key: "agency", label: "Agência", value: target.item.agency || "" }, { key: "account", label: "Conta", value: target.item.account || "" }, { key: "paymentTerms", label: "Condição de pagamento", value: target.item.paymentTerms || "" }, { key: "notes", label: "Observações", value: target.item.notes || "" }];
     if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", mask: "upper", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", mask: "currency", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
-    return [{ key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "dailyInterestAmount", label: "Mora diaria (R$)", mask: "currency", value: target.item.dailyInterestAmount || "R$ 0,00" }, { key: "dailyInterestPercent", label: "Mora diaria (%)", value: target.item.dailyInterestPercent || "" }, { key: "lateFeeAmount", label: "Multa (R$)", mask: "currency", value: target.item.lateFeeAmount || "R$ 0,00" }, { key: "lateFeePercent", label: "Multa (%)", value: target.item.lateFeePercent || "" }, { key: "protestAfterDays", label: "Protesto apos dias", type: "number", value: target.item.protestAfterDays || "" }, { key: "installment", label: "Parcela", value: target.item.installment }];
+    return [{ key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "categoryName", label: "Categoria", mask: "title", value: target.item.categoryName || "" }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "dailyInterestAmount", label: "Mora diaria (R$)", mask: "currency", value: target.item.dailyInterestAmount || "R$ 0,00" }, { key: "dailyInterestPercent", label: "Mora diaria (%)", value: target.item.dailyInterestPercent || "" }, { key: "lateFeeAmount", label: "Multa (R$)", mask: "currency", value: target.item.lateFeeAmount || "R$ 0,00" }, { key: "lateFeePercent", label: "Multa (%)", value: target.item.lateFeePercent || "" }, { key: "protestAfterDays", label: "Protesto apos dias", type: "number", value: target.item.protestAfterDays || "" }, { key: "installment", label: "Parcela", value: target.item.installment }];
   }
 
   async function saveEdit(values: Record<string, string>, password: string) {
@@ -663,7 +711,8 @@ export function OrquestraHubApp() {
         if (persist) await updatePurchase(defaultTenantId, editTarget.item.id, updates);
         setPurchaseList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       } else {
-        const updates = { supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, dailyInterestAmount: values.dailyInterestAmount, dailyInterestPercent: values.dailyInterestPercent, lateFeeAmount: values.lateFeeAmount, lateFeePercent: values.lateFeePercent, protestAfterDays: values.protestAfterDays, installment: values.installment };
+        const matchedCategory = financialCategories.find((category) => category.name.toLocaleLowerCase("pt-BR") === values.categoryName.toLocaleLowerCase("pt-BR"));
+        const updates = { supplier: toTitleCaseBR(values.supplier), categoryColor: matchedCategory?.color || editTarget.item.categoryColor, categoryId: matchedCategory?.id || editTarget.item.categoryId, categoryName: toTitleCaseBR(values.categoryName), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, dailyInterestAmount: values.dailyInterestAmount, dailyInterestPercent: values.dailyInterestPercent, lateFeeAmount: values.lateFeeAmount, lateFeePercent: values.lateFeePercent, protestAfterDays: values.protestAfterDays, installment: values.installment };
         if (persist) await updateAccountPayable(defaultTenantId, editTarget.item.id, updates);
         setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       }
@@ -686,6 +735,7 @@ export function OrquestraHubApp() {
       setPurchaseList([]);
       setAccountList([]);
       setFixedExpenses([]);
+      setFinancialCategories([]);
       setAuditLogs([]);
       setTenantUsers([]);
       setInvites([]);
@@ -716,12 +766,13 @@ export function OrquestraHubApp() {
     if (!user || user.id === demoUserId || !canManageUsers(user.role)) throw new Error("Permissão negada.");
     await verifyCurrentPassword(password);
     await restoreBackup(defaultTenantId, payload, mode);
-    const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseAuditLogs] = await Promise.all([
+    const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseCategories, firebaseAuditLogs] = await Promise.all([
       listStores(defaultTenantId),
       listSuppliers(defaultTenantId),
       listAccountsPayable(defaultTenantId),
       listPurchases(defaultTenantId),
       listFixedExpenses(defaultTenantId),
+      listFinancialCategories(defaultTenantId),
       listAuditLogs(defaultTenantId),
     ]);
     setStoreList(firebaseStores);
@@ -729,6 +780,7 @@ export function OrquestraHubApp() {
     setAccountList(firebaseAccounts);
     setPurchaseList(firebasePurchases);
     setFixedExpenses(firebaseFixedExpenses);
+    setFinancialCategories(firebaseCategories);
     setAuditLogs(firebaseAuditLogs);
     await recordAudit(defaultTenantId, user, mode === "replace" ? "editou" : "criou", "backup", defaultTenantId);
   }
@@ -842,11 +894,16 @@ export function OrquestraHubApp() {
           {canWrite ? <div className="mb-4 flex justify-end"><button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowPurchaseForm((visible) => !visible)} type="button">{showPurchaseForm ? <X size={18} /> : <Plus size={18} />}{showPurchaseForm ? "Cancelar lançamento" : "Cadastrar nova compra"}</button></div> : null}
           {showPurchaseForm ? <PurchaseForm
             boletoFiles={boletoFiles}
+            categoryError={formErrors.category}
+            categoryOptions={financialCategories.filter((category) => category.active).map((category) => ({ id: category.id, name: category.name }))}
             form={purchaseForm}
             invoiceFile={invoiceFile}
+            newCategoryName={newPurchaseCategoryName}
             onBoletoFilesChange={setBoletoFiles}
+            onCategoryCreate={() => addPurchaseCategoryFromForm()}
             onChange={setPurchaseForm}
             onInvoiceFileChange={setInvoiceFile}
+            onNewCategoryNameChange={setNewPurchaseCategoryName}
             onSubmit={addPurchase}
             error={formErrors.purchase}
             storeOptions={storeList.map((store) => store.name)}

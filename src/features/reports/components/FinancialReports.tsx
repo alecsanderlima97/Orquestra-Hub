@@ -9,40 +9,92 @@ import { compareDateBR, parseBRL, parseDateBR } from "@/lib/formatters/br";
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 const all = "Todos";
 const fieldClass = "mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100";
-function total(items: AccountPayable[]) { return items.reduce((sum, item) => sum + parseBRL(item.amount), 0); }
-function options(values: string[]) { return [all, ...new Set(values.filter(Boolean))].toSorted((a, b) => a.localeCompare(b, "pt-BR")); }
-function inPeriod(value: string, start: string, end: string) { const time = parseDateBR(value).getTime(); return (!start || time >= new Date(`${start}T00:00:00`).getTime()) && (!end || time <= new Date(`${end}T23:59:59`).getTime()); }
-function group(accounts: AccountPayable[], key: "store" | "supplier") { const data = accounts.reduce<Record<string, { open: number; overdue: number; paid: number; count: number }>>((result, account) => { const item = result[account[key]] || { open: 0, overdue: 0, paid: 0, count: 0 }; const amount = parseBRL(account.amount); item.count += 1; if (account.status === "Pago") item.paid += amount; else item.open += amount; if (account.status === "Atrasado") item.overdue += amount; result[account[key]] = item; return result; }, {}); return Object.entries(data).map(([name, values]) => ({ name, ...values })).toSorted((a, b) => b.open - a.open); }
+
+function total(items: AccountPayable[]) {
+  return items.reduce((sum, item) => sum + parseBRL(item.amount), 0);
+}
+
+function options(values: string[]) {
+  return [all, ...new Set(values.filter(Boolean))].toSorted((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+function inPeriod(value: string, start: string, end: string) {
+  const time = parseDateBR(value).getTime();
+  return (!start || time >= new Date(`${start}T00:00:00`).getTime()) && (!end || time <= new Date(`${end}T23:59:59`).getTime());
+}
+
+function group(accounts: AccountPayable[], key: "store" | "supplier" | "categoryName") {
+  const data = accounts.reduce<Record<string, { open: number; overdue: number; paid: number; count: number }>>((result, account) => {
+    const name = account[key] || "Sem categoria";
+    const item = result[name] || { open: 0, overdue: 0, paid: 0, count: 0 };
+    const amount = parseBRL(account.amount);
+    item.count += 1;
+    if (account.status === "Pago") item.paid += amount;
+    else item.open += amount;
+    if (account.status === "Atrasado") item.overdue += amount;
+    result[name] = item;
+    return result;
+  }, {});
+  return Object.entries(data).map(([name, values]) => ({ name, ...values })).toSorted((a, b) => b.open - a.open);
+}
 
 export function FinancialReports({ accounts, purchases }: { accounts: AccountPayable[]; purchases: Purchase[] }) {
-  const [filters, setFilters] = useState({ end: "", start: "", status: all, store: all, supplier: all });
+  const [filters, setFilters] = useState({ category: all, end: "", start: "", status: all, store: all, supplier: all });
   const stores = options([...accounts.map((item) => item.store), ...purchases.map((item) => item.store)]);
   const suppliers = options([...accounts.map((item) => item.supplier), ...purchases.map((item) => item.supplier)]);
-  const filteredAccounts = useMemo(() => accounts.filter((item) => (filters.store === all || item.store === filters.store) && (filters.supplier === all || item.supplier === filters.supplier) && (filters.status === all || item.status === filters.status) && inPeriod(item.dueDate, filters.start, filters.end)), [accounts, filters]);
-  const filteredPurchases = useMemo(() => purchases.filter((item) => (filters.store === all || item.store === filters.store) && (filters.supplier === all || item.supplier === filters.supplier) && inPeriod(item.issueDate, filters.start, filters.end)), [purchases, filters]);
-  const paid = filteredAccounts.filter((item) => item.status === "Pago"); const open = filteredAccounts.filter((item) => item.status !== "Pago"); const overdue = filteredAccounts.filter((item) => item.status === "Atrasado");
-  const byStore = group(filteredAccounts, "store"); const bySupplier = group(filteredAccounts, "supplier");
+  const categories = options(accounts.map((item) => item.categoryName || "Sem categoria"));
+  const filteredAccounts = useMemo(
+    () => accounts.filter((item) =>
+      (filters.store === all || item.store === filters.store)
+      && (filters.supplier === all || item.supplier === filters.supplier)
+      && (filters.category === all || (item.categoryName || "Sem categoria") === filters.category)
+      && (filters.status === all || item.status === filters.status)
+      && inPeriod(item.dueDate, filters.start, filters.end),
+    ),
+    [accounts, filters],
+  );
+  const filteredPurchases = useMemo(
+    () => purchases.filter((item) =>
+      (filters.store === all || item.store === filters.store)
+      && (filters.supplier === all || item.supplier === filters.supplier)
+      && inPeriod(item.issueDate, filters.start, filters.end),
+    ),
+    [purchases, filters],
+  );
+  const paid = filteredAccounts.filter((item) => item.status === "Pago");
+  const open = filteredAccounts.filter((item) => item.status !== "Pago");
+  const overdue = filteredAccounts.filter((item) => item.status === "Atrasado");
+  const byCategory = group(filteredAccounts, "categoryName");
+  const byStore = group(filteredAccounts, "store");
+  const bySupplier = group(filteredAccounts, "supplier");
   const orderedAccounts = filteredAccounts.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate));
-  const clear = () => setFilters({ end: "", start: "", status: all, store: all, supplier: all });
-  return <div className="printable-reports space-y-5" id="printable-reports">
-    <div className="no-print grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-5">
-      <Filter label="Data inicial"><input className={fieldClass} onChange={(event) => setFilters({ ...filters, start: event.target.value })} type="date" value={filters.start} /></Filter>
-      <Filter label="Data final"><input className={fieldClass} onChange={(event) => setFilters({ ...filters, end: event.target.value })} type="date" value={filters.end} /></Filter>
-      <Filter label="Loja"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, store: event.target.value })} value={filters.store}>{stores.map((item) => <option key={item}>{item}</option>)}</select></Filter>
-      <Filter label="Fornecedor"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, supplier: event.target.value })} value={filters.supplier}>{suppliers.map((item) => <option key={item}>{item}</option>)}</select></Filter>
-      <Filter label="Status"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, status: event.target.value })} value={filters.status}><option>{all}</option><option>Aberto</option><option>Pago</option><option>Atrasado</option></select></Filter>
-      <div className="flex gap-2 md:col-span-2 xl:col-span-5 xl:justify-end"><button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50" onClick={clear} type="button"><RotateCcw size={16} />Limpar filtros</button><button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => window.print()} title="Imprimir ou salvar somente este relatório em PDF" type="button"><Printer size={17} />Imprimir relatório</button></div>
+  const clear = () => setFilters({ category: all, end: "", start: "", status: all, store: all, supplier: all });
+
+  return (
+    <div className="printable-reports space-y-5" id="printable-reports">
+      <div className="no-print grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-6">
+        <Filter label="Data inicial"><input className={fieldClass} onChange={(event) => setFilters({ ...filters, start: event.target.value })} type="date" value={filters.start} /></Filter>
+        <Filter label="Data final"><input className={fieldClass} onChange={(event) => setFilters({ ...filters, end: event.target.value })} type="date" value={filters.end} /></Filter>
+        <Filter label="Loja"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, store: event.target.value })} value={filters.store}>{stores.map((item) => <option key={item}>{item}</option>)}</select></Filter>
+        <Filter label="Fornecedor"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, supplier: event.target.value })} value={filters.supplier}>{suppliers.map((item) => <option key={item}>{item}</option>)}</select></Filter>
+        <Filter label="Categoria"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, category: event.target.value })} value={filters.category}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Filter>
+        <Filter label="Status"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, status: event.target.value })} value={filters.status}><option>{all}</option><option>Aberto</option><option>Pago</option><option>Atrasado</option></select></Filter>
+        <div className="flex gap-2 md:col-span-2 xl:col-span-6 xl:justify-end">
+          <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50" onClick={clear} type="button"><RotateCcw size={16} />Limpar filtros</button>
+          <button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => window.print()} title="Imprimir ou salvar somente este relatório em PDF" type="button"><Printer size={17} />Imprimir relatório</button>
+        </div>
+      </div>
+      <div className="hidden print:block"><h2 className="text-xl font-bold">Orquestra Hub - Relatório financeiro</h2><p className="mt-1 text-sm">Período: {filters.start || "Início"} até {filters.end || "Atual"} - Loja: {filters.store} - Fornecedor: {filters.supplier} - Categoria: {filters.category} - Status: {filters.status}</p></div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><ReportCard label="Compras lançadas" value={String(filteredPurchases.length)} helper={money.format(filteredPurchases.reduce((sum, item) => sum + parseBRL(item.total), 0))} /><ReportCard label="Total em aberto" value={money.format(total(open))} helper={`${open.length} conta(s)`} /><ReportCard label="Total pago" value={money.format(total(paid))} helper={`${paid.length} baixa(s)`} /><ReportCard label="Total atrasado" value={money.format(total(overdue))} helper={`${overdue.length} vencida(s)`} /><ReportCard label="Com comprovante" value={String(filteredAccounts.filter((item) => item.receiptName).length)} helper="Pagamentos documentados" /></div>
+      <div className="grid gap-5 xl:grid-cols-3"><Breakdown title="Detalhamento por categoria" items={byCategory} /><Breakdown title="Detalhamento por loja" items={byStore} /><Breakdown title="Detalhamento por fornecedor" items={bySupplier} /></div>
+      <ReportTable accounts={orderedAccounts} />
+      <PurchasesReportTable purchases={filteredPurchases} />
     </div>
-    <div className="hidden print:block"><h2 className="text-xl font-bold">Orquestra Hub · Relatório financeiro</h2><p className="mt-1 text-sm">Período: {filters.start || "Início"} até {filters.end || "Atual"} · Loja: {filters.store} · Fornecedor: {filters.supplier} · Status: {filters.status}</p></div>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><ReportCard label="Compras lançadas" value={String(filteredPurchases.length)} helper={money.format(filteredPurchases.reduce((sum, item) => sum + parseBRL(item.total), 0))} /><ReportCard label="Total em aberto" value={money.format(total(open))} helper={`${open.length} conta(s)`} /><ReportCard label="Total pago" value={money.format(total(paid))} helper={`${paid.length} baixa(s)`} /><ReportCard label="Total atrasado" value={money.format(total(overdue))} helper={`${overdue.length} vencida(s)`} /><ReportCard label="Com comprovante" value={String(filteredAccounts.filter((item) => item.receiptName).length)} helper="Pagamentos documentados" /></div>
-    <div className="grid gap-5 xl:grid-cols-2"><Breakdown title="Detalhamento por loja" items={byStore} /><Breakdown title="Detalhamento por fornecedor" items={bySupplier} /></div>
-    <ReportTable accounts={orderedAccounts} />
-    <PurchasesReportTable purchases={filteredPurchases} />
-  </div>;
+  );
 }
 
 function Filter({ children, label }: { children: React.ReactNode; label: string }) { return <label className="block"><span className="text-sm font-medium text-slate-700">{label}</span>{children}</label>; }
 function ReportCard({ label, value, helper }: { label: string; value: string; helper: string }) { return <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{label}</p><strong className="mt-2 block text-xl">{value}</strong><span className="mt-1 block text-xs text-slate-500">{helper}</span></article>; }
 function Breakdown({ items, title }: { items: { name: string; open: number; overdue: number; paid: number; count: number }[]; title: string }) { return <div className="rounded-lg border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h3 className="font-semibold">{title}</h3></div><div className="divide-y divide-slate-100">{items.length ? items.map((item) => <div className="px-5 py-4" key={item.name}><div className="flex justify-between gap-4"><strong>{item.name}</strong><span className="text-sm text-slate-500">{item.count} conta(s)</span></div><div className="mt-2 grid grid-cols-3 gap-2 text-xs"><span>Aberto: <b>{money.format(item.open)}</b></span><span>Pago: <b>{money.format(item.paid)}</b></span><span>Atrasado: <b className="text-rose-700">{money.format(item.overdue)}</b></span></div></div>) : <p className="px-5 py-8 text-center text-sm text-slate-500">Nenhum dado no período.</p>}</div></div>; }
-function ReportTable({ accounts }: { accounts: AccountPayable[] }) { return <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h3 className="font-semibold">Contas do período</h3></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">Fornecedor</th><th className="px-5 py-3">Loja</th><th className="px-5 py-3">Parcela</th><th className="px-5 py-3">Vencimento</th><th className="px-5 py-3">Valor</th><th className="px-5 py-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{accounts.length ? accounts.map((item) => <tr key={item.id}><td className="px-5 py-3 font-medium">{item.supplier}</td><td className="px-5 py-3">{item.store}</td><td className="px-5 py-3">{item.installment}</td><td className="px-5 py-3">{item.dueDate}</td><td className="px-5 py-3 font-medium">{item.amount}</td><td className="px-5 py-3">{item.status}</td></tr>) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={6}>Nenhuma conta encontrada.</td></tr>}</tbody></table></div></div>; }
+function ReportTable({ accounts }: { accounts: AccountPayable[] }) { return <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h3 className="font-semibold">Contas do período</h3></div><div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm"><thead className="bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">Fornecedor</th><th className="px-5 py-3">Categoria</th><th className="px-5 py-3">Loja</th><th className="px-5 py-3">Parcela</th><th className="px-5 py-3">Vencimento</th><th className="px-5 py-3">Valor</th><th className="px-5 py-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{accounts.length ? accounts.map((item) => <tr key={item.id}><td className="px-5 py-3 font-medium">{item.supplier}</td><td className="px-5 py-3">{item.categoryName || "Sem categoria"}</td><td className="px-5 py-3">{item.store}</td><td className="px-5 py-3">{item.installment}</td><td className="px-5 py-3">{item.dueDate}</td><td className="px-5 py-3 font-medium">{item.amount}</td><td className="px-5 py-3">{item.status}</td></tr>) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={7}>Nenhuma conta encontrada.</td></tr>}</tbody></table></div></div>; }
 function PurchasesReportTable({ purchases }: { purchases: Purchase[] }) { return <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h3 className="font-semibold">Compras e notas do período</h3></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">Nota</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Fornecedor</th><th className="px-5 py-3">Loja</th><th className="px-5 py-3">Descrição</th><th className="px-5 py-3">Total</th></tr></thead><tbody className="divide-y divide-slate-100">{purchases.length ? purchases.map((item) => <tr key={item.id}><td className="px-5 py-3 font-medium">{item.invoiceNumber}</td><td className="px-5 py-3">{item.issueDate}</td><td className="px-5 py-3">{item.supplier}</td><td className="px-5 py-3">{item.store}</td><td className="px-5 py-3">{item.description || "Não informado"}</td><td className="px-5 py-3 font-medium">{item.total}</td></tr>) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={6}>Nenhuma compra encontrada.</td></tr>}</tbody></table></div></div>; }

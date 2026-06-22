@@ -4,6 +4,9 @@ export type AccountPayable = {
   store: string;
   dueDate: string;
   amount: string;
+  categoryColor?: string;
+  categoryId?: string;
+  categoryName?: string;
   installment: string;
   dailyInterestAmount?: string;
   dailyInterestPercent?: string;
