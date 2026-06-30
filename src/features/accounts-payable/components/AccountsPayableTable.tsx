@@ -1,4 +1,4 @@
-import { CheckCircle2, MessageCircle, Paperclip, Pencil } from "lucide-react";
+import { CheckCircle2, MessageCircle, Paperclip, Pencil, Trash2 } from "lucide-react";
 import { brCurrencyFormatter, parseBRL, parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
 import type { AccountPayable } from "../types/accountPayableTypes";
 
@@ -48,12 +48,14 @@ function lateCharge(account: AccountPayable) {
 
 export function AccountsPayableTable({
   accounts,
+  onDelete,
   onMarkPaid,
   onEdit,
   onReceiptSelected,
   onWhatsApp,
 }: {
   accounts: AccountPayable[];
+  onDelete?: (account: AccountPayable) => void;
   onMarkPaid?: (id: string) => void;
   onEdit?: (account: AccountPayable) => void;
   onReceiptSelected?: (id: string, file: File) => void;
@@ -119,6 +121,7 @@ export function AccountsPayableTable({
                   <td className="px-5 py-4">
                     <div className="flex gap-2">
                       <button aria-label="Editar conta" className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(account)} title={account.status === "Pago" ? "Editar conta paga mediante confirmação da senha" : "Editar esta conta a pagar"} type="button"><Pencil size={17} /></button>
+                      <button aria-label="Excluir lançamento" className="rounded-md border border-slate-200 bg-white p-2 text-rose-600 hover:bg-rose-50" onClick={() => onDelete?.(account)} title="Excluir somente este lançamento de conta a pagar" type="button"><Trash2 size={17} /></button>
                       <button
                         aria-label="Dar baixa"
                         className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"

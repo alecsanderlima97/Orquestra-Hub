@@ -14,7 +14,7 @@ import { AccountsPayableSummary } from "@/features/accounts-payable/components/A
 import type { AccountsPayableSummaryItem } from "@/features/accounts-payable/components/AccountsPayableSummary";
 import { AccountsPayableTable } from "@/features/accounts-payable/components/AccountsPayableTable";
 import { PaymentConfirmModal } from "@/features/accounts-payable/components/PaymentConfirmModal";
-import { createAccountPayable, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
+import { createAccountPayable, deleteAccountPayable, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import { PlatformAdminPanel } from "@/features/admin/components/PlatformAdminPanel";
 import { isPlatformAdmin } from "@/features/admin/services/platformAdminService";
@@ -618,6 +618,13 @@ export function OrquestraHubApp() {
     setPaymentDateTime(nowDateTimeBR());
   }
 
+  async function removeAccountPayable(account: AccountPayable) {
+    if (!window.confirm(`Excluir o lançamento de ${account.supplier}, parcela ${account.installment}, no valor de ${account.amount}? Esta ação não apaga a recorrência fixa nem a nota de origem.`)) return;
+    if (firebaseReady && user?.id !== demoUserId) await deleteAccountPayable(defaultTenantId, account.id);
+    setAccountList((items) => items.filter((item) => item.id !== account.id));
+    await recordChange(defaultTenantId, user, "excluiu", "conta", account.id);
+  }
+
   async function confirmMarkPaid() {
     if (!paymentToConfirm) return;
     if (firebaseReady && user?.id !== demoUserId) await markAccountAsPaid(defaultTenantId, paymentToConfirm.id);
@@ -998,6 +1005,7 @@ export function OrquestraHubApp() {
           <div className="max-h-[560px] overflow-auto">
             <AccountsPayableTable
               accounts={filteredAccounts}
+              onDelete={canWrite ? removeAccountPayable : undefined}
               onEdit={canWrite ? (item) => setEditTarget({ kind: "account", item }) : undefined}
               onMarkPaid={canWrite ? requestMarkPaid : undefined}
               onReceiptSelected={canWrite ? handleReceiptSelected : undefined}

@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db, firebaseReady } from "@/lib/firebase/config";
 import { tenantCollectionPath } from "@/lib/firebase/paths";
 import type { AccountPayable } from "../types/accountPayableTypes";
@@ -23,6 +23,11 @@ export async function markAccountAsPaid(tenantId: string, accountId: string) {
 export async function updateAccountPayable(tenantId: string, accountId: string, account: Partial<AccountPayable>) {
   if (!firebaseReady || !db) throw new Error("Firebase não está pronto para atualizar a conta.");
   await updateDoc(doc(db, tenantCollectionPath(tenantId, collectionName), accountId), { ...account, updatedAt: serverTimestamp() });
+}
+
+export async function deleteAccountPayable(tenantId: string, accountId: string) {
+  if (!firebaseReady || !db) throw new Error("Firebase não está pronto para excluir a conta.");
+  await deleteDoc(doc(db, tenantCollectionPath(tenantId, collectionName), accountId));
 }
 
 export async function createAccountPayable(tenantId: string, account: Omit<AccountPayable, "id">) {

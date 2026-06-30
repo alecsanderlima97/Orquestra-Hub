@@ -64,7 +64,7 @@ export function FixedExpensesPanel({
                 {canWrite ? (
                   <div className="flex gap-1">
                     <button aria-label="Editar despesa fixa" className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(item)} title="Editar esta despesa fixa" type="button"><Pencil size={16} /></button>
-                    <button aria-label="Desativar despesa fixa" className="rounded-md border border-slate-200 p-2 text-rose-600 hover:bg-rose-50" onClick={() => onDelete?.(item)} title="Desativar esta despesa fixa" type="button"><Trash2 size={16} /></button>
+                    <button aria-label="Excluir recorrência" className="rounded-md border border-slate-200 p-2 text-rose-600 hover:bg-rose-50" onClick={() => onDelete?.(item)} title="Excluir esta recorrência sem apagar lançamentos antigos" type="button"><Trash2 size={16} /></button>
                   </div>
                 ) : null}
               </div>
