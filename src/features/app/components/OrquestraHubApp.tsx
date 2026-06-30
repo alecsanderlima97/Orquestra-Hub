@@ -37,7 +37,7 @@ import { FinancialAlertsPanel } from "@/features/dashboard/components/FinancialA
 import { buildFinancialAlerts, type FinancialAlert } from "@/features/dashboard/utils/financialAlerts";
 import type { FinancialSummary } from "@/features/dashboard/types/dashboardTypes";
 import { FixedExpensesPanel, type FixedExpenseForm } from "@/features/fixed-expenses/components/FixedExpensesPanel";
-import { createFixedExpense, listFixedExpenses } from "@/features/fixed-expenses/services/fixedExpenseService";
+import { createFixedExpense, deactivateFixedExpense, listFixedExpenses, updateFixedExpense } from "@/features/fixed-expenses/services/fixedExpenseService";
 import type { FixedExpense } from "@/features/fixed-expenses/types/fixedExpenseTypes";
 import { createFinancialCategory, listFinancialCategories } from "@/features/financial-categories/services/financialCategoryService";
 import type { FinancialCategory } from "@/features/financial-categories/types/financialCategoryTypes";
@@ -76,7 +76,7 @@ import { defaultTenantId as legacyTenantId } from "@/lib/tenant/tenant";
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 const demoUserId = "demo-user";
 const salesWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
-type EditTarget = { kind: "store"; item: Store } | { kind: "supplier"; item: Supplier } | { kind: "purchase"; item: Purchase } | { kind: "account"; item: AccountPayable };
+type EditTarget = { kind: "store"; item: Store } | { kind: "supplier"; item: Supplier } | { kind: "purchase"; item: Purchase } | { kind: "account"; item: AccountPayable } | { kind: "fixedExpense"; item: FixedExpense };
 
 function parseMoney(value: string) {
   return parseBRL(value);
@@ -559,10 +559,9 @@ export function OrquestraHubApp() {
       const dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay).toLocaleDateString("pt-BR");
       const matchedCategory = financialCategories.find((category) => category.name.toLocaleLowerCase("pt-BR") === expense.category.toLocaleLowerCase("pt-BR"));
       const account: Omit<AccountPayable, "id"> = { amount: expense.amount, categoryColor: matchedCategory?.color, categoryId: matchedCategory?.id, categoryName: expense.category, dueDate, fixedExpenseId: id, installment: "Mensal", referenceMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, status: "Aberto", store: expense.store, supplier: expense.payee };
-      const savedAccount = persist ? await createAccountPayable(defaultTenantId, account) : null;
-      if (persist && !savedAccount) throw new Error("A conta da despesa fixa não retornou confirmação de salvamento.");
+      const savedAccount = persist ? await createAccountPayable(defaultTenantId, account).catch(() => null) : null;
       setFixedExpenses((items) => [{ id, ...expense }, ...items]);
-      setAccountList((items) => [{ id: savedAccount?.id || crypto.randomUUID(), ...account }, ...items]);
+      if (savedAccount || !persist) setAccountList((items) => [{ id: savedAccount?.id || crypto.randomUUID(), ...account }, ...items]);
       setFixedExpenseForm({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: storeList[0]?.name || "" });
       setFormErrors((errors) => ({ ...errors, fixedExpense: "" }));
       await recordChange(defaultTenantId, user, "criou", "despesa fixa", id);
@@ -603,6 +602,13 @@ export function OrquestraHubApp() {
     if (!created) return;
     setPurchaseForm((form) => ({ ...form, categoryId: created.id }));
     setNewPurchaseCategoryName("");
+  }
+
+  async function removeFixedExpense(expense: FixedExpense) {
+    if (!window.confirm(`Desativar a despesa fixa ${expense.name}? As contas já lançadas serão mantidas.`)) return;
+    if (firebaseReady && user?.id !== demoUserId) await deactivateFixedExpense(defaultTenantId, expense.id);
+    setFixedExpenses((items) => items.filter((item) => item.id !== expense.id));
+    await recordChange(defaultTenantId, user, "excluiu", "despesa fixa", expense.id);
   }
 
   function requestMarkPaid(id: string) {
@@ -732,6 +738,7 @@ export function OrquestraHubApp() {
     if (target.kind === "store") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "manager", label: "Responsável", mask: "title", value: target.item.manager }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone || "" }, { key: "cep", label: "CEP", mask: "cep", value: target.item.cep || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "city", label: "Cidade", mask: "title", value: target.item.city || "" }, { key: "state", label: "Estado", mask: "upper", value: target.item.state || "" }, { key: "mapsUrl", label: "Google Maps", value: target.item.mapsUrl || "" }, { key: "monthlyGoal", label: "Meta mensal", mask: "currency", value: target.item.monthlyGoal }, { key: "balance", label: "Saldo atual", mask: "currency", value: target.item.balance }];
     if (target.kind === "supplier") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "document", label: "CNPJ", mask: "cnpj", value: target.item.document }, { key: "contactName", label: "Contato", mask: "title", value: target.item.contactName || "" }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone }, { key: "email", label: "E-mail", value: target.item.email || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "paymentMethod", label: "Forma de pagamento", value: target.item.paymentMethod || "" }, { key: "pixKey", label: "Chave PIX", value: target.item.pixKey || "" }, { key: "bank", label: "Banco", mask: "title", value: target.item.bank || "" }, { key: "agency", label: "Agência", value: target.item.agency || "" }, { key: "account", label: "Conta", value: target.item.account || "" }, { key: "paymentTerms", label: "Condição de pagamento", value: target.item.paymentTerms || "" }, { key: "notes", label: "Observações", value: target.item.notes || "" }];
     if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", mask: "upper", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", mask: "currency", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
+    if (target.kind === "fixedExpense") return [{ key: "name", label: "Despesa", mask: "title", value: target.item.name }, { key: "category", label: "Categoria", mask: "title", value: target.item.category }, { key: "payee", label: "Favorecido", mask: "title", value: target.item.payee }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "amount", label: "Valor mensal", mask: "currency", value: target.item.amount }, { key: "dueDay", label: "Dia do vencimento", type: "number", value: String(target.item.dueDay) }, { key: "alertDays", label: "Alertar com antecedência", type: "number", value: String(target.item.alertDays) }];
     return [{ key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "categoryName", label: "Categoria", mask: "title", value: target.item.categoryName || "" }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "dailyInterestAmount", label: "Mora diaria (R$)", mask: "currency", value: target.item.dailyInterestAmount || "R$ 0,00" }, { key: "dailyInterestPercent", label: "Mora diaria (%)", value: target.item.dailyInterestPercent || "" }, { key: "lateFeeAmount", label: "Multa (R$)", mask: "currency", value: target.item.lateFeeAmount || "R$ 0,00" }, { key: "lateFeePercent", label: "Multa (%)", value: target.item.lateFeePercent || "" }, { key: "protestAfterDays", label: "Protesto apos dias", type: "number", value: target.item.protestAfterDays || "" }, { key: "installment", label: "Parcela", value: target.item.installment }];
   }
 
@@ -753,6 +760,10 @@ export function OrquestraHubApp() {
         const updates = { invoiceNumber: values.invoiceNumber.toUpperCase(), description: values.description.trim(), supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), issueDate: values.issueDate, total: values.total, installments: Number(values.installments) };
         if (persist) await updatePurchase(defaultTenantId, editTarget.item.id, updates);
         setPurchaseList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+      } else if (editTarget.kind === "fixedExpense") {
+        const updates = { alertDays: Math.max(Number(values.alertDays), 0), amount: values.amount, category: toTitleCaseBR(values.category || "Outros"), dueDay: Math.min(Math.max(Number(values.dueDay), 1), 28), name: toTitleCaseBR(values.name), payee: toTitleCaseBR(values.payee), store: toTitleCaseBR(values.store) };
+        if (persist) await updateFixedExpense(defaultTenantId, editTarget.item.id, updates);
+        setFixedExpenses((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       } else {
         const matchedCategory = financialCategories.find((category) => category.name.toLocaleLowerCase("pt-BR") === values.categoryName.toLocaleLowerCase("pt-BR"));
         const updates = { supplier: toTitleCaseBR(values.supplier), categoryColor: matchedCategory?.color || editTarget.item.categoryColor, categoryId: matchedCategory?.id || editTarget.item.categoryId, categoryName: toTitleCaseBR(values.categoryName), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, dailyInterestAmount: values.dailyInterestAmount, dailyInterestPercent: values.dailyInterestPercent, lateFeeAmount: values.lateFeeAmount, lateFeePercent: values.lateFeePercent, protestAfterDays: values.protestAfterDays, installment: values.installment };
@@ -996,7 +1007,7 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Cadastre despesas recorrentes e gere automaticamente a conta do mês com antecedência de alerta." id="despesas-fixas" title="Despesas fixas">
-          <FixedExpensesPanel canWrite={canWrite} error={formErrors.fixedExpense} expenses={fixedExpenses} form={fixedExpenseForm} onChange={setFixedExpenseForm} onSubmit={addFixedExpense} storeOptions={storeList.map((store) => store.name)} />
+          <FixedExpensesPanel canWrite={canWrite} error={formErrors.fixedExpense} expenses={fixedExpenses.filter((expense) => expense.active !== false)} form={fixedExpenseForm} onChange={setFixedExpenseForm} onDelete={removeFixedExpense} onEdit={(item) => setEditTarget({ kind: "fixedExpense", item })} onSubmit={addFixedExpense} storeOptions={storeList.map((store) => store.name)} />
         </Section>
 
         <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">
@@ -1028,7 +1039,7 @@ export function OrquestraHubApp() {
         paidAt={paymentDateTime}
         supplier={supplierList.find((item) => item.name === paymentToConfirm?.supplier)}
       />
-      {editTarget ? <EditModal fields={editFields(editTarget)} onClose={() => setEditTarget(null)} onSave={saveEdit} passwordRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} title={`Editar ${editTarget.kind === "store" ? "loja" : editTarget.kind === "supplier" ? "fornecedor" : editTarget.kind === "purchase" ? "nota" : "conta a pagar"}`} /> : null}
+      {editTarget ? <EditModal fields={editFields(editTarget)} onClose={() => setEditTarget(null)} onSave={saveEdit} passwordRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} title={`Editar ${editTarget.kind === "store" ? "loja" : editTarget.kind === "supplier" ? "fornecedor" : editTarget.kind === "purchase" ? "nota" : editTarget.kind === "fixedExpense" ? "despesa fixa" : "conta a pagar"}`} /> : null}
     </AppShell>
   );
 }

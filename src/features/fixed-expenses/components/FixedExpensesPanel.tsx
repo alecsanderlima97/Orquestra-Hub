@@ -1,4 +1,4 @@
-import { Bell, CalendarClock } from "lucide-react";
+import { Bell, CalendarClock, Pencil, Trash2 } from "lucide-react";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { formatBRL, toTitleCaseBR } from "@/lib/formatters/br";
@@ -20,6 +20,8 @@ export function FixedExpensesPanel({
   expenses,
   form,
   onChange,
+  onDelete,
+  onEdit,
   onSubmit,
   storeOptions,
 }: {
@@ -28,6 +30,8 @@ export function FixedExpensesPanel({
   expenses: FixedExpense[];
   form: FixedExpenseForm;
   onChange: (form: FixedExpenseForm) => void;
+  onDelete?: (expense: FixedExpense) => void;
+  onEdit?: (expense: FixedExpense) => void;
   onSubmit: () => void;
   storeOptions: string[];
 }) {
@@ -55,7 +59,15 @@ export function FixedExpensesPanel({
                 <h3 className="mt-1 font-semibold">{item.name}</h3>
                 <p className="text-sm text-slate-500">{item.payee} - {item.store}</p>
               </div>
-              <CalendarClock className="text-slate-400" size={20} />
+              <div className="flex items-start gap-2">
+                <CalendarClock className="text-slate-400" size={20} />
+                {canWrite ? (
+                  <div className="flex gap-1">
+                    <button aria-label="Editar despesa fixa" className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(item)} title="Editar esta despesa fixa" type="button"><Pencil size={16} /></button>
+                    <button aria-label="Desativar despesa fixa" className="rounded-md border border-slate-200 p-2 text-rose-600 hover:bg-rose-50" onClick={() => onDelete?.(item)} title="Desativar esta despesa fixa" type="button"><Trash2 size={16} /></button>
+                  </div>
+                ) : null}
+              </div>
             </div>
             <strong className="mt-4 block text-lg">{item.amount}</strong>
             <div className="mt-3 flex items-center gap-2 text-xs text-amber-800"><Bell size={14} />Vence todo dia {item.dueDay}; alerta {item.alertDays} dia(s) antes</div>
