@@ -113,6 +113,7 @@ export function OrquestraHubApp() {
   const [accountList, setAccountList] = useState<AccountPayable[]>([]);
   const [financialCategories, setFinancialCategories] = useState<FinancialCategory[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+  const [hasSessionChanges, setHasSessionChanges] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [tenantUsers, setTenantUsers] = useState<AppUser[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -277,6 +278,23 @@ export function OrquestraHubApp() {
     [filteredAccounts.length, filteredOpenTotal, filteredOverdueTotal, filteredPaidTotal, filteredTotal],
   );
 
+  const backupData = { accounts: accountList, auditLogs, financialCategories, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList };
+
+  function downloadBackupFile() {
+    const payload = JSON.stringify({ exportedAt: new Date().toISOString(), version: 1, ...backupData }, null, 2);
+    const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `backup-orquestra-hub-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function recordChange(tenantId: string, currentUser: AppUser | null, action: Parameters<typeof recordAudit>[2], entity: string, entityId: string) {
+    setHasSessionChanges(true);
+    await recordAudit(tenantId, currentUser, action, entity, entityId);
+  }
+
   async function addSupplier() {
     if (!user) {
       setFormErrors((errors) => ({ ...errors, supplier: "Entre novamente antes de cadastrar um fornecedor." }));
@@ -319,7 +337,7 @@ export function OrquestraHubApp() {
       setPurchaseForm((form) => ({ ...form, supplier: newSupplier.name }));
       setSupplierForm({ account: "", address: "", agency: "", bank: "", contactName: "", document: "", email: "", name: "", notes: "", paymentMethod: "PIX", paymentTerms: "", phone: "", pixKey: "" });
       setFormErrors((errors) => ({ ...errors, supplier: "" }));
-      await recordAudit(defaultTenantId, user, "criou", "fornecedor", created?.id || "demo");
+      await recordChange(defaultTenantId, user, "criou", "fornecedor", created?.id || "demo");
       setShowSupplierForm(false);
     } catch {
       setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível salvar o fornecedor. Verifique sua conexão e tente novamente." }));
@@ -333,7 +351,7 @@ export function OrquestraHubApp() {
     if (firebaseReady && user?.id !== demoUserId) await deleteSupplier(defaultTenantId, supplier.id);
     setSupplierList((items) => items.filter((item) => item.id !== supplier.id));
     setFormErrors((errors) => ({ ...errors, supplier: "" }));
-    await recordAudit(defaultTenantId, user, "excluiu", "fornecedor", supplier.id);
+    await recordChange(defaultTenantId, user, "excluiu", "fornecedor", supplier.id);
   }
 
   async function addStore() {
@@ -382,7 +400,7 @@ export function OrquestraHubApp() {
       setStoreForm({ address: "", balance: "R$ 0,00", cep: "", city: "", manager: "", mapsUrl: "", monthlyGoal: "R$ 0,00", name: "", phone: "", state: "" });
       setStorePhoto(null);
       setFormErrors((errors) => ({ ...errors, store: "" }));
-      await recordAudit(defaultTenantId, user, "criou", "loja", storeId);
+      await recordChange(defaultTenantId, user, "criou", "loja", storeId);
       setShowStoreForm(false);
     } catch {
       setFormErrors((errors) => ({ ...errors, store: "Não foi possível salvar a loja. Verifique sua conexão e tente novamente." }));
@@ -489,7 +507,7 @@ export function OrquestraHubApp() {
       return;
     }
     setFormErrors((errors) => ({ ...errors, purchase: "" }));
-    await recordAudit(defaultTenantId, user, "criou", "compra", purchaseId);
+    await recordChange(defaultTenantId, user, "criou", "compra", purchaseId);
     setShowPurchaseForm(false);
   }
 
@@ -524,7 +542,7 @@ export function OrquestraHubApp() {
       setAccountList((items) => [{ id: savedAccount?.id || crypto.randomUUID(), ...account }, ...items]);
       setFixedExpenseForm({ alertDays: "5", amount: "R$ 0,00", category: "", dueDay: "10", name: "", payee: "", store: storeList[0]?.name || "" });
       setFormErrors((errors) => ({ ...errors, fixedExpense: "" }));
-      await recordAudit(defaultTenantId, user, "criou", "despesa fixa", id);
+      await recordChange(defaultTenantId, user, "criou", "despesa fixa", id);
     } catch {
       setFormErrors((errors) => ({ ...errors, fixedExpense: "Não foi possível salvar a despesa fixa. Verifique sua conexão e tente novamente." }));
     }
@@ -544,7 +562,7 @@ export function OrquestraHubApp() {
       const created = { id, ...category };
       setFinancialCategories((items) => [created, ...items].toSorted((a, b) => a.name.localeCompare(b.name, "pt-BR")));
       setFormErrors((errors) => ({ ...errors, category: "" }));
-      await recordAudit(defaultTenantId, user, "criou", "categoria financeira", id);
+      await recordChange(defaultTenantId, user, "criou", "categoria financeira", id);
       return created;
     } catch {
       setFormErrors((errors) => ({ ...errors, category: "Não foi possível salvar a categoria. Tente novamente." }));
@@ -581,7 +599,7 @@ export function OrquestraHubApp() {
     );
     setPaymentToConfirm(null);
     setPaymentDateTime("");
-    await recordAudit(defaultTenantId, user, "pagou", "conta", paymentToConfirm.id);
+    await recordChange(defaultTenantId, user, "pagou", "conta", paymentToConfirm.id);
   }
 
   async function handleReceiptSelected(id: string, file: File) {
@@ -591,7 +609,7 @@ export function OrquestraHubApp() {
     if (firebaseReady && user?.id !== demoUserId) await updateAccountPayable(defaultTenantId, id, updates);
     setAccountList((current) => current.map((account) => (account.id === id ? { ...account, ...updates } : account)));
     if (currentAccount?.receiptPath && currentAccount.receiptPath !== attachment.path) await deletePurchaseAttachment(currentAccount.receiptPath);
-    await recordAudit(defaultTenantId, user, "anexou", "comprovante", id);
+    await recordChange(defaultTenantId, user, "anexou", "comprovante", id);
   }
 
   async function replaceInvoiceAttachment(purchase: Purchase, file: File) {
@@ -599,7 +617,7 @@ export function OrquestraHubApp() {
     if (firebaseReady && user?.id !== demoUserId) await updatePurchase(defaultTenantId, purchase.id, { invoiceAttachment: attachment });
     setPurchaseList((items) => items.map((item) => item.id === purchase.id ? { ...item, invoiceAttachment: attachment } : item));
     if (purchase.invoiceAttachment?.path && purchase.invoiceAttachment.path !== attachment.path) await deletePurchaseAttachment(purchase.invoiceAttachment.path);
-    await recordAudit(defaultTenantId, user, "editou", "anexo da nota fiscal", purchase.id);
+    await recordChange(defaultTenantId, user, "editou", "anexo da nota fiscal", purchase.id);
   }
 
   async function removeInvoiceAttachment(purchase: Purchase) {
@@ -607,7 +625,7 @@ export function OrquestraHubApp() {
     if (firebaseReady && user?.id !== demoUserId) await updatePurchase(defaultTenantId, purchase.id, { invoiceAttachment: null });
     await deletePurchaseAttachment(purchase.invoiceAttachment.path);
     setPurchaseList((items) => items.map((item) => item.id === purchase.id ? { ...item, invoiceAttachment: null } : item));
-    await recordAudit(defaultTenantId, user, "excluiu", "anexo da nota fiscal", purchase.id);
+    await recordChange(defaultTenantId, user, "excluiu", "anexo da nota fiscal", purchase.id);
   }
 
   async function removeBoletoAttachment(purchase: Purchase, index: number) {
@@ -617,7 +635,7 @@ export function OrquestraHubApp() {
     if (firebaseReady && user?.id !== demoUserId) await updatePurchase(defaultTenantId, purchase.id, { boletoAttachments });
     await deletePurchaseAttachment(attachment.path);
     setPurchaseList((items) => items.map((item) => item.id === purchase.id ? { ...item, boletoAttachments } : item));
-    await recordAudit(defaultTenantId, user, "excluiu", "boleto", purchase.id);
+    await recordChange(defaultTenantId, user, "excluiu", "boleto", purchase.id);
   }
 
   function sendWhatsApp(account: AccountPayable) {
@@ -649,17 +667,19 @@ export function OrquestraHubApp() {
     }
     await updateTenantUserRole(defaultTenantId, id, role);
     setTenantUsers((items) => items.map((item) => item.id === id ? { ...item, role } : item));
-    await recordAudit(defaultTenantId, user, "editou", "permissão de usuário", id);
+    await recordChange(defaultTenantId, user, "editou", "permissão de usuário", id);
   }
 
   async function generateInvite(role: Invite["role"]) {
     const invite = await createInvite(defaultTenantId, user?.companyName || "Empresa", role);
     setInvites((items) => [invite, ...items]);
+    setHasSessionChanges(true);
   }
 
   async function removeInvite(code: string) {
     await cancelInvite(code);
     setInvites((items) => items.map((item) => item.code === code ? { ...item, status: "Cancelado" } : item));
+    setHasSessionChanges(true);
   }
 
   function exportFilteredAccounts() {
@@ -717,14 +737,18 @@ export function OrquestraHubApp() {
         setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       }
       setEditTarget(null);
-      await recordAudit(defaultTenantId, user, "editou", editTarget.kind, editTarget.item.id);
+      await recordChange(defaultTenantId, user, "editou", editTarget.kind, editTarget.item.id);
     } catch {
       throw new Error("Não foi possível salvar a edição. Verifique sua conexão e tente novamente.");
     }
   }
 
   async function handleLogout() {
+    if (hasSessionChanges && window.confirm("Foram feitas alterações nesta sessão. Deseja baixar um backup antes de sair?")) {
+      downloadBackupFile();
+    }
     await logoutUser();
+    setHasSessionChanges(false);
     setUser(null);
   }
 
@@ -759,7 +783,7 @@ export function OrquestraHubApp() {
     const company = await createCompany(user, name);
     setCompanies((items) => [...items, company]);
     activateCompany(company);
-    await recordAudit(company.tenantId, { ...user, ...company }, "criou", "empresa", company.tenantId);
+    await recordChange(company.tenantId, { ...user, ...company }, "criou", "empresa", company.tenantId);
   }
 
   async function importBackup(payload: BackupPayload, mode: BackupRestoreMode, password: string) {
@@ -782,7 +806,7 @@ export function OrquestraHubApp() {
     setFixedExpenses(firebaseFixedExpenses);
     setFinancialCategories(firebaseCategories);
     setAuditLogs(firebaseAuditLogs);
-    await recordAudit(defaultTenantId, user, mode === "replace" ? "editou" : "criou", "backup", defaultTenantId);
+    await recordChange(defaultTenantId, user, mode === "replace" ? "editou" : "criou", "backup", defaultTenantId);
   }
 
   async function saveProfile(name: string, photoUrl: string) {
@@ -791,7 +815,7 @@ export function OrquestraHubApp() {
     setUser(updated);
     setTenantUsers((items) => items.map((item) => item.id === updated.id ? { ...item, name: updated.name, photoUrl: updated.photoUrl } : item));
     window.localStorage.setItem("orquestra-user", JSON.stringify(updated));
-    await recordAudit(defaultTenantId, updated, "editou", "perfil", updated.id);
+    await recordChange(defaultTenantId, updated, "editou", "perfil", updated.id);
   }
 
   async function saveCompanyName(companyName: string) {
@@ -801,7 +825,7 @@ export function OrquestraHubApp() {
     setCompanies((items) => items.map((item) => item.tenantId === updated.tenantId ? { ...item, companyName: updated.companyName } : item));
     setTenantUsers((items) => items.map((item) => item.tenantId === updated.tenantId ? { ...item, companyName: updated.companyName } : item));
     window.localStorage.setItem("orquestra-user", JSON.stringify(updated));
-    await recordAudit(defaultTenantId, updated, "editou", "empresa", updated.tenantId);
+    await recordChange(defaultTenantId, updated, "editou", "empresa", updated.tenantId);
   }
 
   if (!authChecked) {
@@ -885,7 +909,7 @@ export function OrquestraHubApp() {
               value={supplierSearch}
             />
           </div>
-          <div className="overflow-x-auto">
+          <div className="max-h-[520px] overflow-auto">
             <SuppliersTable onDelete={canWrite ? removeSupplier : undefined} onEdit={canWrite ? (item) => setEditTarget({ kind: "supplier", item }) : undefined} suppliers={filteredSuppliers} />
           </div>
         </Section>
@@ -917,7 +941,7 @@ export function OrquestraHubApp() {
               value={purchaseSearch}
             />
           </div>
-          <div className="overflow-x-auto">
+          <div className="max-h-[560px] overflow-auto">
             <PurchasesTable
               onDeleteBoleto={canWrite ? removeBoletoAttachment : undefined}
               onDeleteInvoice={canWrite ? removeInvoiceAttachment : undefined}
@@ -937,7 +961,7 @@ export function OrquestraHubApp() {
           />
           <AccountsPayableSummary items={accountSummary} />
           <AccountsPayableExport onExport={exportFilteredAccounts} />
-          <div className="overflow-x-auto">
+          <div className="max-h-[560px] overflow-auto">
             <AccountsPayableTable
               accounts={filteredAccounts}
               onEdit={canWrite ? (item) => setEditTarget({ kind: "account", item }) : undefined}
@@ -961,9 +985,9 @@ export function OrquestraHubApp() {
             {canManageUsers(user.role) ? <>
               <CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} />
               <UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} />
-              <BackupPanel data={{ accounts: accountList, auditLogs, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} onImport={importBackup} />
+              <BackupPanel data={backupData} onImport={importBackup} />
             </> : null}
-            <PrivacyPanel exportData={{ accounts: accountList, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList }} user={user} />
+            <PrivacyPanel exportData={backupData} user={user} />
             <SystemSettings companyName={user.companyName} planId={user.planId} tenantId={defaultTenantId} />
             {isPlatformAdmin(user) ? <div className="mt-5"><PlatformAdminPanel /></div> : null}
             {canManageUsers(user.role) ? <AuditPanel logs={auditLogs} /> : null}
