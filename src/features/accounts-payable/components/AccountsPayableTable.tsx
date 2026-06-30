@@ -1,5 +1,5 @@
 import { CheckCircle2, MessageCircle, Paperclip, Pencil, Trash2 } from "lucide-react";
-import { brCurrencyFormatter, parseBRL, parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
+import { brCurrencyFormatter, formatFirebaseDateTime, parseBRL, parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
 import type { AccountPayable } from "../types/accountPayableTypes";
 
 const statusStyles: Record<AccountPayable["status"], string> = {
@@ -115,7 +115,7 @@ export function AccountsPayableTable({
                       <span className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[account.status]}`}>
                         {account.status}
                       </span>
-                      {account.paidAt ? <span className="text-xs text-slate-500">Pago em {account.paidAt}</span> : null}
+                      {account.paidAt ? <span className="text-xs text-slate-500">Pago em {formatFirebaseDateTime(account.paidAt)}</span> : null}
                     </div>
                   </td>
                   <td className="px-3 py-4">

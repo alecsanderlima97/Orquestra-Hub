@@ -1,5 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db, firebaseReady } from "@/lib/firebase/config";
+import { formatFirebaseDateTime } from "@/lib/formatters/br";
 import { tenantCollectionPath } from "@/lib/firebase/paths";
 import type { AccountPayable } from "../types/accountPayableTypes";
 
@@ -8,7 +9,10 @@ const collectionName = "accountsPayable";
 export async function listAccountsPayable(tenantId: string): Promise<AccountPayable[]> {
   if (!firebaseReady || !db) return [];
   const snapshot = await getDocs(query(collection(db, tenantCollectionPath(tenantId, collectionName)), orderBy("dueDate")));
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as AccountPayable);
+  return snapshot.docs.map((item) => {
+    const data = item.data();
+    return { id: item.id, ...data, paidAt: formatFirebaseDateTime(data.paidAt) } as AccountPayable;
+  });
 }
 
 export async function markAccountAsPaid(tenantId: string, accountId: string) {
@@ -33,7 +37,10 @@ export async function deleteAccountPayable(tenantId: string, accountId: string) 
 export async function listAccountsByFixedExpense(tenantId: string, fixedExpenseId: string): Promise<AccountPayable[]> {
   if (!firebaseReady || !db) return [];
   const snapshot = await getDocs(query(collection(db, tenantCollectionPath(tenantId, collectionName)), where("fixedExpenseId", "==", fixedExpenseId)));
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as AccountPayable);
+  return snapshot.docs.map((item) => {
+    const data = item.data();
+    return { id: item.id, ...data, paidAt: formatFirebaseDateTime(data.paidAt) } as AccountPayable;
+  });
 }
 
 export async function createAccountPayable(tenantId: string, account: Omit<AccountPayable, "id">) {

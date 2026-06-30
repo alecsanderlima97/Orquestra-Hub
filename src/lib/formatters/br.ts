@@ -73,6 +73,18 @@ export function formatDateBR(value: string) {
   return brDateFormatter.format(new Date(year, month - 1, day));
 }
 
+export function formatFirebaseDateTime(value: unknown) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return brDateTimeFormatter.format(value);
+  if (typeof value === "object") {
+    const candidate = value as { nanoseconds?: number; seconds?: number; toDate?: () => Date };
+    if (typeof candidate.toDate === "function") return brDateTimeFormatter.format(candidate.toDate());
+    if (typeof candidate.seconds === "number") return brDateTimeFormatter.format(new Date(candidate.seconds * 1000 + Math.floor((candidate.nanoseconds || 0) / 1000000)));
+  }
+  return String(value);
+}
+
 export function parseDateBR(value: string) {
   const [day, month, year] = value.split("/").map(Number);
   return new Date(year, month - 1, day);
