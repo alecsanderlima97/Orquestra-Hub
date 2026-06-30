@@ -14,7 +14,7 @@ import { AccountsPayableSummary } from "@/features/accounts-payable/components/A
 import type { AccountsPayableSummaryItem } from "@/features/accounts-payable/components/AccountsPayableSummary";
 import { AccountsPayableTable } from "@/features/accounts-payable/components/AccountsPayableTable";
 import { PaymentConfirmModal } from "@/features/accounts-payable/components/PaymentConfirmModal";
-import { createAccountPayable, deleteAccountPayable, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
+import { createAccountPayable, deleteAccountPayable, listAccountsByFixedExpense, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import { PlatformAdminPanel } from "@/features/admin/components/PlatformAdminPanel";
 import { isPlatformAdmin } from "@/features/admin/services/platformAdminService";
@@ -70,7 +70,7 @@ import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from "@
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
 import { accountsPayable, purchases, stores, suppliers } from "@/lib/data/mockData";
 import { firebaseReady } from "@/lib/firebase/config";
-import { compareDateBR, formatCnpj, formatPhone, nowDateTimeBR, parseBRL, toTitleCaseBR } from "@/lib/formatters/br";
+import { compareDateBR, formatCnpj, formatPhone, nowDateTimeBR, parseBRL, parseDateBR, todaySaoPaulo, toTitleCaseBR } from "@/lib/formatters/br";
 import { defaultTenantId as legacyTenantId } from "@/lib/tenant/tenant";
 
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
@@ -605,9 +605,21 @@ export function OrquestraHubApp() {
   }
 
   async function removeFixedExpense(expense: FixedExpense) {
-    if (!window.confirm(`Desativar a despesa fixa ${expense.name}? As contas já lançadas serão mantidas.`)) return;
-    if (firebaseReady && user?.id !== demoUserId) await deactivateFixedExpense(defaultTenantId, expense.id);
+    if (!window.confirm(`Excluir a recorrência ${expense.name}? Contas pagas e vencidas serão mantidas. Lançamentos futuros em aberto desta recorrência serão removidos do financeiro.`)) return;
+    const today = todaySaoPaulo().getTime();
+    const sourceAccounts = firebaseReady && user?.id !== demoUserId
+      ? await listAccountsByFixedExpense(defaultTenantId, expense.id)
+      : accountList.filter((account) => account.fixedExpenseId === expense.id);
+    const futureOpenAccounts = sourceAccounts.filter((account) => {
+      const dueDate = account.dueDate.includes("-") ? new Date(`${account.dueDate}T00:00:00`) : parseDateBR(account.dueDate);
+      return account.status !== "Pago" && dueDate.getTime() > today;
+    });
+    if (firebaseReady && user?.id !== demoUserId) {
+      await deactivateFixedExpense(defaultTenantId, expense.id);
+      await Promise.all(futureOpenAccounts.map((account) => deleteAccountPayable(defaultTenantId, account.id)));
+    }
     setFixedExpenses((items) => items.filter((item) => item.id !== expense.id));
+    setAccountList((items) => items.filter((item) => !futureOpenAccounts.some((account) => account.id === item.id)));
     await recordChange(defaultTenantId, user, "excluiu", "despesa fixa", expense.id);
   }
 

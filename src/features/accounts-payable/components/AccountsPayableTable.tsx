@@ -63,18 +63,18 @@ export function AccountsPayableTable({
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <table className="w-full min-w-[980px] text-left text-sm">
+      <table className="w-full table-fixed text-left text-xs lg:text-sm">
         <thead className="bg-slate-50 text-slate-600">
           <tr>
-            <th className="px-5 py-3 font-medium">Fornecedor</th>
-            <th className="px-5 py-3 font-medium">Categoria</th>
-            <th className="px-5 py-3 font-medium">Loja</th>
-            <th className="px-5 py-3 font-medium">Parcela</th>
-            <th className="px-5 py-3 font-medium">Vencimento</th>
-            <th className="px-5 py-3 font-medium">Valor</th>
-            <th className="px-5 py-3 font-medium">Juros/Mora</th>
-            <th className="px-5 py-3 font-medium">Status</th>
-            <th className="px-5 py-3 font-medium">Ações</th>
+            <th className="w-[13%] px-3 py-3 font-medium">Fornecedor</th>
+            <th className="w-[11%] px-3 py-3 font-medium">Categoria</th>
+            <th className="w-[13%] px-3 py-3 font-medium">Loja</th>
+            <th className="w-[7%] px-3 py-3 font-medium">Parcela</th>
+            <th className="w-[11%] px-3 py-3 font-medium">Vencimento</th>
+            <th className="w-[10%] px-3 py-3 font-medium">Valor</th>
+            <th className="w-[13%] px-3 py-3 font-medium">Juros/Mora</th>
+            <th className="w-[10%] px-3 py-3 font-medium">Status</th>
+            <th className="w-[12%] px-3 py-3 text-center font-medium">Ações</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -85,32 +85,32 @@ export function AccountsPayableTable({
               const days = overdueDays(account);
               return (
                 <tr className={rowStyle(account)} key={account.id}>
-                  <td className="px-5 py-4 font-medium text-slate-950">{account.supplier}</td>
-                  <td className="px-5 py-4 text-slate-700">
-                    {account.categoryName ? <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold"><span className="size-2 rounded-full" style={{ backgroundColor: account.categoryColor || "#0891b2" }} />{account.categoryName}</span> : <span className="text-xs text-slate-400">Sem categoria</span>}
+                  <td className="px-3 py-4 font-medium text-slate-950">{account.supplier}</td>
+                  <td className="px-3 py-4 text-slate-700">
+                    {account.categoryName ? <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: account.categoryColor || "#0891b2" }} /><span className="truncate">{account.categoryName}</span></span> : <span className="text-xs text-slate-400">Sem categoria</span>}
                   </td>
-                  <td className="px-5 py-4 text-slate-700">{account.store}</td>
-                  <td className="px-5 py-4 text-slate-700">{account.installment}</td>
-                  <td className="px-5 py-4 text-slate-700">
+                  <td className="px-3 py-4 text-slate-700">{account.store}</td>
+                  <td className="px-3 py-4 text-slate-700">{account.installment}</td>
+                  <td className="px-3 py-4 text-slate-700">
                     <div className="flex flex-col gap-1">
                       <span>{account.dueDate}</span>
                       {label ? <span className="text-xs font-semibold text-rose-700">{label}</span> : null}
                     </div>
                   </td>
-                  <td className="px-5 py-4 font-medium text-slate-950">
+                  <td className="px-3 py-4 font-medium text-slate-950">
                     <div className="flex flex-col gap-1">
                       <span>{account.amount}</span>
                       {charges > 0 ? <span className="text-xs font-semibold text-rose-700">Total com atraso: {brCurrencyFormatter.format(parseBRL(account.amount) + charges)}</span> : null}
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-slate-700">
+                  <td className="px-3 py-4 text-slate-700">
                     <div className="flex flex-col gap-1">
                       <span>{charges > 0 ? brCurrencyFormatter.format(charges) : "R$ 0,00"}</span>
-                      {charges > 0 ? <span className="text-xs text-slate-500">Mora {account.dailyInterestAmount || "R$ 0,00"} / {account.dailyInterestPercent || "0"}% ao dia · Multa {account.lateFeeAmount || "R$ 0,00"} / {account.lateFeePercent || "0"}%</span> : <span className="text-xs text-slate-500">Sem atraso calculado</span>}
+                      {charges > 0 ? <span className="text-xs text-slate-500">Mora {account.dailyInterestAmount || "R$ 0,00"} / {account.dailyInterestPercent || "0"}% ao dia</span> : <span className="text-xs text-slate-500">Sem atraso</span>}
                       {days && account.protestAfterDays ? <span className={`text-xs font-semibold ${days >= Number(account.protestAfterDays) ? "text-rose-700" : "text-slate-500"}`}>Protesto apos {account.protestAfterDays} dia(s)</span> : null}
                     </div>
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-3 py-4">
                     <div className="flex flex-col gap-1">
                       <span className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[account.status]}`}>
                         {account.status}
@@ -118,29 +118,29 @@ export function AccountsPayableTable({
                       {account.paidAt ? <span className="text-xs text-slate-500">Pago em {account.paidAt}</span> : null}
                     </div>
                   </td>
-                  <td className="px-5 py-4">
-                    <div className="flex gap-2">
-                      <button aria-label="Editar conta" className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(account)} title={account.status === "Pago" ? "Editar conta paga mediante confirmação da senha" : "Editar esta conta a pagar"} type="button"><Pencil size={17} /></button>
-                      <button aria-label="Excluir lançamento" className="rounded-md border border-slate-200 bg-white p-2 text-rose-600 hover:bg-rose-50" onClick={() => onDelete?.(account)} title="Excluir somente este lançamento de conta a pagar" type="button"><Trash2 size={17} /></button>
+                  <td className="px-3 py-4">
+                    <div className="grid grid-cols-3 justify-items-center gap-1">
+                      <button aria-label="Editar conta" className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-700 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(account)} title={account.status === "Pago" ? "Editar conta paga mediante confirmação da senha" : "Editar esta conta a pagar"} type="button"><Pencil size={16} /></button>
+                      <button aria-label="Excluir lançamento" className="rounded-md border border-slate-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50" onClick={() => onDelete?.(account)} title="Excluir somente este lançamento de conta a pagar" type="button"><Trash2 size={16} /></button>
                       <button
                         aria-label="Dar baixa"
-                        className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={account.status === "Pago"}
                         onClick={() => onMarkPaid?.(account.id)}
                         title="Confirmar que este boleto foi pago e registrar a baixa."
                         type="button"
                       >
-                        <CheckCircle2 size={17} />
+                        <CheckCircle2 size={16} />
                       </button>
-                      <button aria-label="Enviar pelo WhatsApp" className="rounded-md border border-slate-200 bg-white p-2 text-emerald-700 hover:bg-emerald-50" onClick={() => onWhatsApp?.(account)} title="Abrir alerta ou confirmação no WhatsApp" type="button"><MessageCircle size={17} /></button>
+                      <button aria-label="Enviar pelo WhatsApp" className="rounded-md border border-slate-200 bg-white p-1.5 text-emerald-700 hover:bg-emerald-50" onClick={() => onWhatsApp?.(account)} title="Abrir alerta ou confirmação no WhatsApp" type="button"><MessageCircle size={16} /></button>
                       <button
                         aria-label="Anexar comprovante"
-                        className="relative rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-100"
+                        className="relative rounded-md border border-slate-200 bg-white p-1.5 text-slate-700 hover:bg-slate-100"
                         title="Anexar o comprovante de pagamento desta conta."
                         type="button"
                       >
                         <label className="cursor-pointer">
-                          <Paperclip size={17} />
+                          <Paperclip size={16} />
                           <input
                             className="sr-only"
                             onChange={(event) => {
@@ -151,7 +151,7 @@ export function AccountsPayableTable({
                           />
                         </label>
                       </button>
-                      {account.receiptUrl ? <a className="self-center text-xs font-medium text-emerald-700" href={account.receiptUrl} rel="noreferrer" target="_blank">Comprovante</a> : account.receiptName ? <span className="self-center text-xs font-medium text-emerald-700">Comprovante</span> : null}
+                      {account.receiptUrl ? <a className="col-span-3 text-center text-[11px] font-medium text-emerald-700" href={account.receiptUrl} rel="noreferrer" target="_blank">Comprovante</a> : account.receiptName ? <span className="col-span-3 text-center text-[11px] font-medium text-emerald-700">Comprovante</span> : null}
                     </div>
                   </td>
                 </tr>
