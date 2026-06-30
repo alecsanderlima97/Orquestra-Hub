@@ -88,6 +88,10 @@ function addMonths(date: string, months: number) {
   return next.toLocaleDateString("pt-BR");
 }
 
+function sameName(a: string, b: string) {
+  return a.trim().toLocaleLowerCase("pt-BR") === b.trim().toLocaleLowerCase("pt-BR");
+}
+
 function SubscriptionBlocked({ user }: { user: AppUser }) {
   const status = user.subscriptionStatus || "ativo";
   const message = `Olá, preciso regularizar a assinatura do Orquestra Hub. Empresa: ${user.companyName}. Status: ${status}.`;
@@ -187,6 +191,23 @@ export function OrquestraHubApp() {
     const demoTimer = window.setTimeout(() => { setStoreList(stores); setSupplierList(suppliers); setPurchaseList(purchases); setAccountList(accountsPayable); }, 0);
     return () => window.clearTimeout(demoTimer);
   }, [user]);
+
+  useEffect(() => {
+    const firstStore = storeList[0]?.name || "";
+    const firstSupplier = supplierList[0]?.name || "";
+    const timer = window.setTimeout(() => {
+      setPurchaseForm((form) => ({
+        ...form,
+        store: storeList.some((store) => store.name === form.store) ? form.store : firstStore,
+        supplier: supplierList.some((supplier) => supplier.name === form.supplier) ? form.supplier : firstSupplier,
+      }));
+      setFixedExpenseForm((form) => ({
+        ...form,
+        store: storeList.some((store) => store.name === form.store) ? form.store : firstStore,
+      }));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [storeList, supplierList]);
 
   const userId = user?.id;
   const userTenantId = user?.tenantId;
@@ -420,11 +441,13 @@ export function OrquestraHubApp() {
     const dailyInterestAmount = parseMoney(purchaseForm.dailyInterestAmount);
     const lateFeeAmount = parseMoney(purchaseForm.lateFeeAmount);
     const total = parseMoney(purchaseForm.total);
-    if (!purchaseForm.supplier || !supplierList.some((supplier) => supplier.name === purchaseForm.supplier)) {
+    const selectedSupplier = supplierList.find((supplier) => sameName(supplier.name, purchaseForm.supplier));
+    const selectedStore = storeList.find((store) => sameName(store.name, purchaseForm.store));
+    if (!purchaseForm.supplier || !selectedSupplier) {
       setFormErrors((errors) => ({ ...errors, purchase: "Selecione um fornecedor cadastrado." }));
       return;
     }
-    if (!purchaseForm.store || !storeList.some((store) => store.name === purchaseForm.store)) {
+    if (!purchaseForm.store || !selectedStore) {
       setFormErrors((errors) => ({ ...errors, purchase: "Selecione uma loja cadastrada." }));
       return;
     }
@@ -456,8 +479,8 @@ export function OrquestraHubApp() {
       installments,
       invoiceNumber: purchaseForm.invoiceNumber,
       issueDate: new Date(purchaseForm.issueDate).toLocaleDateString("pt-BR"),
-      store: toTitleCaseBR(purchaseForm.store),
-      supplier: toTitleCaseBR(purchaseForm.supplier),
+      store: selectedStore.name,
+      supplier: selectedSupplier.name,
       total: money.format(total),
     };
     const newAccounts: Omit<AccountPayable, "id">[] = Array.from({ length: installments }, (_, index) => ({
@@ -473,8 +496,8 @@ export function OrquestraHubApp() {
       lateFeePercent: purchaseForm.lateFeePercent.trim(),
       protestAfterDays: purchaseForm.protestAfterDays.trim(),
       status: "Aberto" as const,
-      store: toTitleCaseBR(purchaseForm.store),
-      supplier: toTitleCaseBR(purchaseForm.supplier),
+      store: selectedStore.name,
+      supplier: selectedSupplier.name,
     }));
     try {
       const persist = firebaseReady && user.id !== demoUserId;
