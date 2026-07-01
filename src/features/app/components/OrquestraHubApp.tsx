@@ -306,6 +306,7 @@ export function OrquestraHubApp() {
   const upcomingMonthTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) > todayTime && accountDueTime(item.dueDate) <= endOfCurrentMonthTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const futurePlannedTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) > endOfCurrentMonthTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const paidTotal = accountList.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
+  const totalOpenDebt = accountList.filter((item) => item.status !== "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const overdueTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) < todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const financialAlerts = buildFinancialAlerts(accountList, fixedExpenses);
   const filteredAccounts = accountList
@@ -1038,6 +1039,16 @@ export function OrquestraHubApp() {
             {summary.map((item) => (
               <SummaryCard item={item} key={item.label} />
             ))}
+          </div>
+          <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Total já pago desde o início</p>
+              <strong className="mt-1 block text-xl text-emerald-700">{money.format(paidTotal)}</strong>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Total ainda a pagar</p>
+              <strong className="mt-1 block text-xl text-amber-800">{money.format(totalOpenDebt)}</strong>
+            </div>
           </div>
           {showSubscriptionPrompt ? (
             <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm shadow-sm">
