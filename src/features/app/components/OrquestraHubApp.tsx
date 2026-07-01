@@ -92,6 +92,18 @@ function accountDueTime(dueDate: string) {
   return dueDate.includes("-") ? new Date(`${dueDate}T00:00:00`).getTime() : parseDateBR(dueDate).getTime();
 }
 
+function dateInputToBR(date: string) {
+  if (!date.includes("-")) return date;
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
+}
+
+function daysUntilInputDate(date: string) {
+  if (!date) return null;
+  const dueTime = accountDueTime(dateInputToBR(date));
+  return Math.round((dueTime - todaySaoPaulo().getTime()) / 86_400_000);
+}
+
 function fixedExpenseAccountForMonth(expense: FixedExpense, referenceDate = todaySaoPaulo()): Omit<AccountPayable, "id"> {
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth();
@@ -171,6 +183,7 @@ export function OrquestraHubApp() {
   const [showStoreForm, setShowStoreForm] = useState(false);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
+  const [subscriptionPromptDismissedKey, setSubscriptionPromptDismissedKey] = useState("");
   const [newPurchaseCategoryName, setNewPurchaseCategoryName] = useState("");
   const [purchaseForm, setPurchaseForm] = useState<PurchaseFormState>({
     categoryId: "",
@@ -608,6 +621,78 @@ export function OrquestraHubApp() {
     }
   }
 
+  async function addSubscriptionAccount() {
+    if (!user?.nextBillingDate) return;
+    const plan = getPlanRules(user.planId);
+    const dueDate = dateInputToBR(user.nextBillingDate);
+    const referenceMonth = `assinatura-${user.nextBillingDate.slice(0, 7)}`;
+    const promptKey = `orquestra-subscription-prompt-${user.tenantId}-${user.nextBillingDate}`;
+    if (accountList.some((account) => account.supplier === "Orquestra.cs" && account.referenceMonth === referenceMonth)) {
+      setSubscriptionPromptDismissedKey(promptKey);
+      return;
+    }
+    const account: Omit<AccountPayable, "id"> = {
+      amount: plan.price,
+      categoryName: "Sistemas",
+      dueDate,
+      installment: "Assinatura",
+      referenceMonth,
+      status: "Aberto",
+      store: user.companyName,
+      supplier: "Orquestra.cs",
+    };
+    const saved = user.id !== demoUserId ? await createAccountPayable(defaultTenantId, account) : null;
+    setAccountList((items) => [{ id: saved?.id || crypto.randomUUID(), ...account }, ...items]);
+    setSubscriptionPromptDismissedKey(promptKey);
+    await recordChange(defaultTenantId, user, "criou", "conta", referenceMonth);
+  }
+
+  async function addSubscriptionFixedExpense() {
+    if (!user?.nextBillingDate) return;
+    const plan = getPlanRules(user.planId);
+    const promptKey = `orquestra-subscription-prompt-${user.tenantId}-${user.nextBillingDate}`;
+    if (fixedExpenses.some((expense) => expense.active !== false && sameName(expense.name, "Sistema Orquestra Hub") && sameName(expense.payee, "Orquestra.cs"))) {
+      setSubscriptionPromptDismissedKey(promptKey);
+      return;
+    }
+    const [, , day] = user.nextBillingDate.split("-").map(Number);
+    const expense: Omit<FixedExpense, "id"> = {
+      active: true,
+      alertDays: 5,
+      amount: plan.price,
+      category: "Sistemas",
+      dueDay: Math.min(Math.max(day || 1, 1), 28),
+      name: "Sistema Orquestra Hub",
+      payee: "Orquestra.cs",
+      store: user.companyName,
+    };
+    const saved = user.id !== demoUserId ? await createFixedExpense(defaultTenantId, expense) : null;
+    const id = saved?.id || crypto.randomUUID();
+    const dueDate = dateInputToBR(user.nextBillingDate);
+    const account: Omit<AccountPayable, "id"> = {
+      amount: plan.price,
+      categoryName: "Sistemas",
+      dueDate,
+      fixedExpenseId: id,
+      installment: "Mensal",
+      referenceMonth: user.nextBillingDate.slice(0, 7),
+      status: "Aberto",
+      store: user.companyName,
+      supplier: "Orquestra.cs",
+    };
+    const savedAccount = user.id !== demoUserId ? await createAccountPayable(defaultTenantId, account) : null;
+    setFixedExpenses((items) => [{ id, ...expense }, ...items]);
+    setAccountList((items) => [{ id: savedAccount?.id || crypto.randomUUID(), ...account }, ...items]);
+    setSubscriptionPromptDismissedKey(promptKey);
+    await recordChange(defaultTenantId, user, "criou", "despesa fixa", id);
+  }
+
+  function ignoreSubscriptionPrompt() {
+    const promptKey = user?.tenantId && user.nextBillingDate ? `orquestra-subscription-prompt-${user.tenantId}-${user.nextBillingDate}` : "";
+    if (promptKey) window.localStorage.setItem(promptKey, "ignored");
+    setSubscriptionPromptDismissedKey(promptKey);
+  }
+
   async function addFinancialCategory(category: Omit<FinancialCategory, "id">) {
     if (!user) return null;
     const duplicate = financialCategories.some((item) => item.name.toLocaleLowerCase("pt-BR") === category.name.toLocaleLowerCase("pt-BR"));
@@ -929,12 +1014,18 @@ export function OrquestraHubApp() {
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
-  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName, inviteCode) => { const completed = await completeGoogleOnboarding(user, companyName, userName, inviteCode); setUser(completed); setCompanies([{ companyName: completed.companyName, planId: completed.planId, role: completed.role, subscriptionStatus: completed.subscriptionStatus, tenantId: completed.tenantId }]); }} onLogout={handleLogout} user={user} />;
+  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName, inviteCode) => { const completed = await completeGoogleOnboarding(user, companyName, userName, inviteCode); setUser(completed); setCompanies([{ companyName: completed.companyName, nextBillingDate: completed.nextBillingDate, planId: completed.planId, role: completed.role, subscriptionStatus: completed.subscriptionStatus, tenantId: completed.tenantId }]); }} onLogout={handleLogout} user={user} />;
 
   if (user.id !== demoUserId && !isPlatformAdmin(user) && ["vencido", "bloqueado", "cancelado"].includes(user.subscriptionStatus || "")) return <SubscriptionBlocked user={user} />;
 
   const canWrite = roleCanWrite(user.role);
   const plan = getPlanRules(user.planId);
+  const subscriptionDays = daysUntilInputDate(user.nextBillingDate || "");
+  const subscriptionReference = user.nextBillingDate?.slice(0, 7) || "";
+  const subscriptionPromptKey = user.tenantId && user.nextBillingDate ? `orquestra-subscription-prompt-${user.tenantId}-${user.nextBillingDate}` : "";
+  const subscriptionPromptIgnored = Boolean(subscriptionPromptKey) && (subscriptionPromptDismissedKey === subscriptionPromptKey || (typeof window !== "undefined" && window.localStorage.getItem(subscriptionPromptKey) === "ignored"));
+  const hasSubscriptionAccount = accountList.some((account) => account.supplier === "Orquestra.cs" && (account.referenceMonth === `assinatura-${subscriptionReference}` || account.referenceMonth === subscriptionReference));
+  const showSubscriptionPrompt = canWrite && user.nextBillingDate && subscriptionDays !== null && subscriptionDays >= 0 && subscriptionDays <= 5 && !subscriptionPromptIgnored && !hasSubscriptionAccount;
 
   return (
     <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} user={user}>
@@ -945,6 +1036,21 @@ export function OrquestraHubApp() {
               <SummaryCard item={item} key={item.label} />
             ))}
           </div>
+          {showSubscriptionPrompt ? (
+            <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm shadow-sm">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <strong className="text-slate-950">Assinatura Orquestra.cs vence em {subscriptionDays === 0 ? "hoje" : `${subscriptionDays} dia(s)`}</strong>
+                  <p className="mt-1 text-slate-600">{plan.label} · {plan.price} · vencimento {dateInputToBR(user.nextBillingDate || "")}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className="rounded-md bg-slate-950 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800" onClick={addSubscriptionAccount} type="button">Adicionar em contas a pagar</button>
+                  <button className="rounded-md border border-cyan-300 bg-white px-3 py-2 text-xs font-semibold text-cyan-800 hover:bg-cyan-100" onClick={addSubscriptionFixedExpense} type="button">Adicionar como despesa fixa</button>
+                  <button className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100" onClick={ignoreSubscriptionPrompt} type="button">Ignorar este mês</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <FinancialAlertsPanel alerts={financialAlerts} onWhatsApp={sendAlertWhatsApp} />
           <div className="mt-6">
             <PaymentsTable accounts={accountList.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate))} />

@@ -53,13 +53,14 @@ async function runFirebaseStep<T>(step: string, action: () => Promise<T>) {
   }
 }
 
-export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo"): AppUser {
+export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate = ""): AppUser {
   const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) || role === "Dono" ? ownerRole() : role;
   return {
     companyName,
     email: user.email || "",
     id: user.uid,
     name: user.displayName || user.email || "Usuário",
+    nextBillingDate,
     photoUrl: user.photoURL || "",
     planId: normalizePlanId(planId),
     role: effectiveRole,
@@ -87,7 +88,7 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
       ? ownerRole()
       : access.data()?.role || data.role || "Consulta";
     return {
-      ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo"),
+      ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo", tenant.data()?.nextBillingDate || ""),
       name: access.data()?.name || user.displayName || user.email || "Usuário",
       photoUrl: access.data()?.photoUrl || user.photoURL || "",
     };
@@ -155,7 +156,7 @@ export async function registerWithEmail(name: string, companyName: string, email
       if (createsCompany) await deleteDoc(doc(firestore, tenantPath(tenantId))).catch(() => undefined);
       throw error;
     }
-    return cacheUser(mapFirebaseUser(credential.user, role, tenantId, tenantName, plan.id, subscriptionStatus));
+    return cacheUser(mapFirebaseUser(credential.user, role, tenantId, tenantName, plan.id, subscriptionStatus, invite.nextBillingDate || ""));
   } catch (error) {
     await deleteUser(credential.user).catch(() => undefined);
     throw error;
@@ -201,7 +202,7 @@ export async function completeGoogleOnboarding(user: AppUser, companyName: strin
   await runFirebaseStep("Falha ao criar usuário da empresa", () => setDoc(doc(firestore, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, inviteCode: normalizedInviteCode, name: finalUserName, role, updatedAt: serverTimestamp(), userId: user.id }, { merge: true }));
   await runFirebaseStep("Falha ao vincular usuário à empresa", () => setDoc(doc(firestore, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: tenantName, inviteCode: normalizedInviteCode, role, updatedAt: serverTimestamp() }, { merge: true }));
   await runFirebaseStep("Falha ao marcar convite como usado", () => consumeInvite(normalizedInviteCode, user.id));
-  return cacheUser({ ...user, companyName: tenantName, name: finalUserName, needsOnboarding: false, planId: plan.id, role, subscriptionStatus, tenantId });
+  return cacheUser({ ...user, companyName: tenantName, name: finalUserName, needsOnboarding: false, nextBillingDate: invite.nextBillingDate || "", planId: plan.id, role, subscriptionStatus, tenantId });
 }
 
 export async function resetPassword(email: string) {
@@ -251,6 +252,6 @@ export async function listUserCompanies(userId: string): Promise<CompanyMembersh
       getDoc(doc(firestore, tenantPath(membership.id))),
     ]);
     const role = platformOwnerEmails.has(currentEmail) || tenant.data()?.ownerId === userId ? ownerRole() : access.data()?.role || membership.data().role || "Consulta";
-    return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", planId: normalizePlanId(tenant.data()?.planId), role: role === "Dono" ? ownerRole() : role, subscriptionStatus: tenant.data()?.subscriptionStatus || "ativo", tenantId: membership.id };
+    return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", nextBillingDate: tenant.data()?.nextBillingDate || "", planId: normalizePlanId(tenant.data()?.planId), role: role === "Dono" ? ownerRole() : role, subscriptionStatus: tenant.data()?.subscriptionStatus || "ativo", tenantId: membership.id };
   }));
 }

@@ -6,9 +6,10 @@ export type AppUser = {
   tenantId: string;
   companyName: string;
   planId?: "inicial" | "medio" | "premium";
+  nextBillingDate?: string;
   subscriptionStatus?: "trial" | "ativo" | "vencido" | "bloqueado" | "cancelado";
   photoUrl?: string;
   needsOnboarding?: boolean;
 };
 
-export type CompanyMembership = { companyName: string; planId?: AppUser["planId"]; role: AppUser["role"]; subscriptionStatus?: AppUser["subscriptionStatus"]; tenantId: string };
+export type CompanyMembership = { companyName: string; nextBillingDate?: string; planId?: AppUser["planId"]; role: AppUser["role"]; subscriptionStatus?: AppUser["subscriptionStatus"]; tenantId: string };
