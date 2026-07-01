@@ -50,9 +50,10 @@ export function FixedExpensesPanel({
           {error ? <p className="rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 md:col-span-2 xl:col-span-4">{error}</p> : null}
         </div>
       ) : null}
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {expenses.map((item) => (
-          <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={item.id}>
+      <div className="max-h-[560px] overflow-y-auto pr-1">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {expenses.map((item) => (
+            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={item.id}>
             <div className="flex justify-between gap-3">
               <div>
                 <span className="text-xs font-semibold uppercase text-cyan-700">{item.category}</span>
@@ -71,8 +72,9 @@ export function FixedExpensesPanel({
             </div>
             <strong className="mt-4 block text-lg">{item.amount}</strong>
             <div className="mt-3 flex items-center gap-2 text-xs text-amber-800"><Bell size={14} />Vence todo dia {item.dueDay}; alerta {item.alertDays} dia(s) antes</div>
-          </article>
-        ))}
+            </article>
+          ))}
+        </div>
       </div>
     </div>
   );

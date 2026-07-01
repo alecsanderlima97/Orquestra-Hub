@@ -14,8 +14,9 @@ export function PurchasesTable({ onDeleteBoleto, onDeleteInvoice, onEdit, onRepl
   return (
     <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4"><h3 className="text-base font-semibold text-slate-950">Notas lançadas</h3></div>
+      <div className="max-h-[520px] overflow-auto">
       <table className="w-full min-w-[980px] text-left text-sm">
-        <thead className="bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">Nota</th><th className="px-5 py-3">Fornecedor</th><th className="px-5 py-3">Produtos</th><th className="px-5 py-3">Loja</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Valor</th><th className="px-5 py-3">Parcelas</th><th className="px-5 py-3">Anexos</th>{canManage ? <th className="px-5 py-3">Ações</th> : null}</tr></thead>
+        <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">Nota</th><th className="px-5 py-3">Fornecedor</th><th className="px-5 py-3">Produtos</th><th className="px-5 py-3">Loja</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Valor</th><th className="px-5 py-3">Parcelas</th><th className="px-5 py-3">Anexos</th>{canManage ? <th className="px-5 py-3">Ações</th> : null}</tr></thead>
         <tbody className="divide-y divide-slate-100">
           {purchases.length ? purchases.map((purchase) => (
             <tr key={purchase.id}>
@@ -29,6 +30,7 @@ export function PurchasesTable({ onDeleteBoleto, onDeleteInvoice, onEdit, onRepl
           )) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={canManage ? 9 : 8}>Nenhuma nota lançada ainda.</td></tr>}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

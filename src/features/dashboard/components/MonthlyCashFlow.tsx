@@ -11,7 +11,13 @@ export function MonthlyCashFlow({ accounts }: { accounts: AccountPayable[] }) {
     result[key][item.status === "Pago" ? "paid" : "open"] += parseBRL(item.amount);
     return result;
   }, {});
-  const rows = Object.entries(months).slice(-6);
+  const rows = Object.entries(months)
+    .toSorted(([a], [b]) => {
+      const [monthA, yearA] = a.split("/").map(Number);
+      const [monthB, yearB] = b.split("/").map(Number);
+      return new Date(yearA, monthA - 1).getTime() - new Date(yearB, monthB - 1).getTime();
+    })
+    .slice(-6);
 
   return (
     <div className="theme-surface mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -19,7 +25,8 @@ export function MonthlyCashFlow({ accounts }: { accounts: AccountPayable[] }) {
         <h3 className="font-semibold">Fluxo de caixa mensal</h3>
         <p className="mt-1 text-sm text-slate-500">Comparacao entre valores pagos e compromissos em aberto.</p>
       </div>
-      <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="max-h-[320px] overflow-y-auto p-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {rows.map(([month, values]) => (
           <article className="dashboard-subcard rounded-md border border-slate-200 p-4" key={month}>
             <strong>{month}</strong>
@@ -29,6 +36,7 @@ export function MonthlyCashFlow({ accounts }: { accounts: AccountPayable[] }) {
             </div>
           </article>
         ))}
+        </div>
       </div>
     </div>
   );

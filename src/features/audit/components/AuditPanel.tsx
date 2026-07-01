@@ -6,7 +6,7 @@ export function AuditPanel({ logs }: { logs: AuditLog[] }) {
       <div className="border-b border-slate-200 px-5 py-4">
         <h3 className="font-semibold">Últimas alterações</h3>
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="max-h-[360px] divide-y divide-slate-100 overflow-y-auto">
         {logs.length ? logs.map((log) => (
           <div className="flex justify-between gap-4 px-5 py-3 text-sm" key={log.id}>
             <span><strong>{log.userName || log.userEmail}</strong> <span className="text-slate-500">({log.userEmail})</span> {log.action} {log.entity}</span>
