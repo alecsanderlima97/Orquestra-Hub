@@ -8,6 +8,7 @@ import {
   FileText,
   LayoutDashboard,
   Plus,
+  RefreshCw,
   Settings,
   Store,
   Truck,
@@ -136,6 +137,15 @@ export function AppShell({
                 <Plus size={18} />
                 Nova compra
               </a>
+              <button
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800 md:w-auto"
+                onClick={() => window.location.reload()}
+                title="Atualizar o sistema e carregar a versão mais recente."
+                type="button"
+              >
+                <RefreshCw size={17} />
+                Atualizar
+              </button>
               {onLogout ? (
                 <button
                   className="rounded-md border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
