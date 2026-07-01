@@ -301,8 +301,10 @@ export function OrquestraHubApp() {
   }, [userId, userTenantId, userRole, userCompanyName]);
 
   const todayTime = todaySaoPaulo().getTime();
+  const endOfCurrentMonthTime = new Date(todaySaoPaulo().getFullYear(), todaySaoPaulo().getMonth() + 1, 0).getTime();
   const openDueTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) <= todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
-  const upcomingTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) > todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
+  const upcomingMonthTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) > todayTime && accountDueTime(item.dueDate) <= endOfCurrentMonthTime).reduce((total, item) => total + parseMoney(item.amount), 0);
+  const futurePlannedTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) > endOfCurrentMonthTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const paidTotal = accountList.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const overdueTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) < todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const financialAlerts = buildFinancialAlerts(accountList, fixedExpenses);
@@ -334,11 +336,12 @@ export function OrquestraHubApp() {
   const summary = useMemo<FinancialSummary[]>(
     () => [
       { helper: "Vencidos ou vencendo hoje", label: "A pagar hoje", tone: "warning", value: money.format(openDueTotal) },
-      { helper: "Lançamentos futuros", label: "A vencer", tone: "neutral", value: money.format(upcomingTotal) },
+      { helper: "Até o fim do mês", label: "A vencer no mês", tone: "neutral", value: money.format(upcomingMonthTotal) },
+      { helper: "Depois deste mês", label: "Futuro previsto", tone: "neutral", value: money.format(futurePlannedTotal) },
       { helper: "Baixas confirmadas", label: "Pago", tone: "success", value: money.format(paidTotal) },
       { helper: "Exigem atenção", label: "Vencidos", tone: "danger", value: money.format(overdueTotal) },
     ],
-    [openDueTotal, overdueTotal, paidTotal, upcomingTotal],
+    [futurePlannedTotal, openDueTotal, overdueTotal, paidTotal, upcomingMonthTotal],
   );
   const accountSummary = useMemo<AccountsPayableSummaryItem[]>(
     () => [
