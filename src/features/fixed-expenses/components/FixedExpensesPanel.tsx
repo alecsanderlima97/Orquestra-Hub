@@ -1,8 +1,10 @@
 import { Bell, CalendarClock, Pencil, Trash2 } from "lucide-react";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
-import { formatBRL, toTitleCaseBR } from "@/lib/formatters/br";
+import { formatBRL, parseBRL, todaySaoPaulo, toTitleCaseBR } from "@/lib/formatters/br";
 import type { FixedExpense } from "../types/fixedExpenseTypes";
+
+const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 
 export type FixedExpenseForm = {
   alertDays: string;
@@ -35,8 +37,38 @@ export function FixedExpensesPanel({
   onSubmit: () => void;
   storeOptions: string[];
 }) {
+  const activeExpenses = expenses.filter((expense) => expense.active !== false);
+  const totalMonthly = activeExpenses.reduce((total, expense) => total + parseBRL(expense.amount), 0);
+  const nextExpense = activeExpenses
+    .toSorted((a, b) => {
+      const today = todaySaoPaulo();
+      const day = today.getDate();
+      const nextA = a.dueDay >= day ? a.dueDay : a.dueDay + 31;
+      const nextB = b.dueDay >= day ? b.dueDay : b.dueDay + 31;
+      return nextA - nextB;
+    })[0];
+  const largestExpense = activeExpenses.toSorted((a, b) => parseBRL(b.amount) - parseBRL(a.amount))[0];
+
   return (
     <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <article className="rounded-lg border border-cyan-100 bg-cyan-50/70 p-4">
+          <p className="text-xs font-semibold uppercase text-cyan-800">Total mensal ativo</p>
+          <strong className="mt-2 block text-2xl text-slate-950">{money.format(totalMonthly)}</strong>
+        </article>
+        <article className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase text-slate-500">Recorrências ativas</p>
+          <strong className="mt-2 block text-2xl text-slate-950">{activeExpenses.length}</strong>
+        </article>
+        <article className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase text-slate-500">Próximo vencimento</p>
+          <strong className="mt-2 block text-base text-slate-950">{nextExpense ? `${nextExpense.name} - dia ${nextExpense.dueDay}` : "Nenhum"}</strong>
+        </article>
+        <article className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase text-slate-500">Maior despesa</p>
+          <strong className="mt-2 block text-base text-slate-950">{largestExpense ? `${largestExpense.name} - ${largestExpense.amount}` : "Nenhuma"}</strong>
+        </article>
+      </div>
       {canWrite ? (
         <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-4">
           <TextField label="Despesa" onBlur={() => onChange({ ...form, name: toTitleCaseBR(form.name) })} onChange={(event) => onChange({ ...form, name: event.target.value })} placeholder="Ex.: Aluguel" value={form.name} />
