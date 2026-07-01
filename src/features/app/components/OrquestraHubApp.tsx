@@ -92,6 +92,25 @@ function accountDueTime(dueDate: string) {
   return dueDate.includes("-") ? new Date(`${dueDate}T00:00:00`).getTime() : parseDateBR(dueDate).getTime();
 }
 
+function fixedExpenseAccountForMonth(expense: FixedExpense, referenceDate = todaySaoPaulo()): Omit<AccountPayable, "id"> {
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const dueDate = new Date(year, month, Math.min(expense.dueDay, lastDay)).toLocaleDateString("pt-BR");
+  const referenceMonth = `${year}-${String(month + 1).padStart(2, "0")}`;
+  return {
+    amount: expense.amount,
+    categoryName: expense.category,
+    dueDate,
+    fixedExpenseId: expense.id,
+    installment: "Mensal",
+    referenceMonth,
+    status: "Aberto",
+    store: expense.store,
+    supplier: expense.payee,
+  };
+}
+
 function sameName(a: string, b: string) {
   return a.trim().toLocaleLowerCase("pt-BR") === b.trim().toLocaleLowerCase("pt-BR");
 }
@@ -238,9 +257,22 @@ export function OrquestraHubApp() {
           canManage ? listInvites(tenantId) : Promise.resolve([]),
         ]);
         if (cancelled) return;
+        const today = todaySaoPaulo();
+        const currentReferenceMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+        const generatedAccounts = await Promise.all(
+          firebaseFixedExpenses
+            .filter((expense) => expense.active !== false)
+            .filter((expense) => !firebaseAccounts.some((account) => account.fixedExpenseId === expense.id && account.referenceMonth === currentReferenceMonth))
+            .map(async (expense) => {
+              const account = fixedExpenseAccountForMonth(expense, today);
+              const saved = await createAccountPayable(tenantId, account);
+              return { id: saved.id, ...account };
+            }),
+        );
+        if (cancelled) return;
         setStoreList(firebaseStores);
         setSupplierList(firebaseSuppliers);
-        setAccountList(firebaseAccounts);
+        setAccountList([...generatedAccounts, ...firebaseAccounts]);
         setPurchaseList(firebasePurchases);
         setFixedExpenses(firebaseFixedExpenses);
         setFinancialCategories(firebaseCategories);
