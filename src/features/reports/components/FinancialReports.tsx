@@ -38,6 +38,10 @@ function group(accounts: AccountPayable[], key: "store" | "supplier" | "category
   return Object.entries(data).map(([name, values]) => ({ name, ...values })).toSorted((a, b) => b.open - a.open);
 }
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" })[char] || char);
+}
+
 export function FinancialReports({ accounts, purchases }: { accounts: AccountPayable[]; purchases: Purchase[] }) {
   const [filters, setFilters] = useState({ category: all, end: "", start: "", status: all, store: all, supplier: all });
   const stores = options([...accounts.map((item) => item.store), ...purchases.map((item) => item.store)]);
@@ -69,6 +73,31 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
   const bySupplier = group(filteredAccounts, "supplier");
   const orderedAccounts = filteredAccounts.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate));
   const clear = () => setFilters({ category: all, end: "", start: "", status: all, store: all, supplier: all });
+  const printReport = () => {
+    const reportWindow = window.open("", "_blank", "width=1100,height=800");
+    if (!reportWindow) return;
+    const filterLine = `Período: ${filters.start || "Início"} até ${filters.end || "Atual"} · Loja: ${filters.store} · Fornecedor: ${filters.supplier} · Categoria: ${filters.category} · Status: ${filters.status}`;
+    const accountRows = orderedAccounts.length ? orderedAccounts.map((item) => `<tr><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(item.categoryName || "Sem categoria")}</td><td>${escapeHtml(item.store)}</td><td>${escapeHtml(item.installment)}</td><td>${escapeHtml(item.dueDate)}</td><td>${escapeHtml(item.amount)}</td><td>${escapeHtml(item.status)}</td></tr>`).join("") : `<tr><td colspan="7" class="empty">Nenhuma conta encontrada.</td></tr>`;
+    const purchaseRows = filteredPurchases.length ? filteredPurchases.map((item) => `<tr><td>${escapeHtml(item.invoiceNumber)}</td><td>${escapeHtml(item.issueDate)}</td><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(item.store)}</td><td>${escapeHtml(item.description || "Não informado")}</td><td>${escapeHtml(item.total)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty">Nenhuma compra encontrada.</td></tr>`;
+    const breakdownRows = (items: typeof byCategory) => items.length ? items.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.count}</td><td>${money.format(item.open)}</td><td>${money.format(item.paid)}</td><td>${money.format(item.overdue)}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">Nenhum dado no período.</td></tr>`;
+    reportWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Relatório financeiro</title><style>
+      * { box-sizing: border-box; } body { margin: 0; padding: 28px; color: #0f172a; font-family: Arial, sans-serif; background: #fff; }
+      header { border-bottom: 2px solid #0f172a; margin-bottom: 20px; padding-bottom: 14px; } h1 { margin: 0; font-size: 24px; } h2 { margin: 22px 0 10px; font-size: 16px; }
+      .meta { margin-top: 8px; color: #475569; font-size: 12px; line-height: 1.5; } .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+      .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; } .card small { display: block; color: #64748b; } .card strong { display: block; margin-top: 6px; font-size: 16px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 11px; } th, td { border: 1px solid #cbd5e1; padding: 7px; text-align: left; vertical-align: top; } th { background: #f1f5f9; color: #334155; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; } .empty { color: #64748b; text-align: center; } @media print { body { padding: 18px; } }
+    </style></head><body>
+      <header><h1>Orquestra Hub - Relatório financeiro</h1><p class="meta">${escapeHtml(filterLine)}<br />Gerado em ${escapeHtml(new Date().toLocaleString("pt-BR"))}</p></header>
+      <section class="cards"><div class="card"><small>Compras lançadas</small><strong>${filteredPurchases.length}</strong><small>${money.format(filteredPurchases.reduce((sum, item) => sum + parseBRL(item.total), 0))}</small></div><div class="card"><small>Total em aberto</small><strong>${money.format(total(open))}</strong><small>${open.length} conta(s)</small></div><div class="card"><small>Total pago</small><strong>${money.format(total(paid))}</strong><small>${paid.length} baixa(s)</small></div><div class="card"><small>Total atrasado</small><strong>${money.format(total(overdue))}</strong><small>${overdue.length} vencida(s)</small></div><div class="card"><small>Com comprovante</small><strong>${filteredAccounts.filter((item) => item.receiptName).length}</strong><small>Pagamentos documentados</small></div></section>
+      <section class="grid"><div><h2>Por categoria</h2><table><thead><tr><th>Categoria</th><th>Qtd.</th><th>Aberto</th><th>Pago</th><th>Atrasado</th></tr></thead><tbody>${breakdownRows(byCategory)}</tbody></table></div><div><h2>Por loja</h2><table><thead><tr><th>Loja</th><th>Qtd.</th><th>Aberto</th><th>Pago</th><th>Atrasado</th></tr></thead><tbody>${breakdownRows(byStore)}</tbody></table></div><div><h2>Por fornecedor</h2><table><thead><tr><th>Fornecedor</th><th>Qtd.</th><th>Aberto</th><th>Pago</th><th>Atrasado</th></tr></thead><tbody>${breakdownRows(bySupplier)}</tbody></table></div></section>
+      <h2>Contas do período</h2><table><thead><tr><th>Fornecedor</th><th>Categoria</th><th>Loja</th><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead><tbody>${accountRows}</tbody></table>
+      <h2>Compras e notas do período</h2><table><thead><tr><th>Nota</th><th>Data</th><th>Fornecedor</th><th>Loja</th><th>Descrição</th><th>Total</th></tr></thead><tbody>${purchaseRows}</tbody></table>
+    </body></html>`);
+    reportWindow.document.close();
+    reportWindow.focus();
+    window.setTimeout(() => reportWindow.print(), 300);
+  };
 
   return (
     <div className="printable-reports space-y-5" id="printable-reports">
@@ -81,7 +110,7 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
         <Filter label="Status"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, status: event.target.value })} value={filters.status}><option>{all}</option><option>Aberto</option><option>Pago</option><option>Atrasado</option></select></Filter>
         <div className="flex gap-2 md:col-span-2 xl:col-span-6 xl:justify-end">
           <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50" onClick={clear} type="button"><RotateCcw size={16} />Limpar filtros</button>
-          <button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => window.print()} title="Imprimir ou salvar somente este relatório em PDF" type="button"><Printer size={17} />Imprimir relatório</button>
+          <button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={printReport} title="Imprimir ou salvar somente este relatório em PDF" type="button"><Printer size={17} />Imprimir relatório</button>
         </div>
       </div>
       <div className="hidden print:block"><h2 className="text-xl font-bold">Orquestra Hub - Relatório financeiro</h2><p className="mt-1 text-sm">Período: {filters.start || "Início"} até {filters.end || "Atual"} - Loja: {filters.store} - Fornecedor: {filters.supplier} - Categoria: {filters.category} - Status: {filters.status}</p></div>
