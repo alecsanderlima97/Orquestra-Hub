@@ -39,6 +39,7 @@ export function FixedExpensesPanel({
 }) {
   const activeExpenses = expenses.filter((expense) => expense.active !== false);
   const totalMonthly = activeExpenses.reduce((total, expense) => total + parseBRL(expense.amount), 0);
+  const totalYearly = totalMonthly * 12;
   const nextExpense = activeExpenses
     .toSorted((a, b) => {
       const today = todaySaoPaulo();
@@ -51,10 +52,14 @@ export function FixedExpensesPanel({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <article className="rounded-lg border border-cyan-100 bg-cyan-50/70 p-4">
           <p className="text-xs font-semibold uppercase text-cyan-800">Total mensal ativo</p>
           <strong className="mt-2 block text-2xl text-slate-950">{money.format(totalMonthly)}</strong>
+        </article>
+        <article className="rounded-lg border border-amber-100 bg-amber-50/70 p-4" title="Projecao de 12 meses considerando as recorrencias fixas ativas de hoje.">
+          <p className="text-xs font-semibold uppercase text-amber-800">Total anual estimado</p>
+          <strong className="mt-2 block text-2xl text-slate-950">{money.format(totalYearly)}</strong>
         </article>
         <article className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase text-slate-500">Recorrências ativas</p>

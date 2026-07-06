@@ -28,7 +28,6 @@ import { BackupPanel } from "@/features/backup/components/BackupPanel";
 import { restoreBackup, type BackupPayload, type BackupRestoreMode } from "@/features/backup/services/backupRestoreService";
 import { listAuditLogs, recordAudit } from "@/features/audit/services/auditService";
 import type { AuditLog } from "@/features/audit/types/auditTypes";
-import { PaymentsTable } from "@/features/dashboard/components/PaymentsTable";
 import { MonthlyCashFlow } from "@/features/dashboard/components/MonthlyCashFlow";
 import { CompaniesPanel } from "@/features/companies/components/CompaniesPanel";
 import { createCompany } from "@/features/companies/services/companyService";
@@ -68,7 +67,7 @@ import { canManageUsers, canWrite as roleCanWrite, wouldRemoveLastOwner } from "
 import { SuppliersTable } from "@/features/suppliers/components/SuppliersTable";
 import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from "@/features/suppliers/services/supplierService";
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
-import { accountsPayable, purchases, stores, suppliers } from "@/lib/data/mockData";
+import { accountsPayable, fixedExpenses as demoFixedExpenses, purchases, stores, suppliers } from "@/lib/data/mockData";
 import { firebaseReady } from "@/lib/firebase/config";
 import { compareDateBR, formatCnpj, formatPhone, nowDateTimeBR, parseBRL, parseDateBR, todaySaoPaulo, toTitleCaseBR } from "@/lib/formatters/br";
 import { defaultTenantId as legacyTenantId } from "@/lib/tenant/tenant";
@@ -224,7 +223,13 @@ export function OrquestraHubApp() {
 
   useEffect(() => {
     if (user?.id !== demoUserId) return;
-    const demoTimer = window.setTimeout(() => { setStoreList(stores); setSupplierList(suppliers); setPurchaseList(purchases); setAccountList(accountsPayable); }, 0);
+    const demoTimer = window.setTimeout(() => {
+      setStoreList(stores);
+      setSupplierList(suppliers);
+      setPurchaseList(purchases);
+      setAccountList(accountsPayable);
+      setFixedExpenses(demoFixedExpenses);
+    }, 0);
     return () => window.clearTimeout(demoTimer);
   }, [user]);
 
@@ -312,6 +317,23 @@ export function OrquestraHubApp() {
   const fixedMonthlyTotal = fixedExpenses.filter((expense) => expense.active !== false).reduce((total, expense) => total + parseMoney(expense.amount), 0);
   const totalOpenDebtWithFixed = openDebtWithoutFixedExpenses + fixedMonthlyTotal;
   const todayPaymentCount = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) === todayTime).length;
+  const nextSevenDaysTime = todayTime + 7 * 86_400_000;
+  const nextSevenDaysAccounts = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) >= todayTime && accountDueTime(item.dueDate) <= nextSevenDaysTime);
+  const nextSevenDaysTotal = nextSevenDaysAccounts.reduce((total, item) => total + parseMoney(item.amount), 0);
+  const topSuppliersToPay = Object.values(accountList.filter((item) => item.status !== "Pago").reduce<Record<string, { name: string; total: number; count: number }>>((result, item) => {
+    const current = result[item.supplier] || { count: 0, name: item.supplier, total: 0 };
+    current.count += 1;
+    current.total += parseMoney(item.amount);
+    result[item.supplier] = current;
+    return result;
+  }, {})).toSorted((a, b) => b.total - a.total).slice(0, 5);
+  const storeOpenSummary = Object.values(accountList.filter((item) => item.status !== "Pago").reduce<Record<string, { name: string; total: number; count: number }>>((result, item) => {
+    const current = result[item.store] || { count: 0, name: item.store, total: 0 };
+    current.count += 1;
+    current.total += parseMoney(item.amount);
+    result[item.store] = current;
+    return result;
+  }, {})).toSorted((a, b) => b.total - a.total);
   const overdueTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) < todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const financialAlerts = buildFinancialAlerts(accountList, fixedExpenses);
   const filteredAccounts = accountList
@@ -1059,6 +1081,42 @@ export function OrquestraHubApp() {
               <strong className="mt-1 block text-xl text-cyan-800">{money.format(totalOpenDebtWithFixed)}</strong>
             </div>
           </div>
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" title="Soma contas não pagas com vencimento entre hoje e os próximos 7 dias.">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Próximos 7 dias</p>
+                  <strong className="mt-1 block text-2xl text-slate-950">{money.format(nextSevenDaysTotal)}</strong>
+                </div>
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">{nextSevenDaysAccounts.length} vencimento(s)</span>
+              </div>
+              <div className="mt-4 max-h-44 space-y-2 overflow-y-auto pr-1">
+                {nextSevenDaysAccounts.length ? nextSevenDaysAccounts.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate)).slice(0, 6).map((account) => (
+                  <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm" key={account.id}>
+                    <span className="min-w-0"><strong className="block truncate">{account.supplier}</strong><small className="text-slate-500">{account.dueDate} · {account.store}</small></span>
+                    <strong className="shrink-0 text-slate-950">{account.amount}</strong>
+                  </div>
+                )) : <p className="rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-500">Nenhum vencimento nos próximos 7 dias.</p>}
+              </div>
+            </section>
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" title="Lista os fornecedores com maior valor ainda em aberto.">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Top fornecedores a pagar</p>
+                  <strong className="mt-1 block text-2xl text-slate-950">{topSuppliersToPay.length}</strong>
+                </div>
+                <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">maiores saldos</span>
+              </div>
+              <div className="mt-4 max-h-44 space-y-2 overflow-y-auto pr-1">
+                {topSuppliersToPay.length ? topSuppliersToPay.map((supplier) => (
+                  <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm" key={supplier.name}>
+                    <span className="min-w-0"><strong className="block truncate">{supplier.name}</strong><small className="text-slate-500">{supplier.count} conta(s) em aberto</small></span>
+                    <strong className="shrink-0 text-slate-950">{money.format(supplier.total)}</strong>
+                  </div>
+                )) : <p className="rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-500">Nenhum fornecedor com saldo em aberto.</p>}
+              </div>
+            </section>
+          </div>
           {showSubscriptionPrompt ? (
             <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1075,9 +1133,27 @@ export function OrquestraHubApp() {
             </div>
           ) : null}
           <FinancialAlertsPanel alerts={financialAlerts} onWhatsApp={sendAlertWhatsApp} />
-          <div className="mt-6">
-            <PaymentsTable accounts={accountList.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate))} />
-          </div>
+          <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" title="Mostra quanto cada loja ainda tem em aberto, sem repetir a lista de próximos vencimentos.">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">Resumo por loja</h2>
+                <p className="mt-1 text-sm text-slate-500">Valores em aberto separados por unidade.</p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{storeOpenSummary.length} unidade(s)</span>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {storeOpenSummary.length ? storeOpenSummary.map((store) => (
+                <div className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3" key={store.name}>
+                  <div className="flex items-start justify-between gap-3">
+                    <strong className="text-sm text-slate-950">{store.name}</strong>
+                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600">{store.count} conta(s)</span>
+                  </div>
+                  <p className="mt-3 text-xl font-bold text-slate-950">{money.format(store.total)}</p>
+                  <small className="text-slate-500">Total ainda pendente nesta unidade</small>
+                </div>
+              )) : <p className="rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-500">Nenhuma loja com saldo em aberto.</p>}
+            </div>
+          </section>
           <MonthlyCashFlow accounts={accountList} />
         </Section>
 
