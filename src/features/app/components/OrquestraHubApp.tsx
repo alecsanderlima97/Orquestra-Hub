@@ -75,6 +75,7 @@ import { defaultTenantId as legacyTenantId } from "@/lib/tenant/tenant";
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 const demoUserId = "demo-user";
 const salesWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
+const subscriptionGraceDays = 5;
 type EditTarget = { kind: "store"; item: Store } | { kind: "supplier"; item: Supplier } | { kind: "purchase"; item: Purchase } | { kind: "account"; item: AccountPayable } | { kind: "fixedExpense"; item: FixedExpense };
 
 function parseMoney(value: string) {
@@ -101,6 +102,11 @@ function daysUntilInputDate(date: string) {
   if (!date) return null;
   const dueTime = accountDueTime(dateInputToBR(date));
   return Math.round((dueTime - todaySaoPaulo().getTime()) / 86_400_000);
+}
+
+function isBlockedByBillingDate(user: AppUser) {
+  const daysUntilBilling = daysUntilInputDate(user.nextBillingDate || "");
+  return daysUntilBilling !== null && daysUntilBilling < -subscriptionGraceDays;
 }
 
 function fixedExpenseAccountForMonth(expense: FixedExpense, referenceDate = todaySaoPaulo()): Omit<AccountPayable, "id"> {
@@ -1047,7 +1053,9 @@ export function OrquestraHubApp() {
 
   if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName, inviteCode) => { const completed = await completeGoogleOnboarding(user, companyName, userName, inviteCode); setUser(completed); setCompanies([{ companyName: completed.companyName, nextBillingDate: completed.nextBillingDate, planId: completed.planId, role: completed.role, subscriptionStatus: completed.subscriptionStatus, tenantId: completed.tenantId }]); }} onLogout={handleLogout} user={user} />;
 
-  if (user.id !== demoUserId && !isPlatformAdmin(user) && ["vencido", "bloqueado", "cancelado"].includes(user.subscriptionStatus || "")) return <SubscriptionBlocked user={user} />;
+  const blockedByStatus = ["vencido", "bloqueado", "cancelado"].includes(user.subscriptionStatus || "");
+  const blockedByBillingDate = isBlockedByBillingDate(user);
+  if (user.id !== demoUserId && !isPlatformAdmin(user) && (blockedByStatus || blockedByBillingDate)) return <SubscriptionBlocked user={user} />;
 
   const canWrite = roleCanWrite(user.role);
   const plan = getPlanRules(user.planId);
@@ -1056,7 +1064,12 @@ export function OrquestraHubApp() {
   const subscriptionPromptKey = user.tenantId && user.nextBillingDate ? `orquestra-subscription-prompt-${user.tenantId}-${user.nextBillingDate}` : "";
   const subscriptionPromptIgnored = Boolean(subscriptionPromptKey) && (subscriptionPromptDismissedKey === subscriptionPromptKey || (typeof window !== "undefined" && window.localStorage.getItem(subscriptionPromptKey) === "ignored"));
   const hasSubscriptionAccount = accountList.some((account) => account.supplier === "Orquestra.cs" && (account.referenceMonth === `assinatura-${subscriptionReference}` || account.referenceMonth === subscriptionReference));
-  const showSubscriptionPrompt = canWrite && user.nextBillingDate && subscriptionDays !== null && subscriptionDays >= 0 && subscriptionDays <= 5 && !subscriptionPromptIgnored && !hasSubscriptionAccount;
+  const showSubscriptionPrompt = canWrite && user.nextBillingDate && subscriptionDays !== null && subscriptionDays >= -subscriptionGraceDays && subscriptionDays <= 5 && !subscriptionPromptIgnored && !hasSubscriptionAccount;
+  const subscriptionPromptTitle = subscriptionDays === null
+    ? "Assinatura Orquestra.cs"
+    : subscriptionDays < 0
+      ? `Assinatura Orquestra.cs vencida ha ${Math.abs(subscriptionDays)} dia(s)`
+      : `Assinatura Orquestra.cs vence ${subscriptionDays === 0 ? "hoje" : `em ${subscriptionDays} dia(s)`}`;
 
   return (
     <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} user={user}>
@@ -1121,7 +1134,7 @@ export function OrquestraHubApp() {
             <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <strong className="text-slate-950">Assinatura Orquestra.cs vence em {subscriptionDays === 0 ? "hoje" : `${subscriptionDays} dia(s)`}</strong>
+                  <strong className="text-slate-950">{subscriptionPromptTitle}</strong>
                   <p className="mt-1 text-slate-600">{plan.label} · {plan.price} · vencimento {dateInputToBR(user.nextBillingDate || "")}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">

@@ -8,6 +8,26 @@ import { createCommercialInvite } from "@/features/users/services/inviteService"
 import { listPlatformTenants, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "vencido", "bloqueado", "cancelado"];
+const graceDays = 5;
+
+function daysUntilBilling(date: string) {
+  if (!date) return null;
+  const [year, month, day] = date.split("-").map(Number);
+  const due = new Date(year, month - 1, day).getTime();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return Math.round((due - today) / 86_400_000);
+}
+
+function billingStatus(item: PlatformTenant) {
+  if (["bloqueado", "cancelado"].includes(item.subscriptionStatus)) return { label: "Bloqueio manual", tone: "bg-rose-100 text-rose-800" };
+  const days = daysUntilBilling(item.nextBillingDate || "");
+  if (days === null) return { label: "Sem vencimento", tone: "bg-slate-100 text-slate-700" };
+  if (days < -graceDays) return { label: `Bloqueio automatico (${Math.abs(days)} dias em atraso)`, tone: "bg-rose-100 text-rose-800" };
+  if (days < 0) return { label: `Em tolerancia: bloqueia em ${graceDays - Math.abs(days) + 1} dia(s)`, tone: "bg-amber-100 text-amber-800" };
+  if (days === 0) return { label: "Vence hoje", tone: "bg-amber-100 text-amber-800" };
+  return { label: `Em dia: vence em ${days} dia(s)`, tone: "bg-emerald-100 text-emerald-800" };
+}
 
 export function PlatformAdminPanel() {
   const [inviteBillingDate, setInviteBillingDate] = useState("");
@@ -107,19 +127,22 @@ export function PlatformAdminPanel() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-left text-sm">
+        <table className="w-full min-w-[1180px] text-left text-sm">
           <thead className="bg-slate-50 text-slate-600">
             <tr>
               <th className="px-5 py-3">Cliente</th>
               <th className="px-5 py-3">Plano</th>
               <th className="px-5 py-3">Status</th>
               <th className="px-5 py-3">Vencimento</th>
+              <th className="px-5 py-3">Situacao calculada</th>
               <th className="px-5 py-3">Créditos IA</th>
               <th className="px-5 py-3">Ação</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {tenants.map((item) => (
+            {tenants.map((item) => {
+              const calculatedStatus = billingStatus(item);
+              return (
               <tr key={item.id}>
                 <td className="px-5 py-3">
                   <strong>{item.name}</strong>
@@ -138,6 +161,9 @@ export function PlatformAdminPanel() {
                 <td className="px-5 py-3">
                   <input className="h-10 rounded-md border border-slate-300 px-3" onChange={(event) => setTenants((items) => items.map((tenant) => tenant.id === item.id ? { ...tenant, nextBillingDate: event.target.value } : tenant))} type="date" value={item.nextBillingDate || ""} />
                 </td>
+                <td className="px-5 py-3">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${calculatedStatus.tone}`}>{calculatedStatus.label}</span>
+                </td>
                 <td className="px-5 py-3">{item.aiBalance}/{item.aiIncluded}</td>
                 <td className="px-5 py-3">
                   <button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white" onClick={() => save(item)} type="button">
@@ -145,8 +171,9 @@ export function PlatformAdminPanel() {
                   </button>
                 </td>
               </tr>
-            ))}
-            {!tenants.length ? <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={6}>{loading ? "Carregando clientes..." : "Nenhum cliente encontrado."}</td></tr> : null}
+              );
+            })}
+            {!tenants.length ? <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={7}>{loading ? "Carregando clientes..." : "Nenhum cliente encontrado."}</td></tr> : null}
           </tbody>
         </table>
       </div>
