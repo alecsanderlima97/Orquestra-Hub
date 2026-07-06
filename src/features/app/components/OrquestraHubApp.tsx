@@ -301,12 +301,17 @@ export function OrquestraHubApp() {
   }, [userId, userTenantId, userRole, userCompanyName]);
 
   const todayTime = todaySaoPaulo().getTime();
-  const endOfCurrentMonthTime = new Date(todaySaoPaulo().getFullYear(), todaySaoPaulo().getMonth() + 1, 0).getTime();
-  const openDueTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) <= todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
+  const today = todaySaoPaulo();
+  const endOfCurrentMonthTime = new Date(today.getFullYear(), today.getMonth() + 1, 0).getTime();
+  const dueTodayTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) === todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const upcomingMonthTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) > todayTime && accountDueTime(item.dueDate) <= endOfCurrentMonthTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const futurePlannedTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) > endOfCurrentMonthTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const paidTotal = accountList.filter((item) => item.status === "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
   const totalOpenDebt = accountList.filter((item) => item.status !== "Pago").reduce((total, item) => total + parseMoney(item.amount), 0);
+  const openDebtWithoutFixedExpenses = accountList.filter((item) => item.status !== "Pago" && !item.fixedExpenseId).reduce((total, item) => total + parseMoney(item.amount), 0);
+  const fixedMonthlyTotal = fixedExpenses.filter((expense) => expense.active !== false).reduce((total, expense) => total + parseMoney(expense.amount), 0);
+  const totalOpenDebtWithFixed = openDebtWithoutFixedExpenses + fixedMonthlyTotal;
+  const todayPaymentCount = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) === todayTime).length;
   const overdueTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) < todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const financialAlerts = buildFinancialAlerts(accountList, fixedExpenses);
   const filteredAccounts = accountList
@@ -336,13 +341,13 @@ export function OrquestraHubApp() {
 
   const summary = useMemo<FinancialSummary[]>(
     () => [
-      { helper: "Vencidos ou vencendo hoje", label: "A pagar hoje", tone: "warning", value: money.format(openDueTotal) },
-      { helper: "Até o fim do mês", label: "A vencer no mês", tone: "neutral", value: money.format(upcomingMonthTotal) },
-      { helper: "Depois deste mês", label: "Futuro previsto", tone: "neutral", value: money.format(futurePlannedTotal) },
-      { helper: "Baixas confirmadas", label: "Pago", tone: "success", value: money.format(paidTotal) },
-      { helper: "Exigem atenção", label: "Vencidos", tone: "danger", value: money.format(overdueTotal) },
+      { helper: `${todayPaymentCount} vencimento(s) hoje`, label: "A pagar hoje", tone: "warning", tooltip: "Soma somente contas não pagas com vencimento na data de hoje.", value: money.format(dueTodayTotal) },
+      { helper: "Até o fim do mês", label: "A vencer no mês", tone: "neutral", tooltip: "Soma contas não pagas que ainda vencem dentro do mês atual.", value: money.format(upcomingMonthTotal) },
+      { helper: "Depois deste mês", label: "Futuro previsto", tone: "neutral", tooltip: "Soma contas não pagas com vencimento depois do mês atual.", value: money.format(futurePlannedTotal) },
+      { helper: "Baixas confirmadas", label: "Pago", tone: "success", tooltip: "Soma tudo que já foi marcado como pago desde o início dos lançamentos.", value: money.format(paidTotal) },
+      { helper: "Exigem atenção", label: "Vencidos", tone: "danger", tooltip: "Soma contas vencidas e ainda não pagas.", value: money.format(overdueTotal) },
     ],
-    [futurePlannedTotal, openDueTotal, overdueTotal, paidTotal, upcomingMonthTotal],
+    [dueTodayTotal, futurePlannedTotal, overdueTotal, paidTotal, todayPaymentCount, upcomingMonthTotal],
   );
   const accountSummary = useMemo<AccountsPayableSummaryItem[]>(
     () => [
@@ -1040,14 +1045,18 @@ export function OrquestraHubApp() {
               <SummaryCard item={item} key={item.label} />
             ))}
           </div>
-          <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2">
-            <div>
+          <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3">
+            <div title="Soma tudo que já foi marcado como pago desde o início dos lançamentos.">
               <p className="text-xs font-semibold uppercase text-slate-500">Total já pago desde o início</p>
               <strong className="mt-1 block text-xl text-emerald-700">{money.format(paidTotal)}</strong>
             </div>
-            <div>
+            <div title="Soma todas as contas ainda não pagas, incluindo vencidas, vencendo hoje, do mês e futuras.">
               <p className="text-xs font-semibold uppercase text-slate-500">Total ainda a pagar</p>
               <strong className="mt-1 block text-xl text-amber-800">{money.format(totalOpenDebt)}</strong>
+            </div>
+            <div title="Soma lançamentos em aberto sem recorrência fixa mais o valor mensal das despesas fixas ativas, evitando contar a mesma recorrência duas vezes.">
+              <p className="text-xs font-semibold uppercase text-slate-500">A pagar + despesas fixas</p>
+              <strong className="mt-1 block text-xl text-cyan-800">{money.format(totalOpenDebtWithFixed)}</strong>
             </div>
           </div>
           {showSubscriptionPrompt ? (

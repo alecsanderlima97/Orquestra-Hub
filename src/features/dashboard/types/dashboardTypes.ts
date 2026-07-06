@@ -3,6 +3,7 @@ export type FinancialSummary = {
   value: string;
   helper: string;
   tone: "neutral" | "success" | "danger" | "warning";
+  tooltip?: string;
 };
 
 export type UpcomingPayment = {
