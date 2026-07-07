@@ -20,7 +20,7 @@ import { PlatformAdminPanel } from "@/features/admin/components/PlatformAdminPan
 import { isPlatformAdmin } from "@/features/admin/services/platformAdminService";
 import { FinancialAssistant } from "@/features/ai/components/FinancialAssistant";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
-import { completeGoogleOnboarding, listenAuth, listUserCompanies, logoutUser, verifyCurrentPassword } from "@/features/auth/services/authService";
+import { completeGoogleOnboarding, listenAuth, listUserCompanies, logoutUser, touchTenantPresence, verifyCurrentPassword } from "@/features/auth/services/authService";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import type { CompanyMembership } from "@/features/auth/types/authTypes";
 import { AuditPanel } from "@/features/audit/components/AuditPanel";
@@ -104,9 +104,24 @@ function daysUntilInputDate(date: string) {
   return Math.round((dueTime - todaySaoPaulo().getTime()) / 86_400_000);
 }
 
+function businessDaysAfterInputDate(date: string) {
+  if (!date) return 0;
+  const due = parseDateBR(dateInputToBR(date));
+  const today = todaySaoPaulo();
+  if (due.getTime() >= today.getTime()) return 0;
+  let count = 0;
+  const current = new Date(due);
+  current.setDate(current.getDate() + 1);
+  while (current.getTime() <= today.getTime()) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count += 1;
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
 function isBlockedByBillingDate(user: AppUser) {
-  const daysUntilBilling = daysUntilInputDate(user.nextBillingDate || "");
-  return daysUntilBilling !== null && daysUntilBilling < -subscriptionGraceDays;
+  return businessDaysAfterInputDate(user.nextBillingDate || "") > subscriptionGraceDays;
 }
 
 function fixedExpenseAccountForMonth(expense: FixedExpense, referenceDate = todaySaoPaulo()): Omit<AccountPayable, "id"> {
@@ -226,6 +241,13 @@ export function OrquestraHubApp() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.tenantId || user.id === demoUserId || isPlatformAdmin(user)) return;
+    void touchTenantPresence(user.tenantId);
+    const timer = window.setInterval(() => void touchTenantPresence(user.tenantId), 60_000);
+    return () => window.clearInterval(timer);
+  }, [user]);
 
   useEffect(() => {
     if (user?.id !== demoUserId) return;
@@ -1064,11 +1086,12 @@ export function OrquestraHubApp() {
   const subscriptionPromptKey = user.tenantId && user.nextBillingDate ? `orquestra-subscription-prompt-${user.tenantId}-${user.nextBillingDate}` : "";
   const subscriptionPromptIgnored = Boolean(subscriptionPromptKey) && (subscriptionPromptDismissedKey === subscriptionPromptKey || (typeof window !== "undefined" && window.localStorage.getItem(subscriptionPromptKey) === "ignored"));
   const hasSubscriptionAccount = accountList.some((account) => account.supplier === "Orquestra.cs" && (account.referenceMonth === `assinatura-${subscriptionReference}` || account.referenceMonth === subscriptionReference));
-  const showSubscriptionPrompt = canWrite && user.nextBillingDate && subscriptionDays !== null && subscriptionDays >= -subscriptionGraceDays && subscriptionDays <= 5 && !subscriptionPromptIgnored && !hasSubscriptionAccount;
+  const subscriptionBusinessDaysLate = businessDaysAfterInputDate(user.nextBillingDate || "");
+  const showSubscriptionPrompt = canWrite && user.nextBillingDate && subscriptionDays !== null && subscriptionDays <= 5 && subscriptionBusinessDaysLate <= subscriptionGraceDays && !subscriptionPromptIgnored && !hasSubscriptionAccount;
   const subscriptionPromptTitle = subscriptionDays === null
     ? "Assinatura Orquestra.cs"
     : subscriptionDays < 0
-      ? `Assinatura Orquestra.cs vencida ha ${Math.abs(subscriptionDays)} dia(s)`
+      ? `Assinatura Orquestra.cs vencida ha ${subscriptionBusinessDaysLate} dia(s) uteis`
       : `Assinatura Orquestra.cs vence ${subscriptionDays === 0 ? "hoje" : `em ${subscriptionDays} dia(s)`}`;
 
   return (

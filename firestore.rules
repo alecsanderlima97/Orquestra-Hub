@@ -29,8 +29,10 @@ service cloud.firestore {
     match /tenants/{tenantId} {
       allow read: if isPlatformOwner() || belongsToTenant(tenantId);
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if (isPlatformOwner() || isOwner(tenantId))
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['aiCredits']);
+      allow update: if ((isPlatformOwner() || isOwner(tenantId))
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['aiCredits']))
+        || (belongsToTenant(tenantId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAccessAt', 'lastSeenAt']));
       allow delete: if false;
 
       match /users/{userId} {

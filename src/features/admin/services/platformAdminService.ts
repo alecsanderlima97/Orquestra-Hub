@@ -12,6 +12,8 @@ export type PlatformTenant = {
   aiBalance: number;
   aiIncluded: number;
   id: string;
+  lastAccessAt?: number;
+  lastSeenAt?: number;
   name: string;
   nextBillingDate?: string;
   ownerId?: string;
@@ -21,6 +23,10 @@ export type PlatformTenant = {
 
 export function isPlatformAdmin(user?: AppUser | null) {
   return Boolean(user?.email && platformAdminEmails.has(user.email.toLowerCase()));
+}
+
+function timestampToMillis(value: unknown) {
+  return typeof (value as { toMillis?: () => number })?.toMillis === "function" ? (value as { toMillis: () => number }).toMillis() : undefined;
 }
 
 export async function listPlatformTenants(): Promise<PlatformTenant[]> {
@@ -33,6 +39,8 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
       aiBalance: Number(aiCredits.balance || 0),
       aiIncluded: Number(aiCredits.included || 0),
       id: item.id,
+      lastAccessAt: timestampToMillis(data.lastAccessAt),
+      lastSeenAt: timestampToMillis(data.lastSeenAt),
       name: String(data.name || "Empresa"),
       nextBillingDate: data.nextBillingDate || "",
       ownerId: data.ownerId || "",

@@ -1,5 +1,5 @@
 import { browserLocalPersistence, createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from "firebase/auth";
-import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { defaultPlanId, getPlanRules, normalizePlanId } from "@/features/plans/planRules";
 import { consumeInvite, getInvite, type Invite } from "@/features/users/services/inviteService";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
@@ -31,6 +31,7 @@ function tenantPayload(name: string, ownerId: string, invite: Invite) {
   return {
     aiCredits: { balance: plan.initialAiCredits, included: plan.initialAiCredits, renewalMonth: renewalMonth(), status: "Ativo", used: 0 },
     createdAt: serverTimestamp(),
+    firstBillingDate: invite.nextBillingDate || "",
     name,
     nextBillingDate: invite.nextBillingDate || "",
     ownerId,
@@ -51,6 +52,16 @@ async function runFirebaseStep<T>(step: string, action: () => Promise<T>) {
   } catch (error) {
     throw firebaseStepError(step, error);
   }
+}
+
+async function registerTenantAccess(tenantId: string) {
+  if (!db || !tenantId) return;
+  await updateDoc(doc(db, tenantPath(tenantId)), { lastAccessAt: serverTimestamp(), lastSeenAt: serverTimestamp() }).catch(() => undefined);
+}
+
+export async function touchTenantPresence(tenantId: string) {
+  if (!db || !tenantId || tenantId === defaultTenantId) return;
+  await updateDoc(doc(db, tenantPath(tenantId)), { lastSeenAt: serverTimestamp() }).catch(() => undefined);
 }
 
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate = ""): AppUser {
@@ -87,11 +98,13 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
     const role = platformOwnerEmails.has((user.email || "").toLowerCase()) || tenant.data()?.ownerId === user.uid
       ? ownerRole()
       : access.data()?.role || data.role || "Consulta";
-    return {
+    const mapped = {
       ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo", tenant.data()?.nextBillingDate || ""),
       name: access.data()?.name || user.displayName || user.email || "Usuário",
       photoUrl: access.data()?.photoUrl || user.photoURL || "",
     };
+    await registerTenantAccess(membership.id);
+    return mapped;
   }
 
   if (allowOnboarding) return cacheUser({ ...mapFirebaseUser(user, ownerRole(), "", "Nova empresa"), needsOnboarding: true });
