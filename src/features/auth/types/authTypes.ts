@@ -7,7 +7,7 @@ export type AppUser = {
   companyName: string;
   planId?: "inicial" | "medio" | "premium";
   nextBillingDate?: string;
-  subscriptionStatus?: "trial" | "ativo" | "vencido" | "bloqueado" | "cancelado";
+  subscriptionStatus?: "trial" | "ativo" | "pausado" | "vencido" | "bloqueado" | "cancelado";
   photoUrl?: string;
   needsOnboarding?: boolean;
 };

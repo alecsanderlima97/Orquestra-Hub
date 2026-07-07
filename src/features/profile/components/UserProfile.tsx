@@ -91,7 +91,10 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
         </label>
         <h3 className="mt-4 text-lg font-semibold">{user.name}</h3>
         <p className="mt-1 text-sm text-slate-500">{user.email}</p>
-        <span className="mt-4 inline-block rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">{user.role}</span>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <span className="inline-block rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">{user.role}</span>
+          <span className="inline-block rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">{user.subscriptionStatus || "ativo"}</span>
+        </div>
       </div>
 
       <div className="space-y-5">
@@ -106,6 +109,16 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
 
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="font-semibold">Empresa</h3>
+          <div className="mt-3 grid gap-3 rounded-md bg-slate-50 p-3 text-sm sm:grid-cols-2">
+            <div>
+              <span className="text-xs font-semibold uppercase text-slate-500">Status da assinatura</span>
+              <strong className="mt-1 block capitalize text-slate-950">{user.subscriptionStatus || "ativo"}</strong>
+            </div>
+            <div>
+              <span className="text-xs font-semibold uppercase text-slate-500">Proximo vencimento</span>
+              <strong className="mt-1 block text-slate-950">{user.nextBillingDate || "Nao informado"}</strong>
+            </div>
+          </div>
           <div className="mt-5">
             <TextField label="Nome da empresa" onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" value={companyName} />
           </div>

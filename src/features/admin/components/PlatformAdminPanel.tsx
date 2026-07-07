@@ -1,13 +1,13 @@
 "use client";
 
-import { Copy, RefreshCw, Save, TicketPlus } from "lucide-react";
+import { Copy, Pause, Pencil, RefreshCw, Save, Trash2, X, TicketPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { PlanId } from "@/features/plans/planRules";
 import { plans } from "@/features/plans/planRules";
 import { createCommercialInvite } from "@/features/users/services/inviteService";
 import { listPlatformTenants, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
-const statuses: SubscriptionStatus[] = ["trial", "ativo", "vencido", "bloqueado", "cancelado"];
+const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
 const graceDays = 5;
 const onlineWindowMs = 2 * 60 * 1000;
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
@@ -54,7 +54,7 @@ function businessDaysLate(date: string) {
 }
 
 function billingStatus(item: PlatformTenant) {
-  if (["bloqueado", "cancelado"].includes(item.subscriptionStatus)) return { label: "Bloqueio manual", tone: "bg-rose-100 text-rose-800" };
+  if (["pausado", "bloqueado", "cancelado"].includes(item.subscriptionStatus)) return { label: item.subscriptionStatus === "pausado" ? "Pausado" : "Bloqueio manual", tone: "bg-rose-100 text-rose-800" };
   const days = daysUntilBilling(item.nextBillingDate || "");
   if (days === null) return { label: "Sem vencimento", tone: "bg-slate-100 text-slate-700" };
   const lateBusinessDays = businessDaysLate(item.nextBillingDate || "");
@@ -69,6 +69,7 @@ export function PlatformAdminPanel() {
   const [inviteCode, setInviteCode] = useState("");
   const [invitePlan, setInvitePlan] = useState<PlanId>("medio");
   const [inviteStatus, setInviteStatus] = useState<SubscriptionStatus>("trial");
+  const [editingTenantId, setEditingTenantId] = useState("");
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -117,10 +118,23 @@ export function PlatformAdminPanel() {
     setMessage("");
     try {
       await updateTenantSubscription(item.id, { nextBillingDate: item.nextBillingDate, planId: item.planId, subscriptionStatus: item.subscriptionStatus });
+      setEditingTenantId("");
       setMessage("Cliente atualizado com sucesso.");
     } catch {
       setMessage("Não foi possível salvar o cliente.");
     }
+  }
+
+  function updateTenantLocal(tenantId: string, updates: Partial<PlatformTenant>) {
+    setTenants((items) => items.map((tenant) => tenant.id === tenantId ? { ...tenant, ...updates } : tenant));
+  }
+
+  async function changeStatus(item: PlatformTenant, subscriptionStatus: SubscriptionStatus) {
+    const action = subscriptionStatus === "pausado" ? "pausar" : "cancelar";
+    if (!window.confirm(`Deseja ${action} o cliente ${item.name}? Os dados serao preservados.`)) return;
+    const next = { ...item, subscriptionStatus };
+    updateTenantLocal(item.id, { subscriptionStatus });
+    await save(next);
   }
 
   return (
@@ -180,6 +194,7 @@ export function PlatformAdminPanel() {
           <tbody className="divide-y divide-slate-100">
             {tenants.map((item) => {
               const calculatedStatus = billingStatus(item);
+              const isEditing = editingTenantId === item.id;
               const online = isOnline(item.lastSeenAt);
               return (
               <tr key={item.id}>
@@ -188,17 +203,17 @@ export function PlatformAdminPanel() {
                   <p className="text-xs text-slate-500">{item.id}</p>
                 </td>
                 <td className="px-5 py-3">
-                  <select className="h-10 rounded-md border border-slate-300 bg-white px-3" onChange={(event) => setTenants((items) => items.map((tenant) => tenant.id === item.id ? { ...tenant, planId: event.target.value as PlanId } : tenant))} value={item.planId}>
+                  <select className="h-10 rounded-md border border-slate-300 bg-white px-3 disabled:bg-slate-100 disabled:text-slate-500" disabled={!isEditing} onChange={(event) => updateTenantLocal(item.id, { planId: event.target.value as PlanId })} value={item.planId}>
                     {Object.values(plans).map((plan) => <option key={plan.id} value={plan.id}>{plan.label}</option>)}
                   </select>
                 </td>
                 <td className="px-5 py-3">
-                  <select className="h-10 rounded-md border border-slate-300 bg-white px-3" onChange={(event) => setTenants((items) => items.map((tenant) => tenant.id === item.id ? { ...tenant, subscriptionStatus: event.target.value as SubscriptionStatus } : tenant))} value={item.subscriptionStatus}>
+                  <select className="h-10 rounded-md border border-slate-300 bg-white px-3 disabled:bg-slate-100 disabled:text-slate-500" disabled={!isEditing} onChange={(event) => updateTenantLocal(item.id, { subscriptionStatus: event.target.value as SubscriptionStatus })} value={item.subscriptionStatus}>
                     {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
                   </select>
                 </td>
                 <td className="px-5 py-3">
-                  <input className="h-10 rounded-md border border-slate-300 px-3" onChange={(event) => setTenants((items) => items.map((tenant) => tenant.id === item.id ? { ...tenant, nextBillingDate: event.target.value } : tenant))} type="date" value={item.nextBillingDate || ""} />
+                  <input className="h-10 rounded-md border border-slate-300 px-3 disabled:bg-slate-100 disabled:text-slate-500" disabled={!isEditing} onChange={(event) => updateTenantLocal(item.id, { nextBillingDate: event.target.value })} type="date" value={item.nextBillingDate || ""} />
                 </td>
                 <td className="px-5 py-3">{subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
                 <td className="px-5 py-3">
@@ -210,9 +225,18 @@ export function PlatformAdminPanel() {
                 </td>
                 <td className="px-5 py-3">{item.aiBalance}/{item.aiIncluded}</td>
                 <td className="px-5 py-3">
-                  <button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white" onClick={() => save(item)} type="button">
-                    <Save size={16} />Salvar
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    {isEditing ? (
+                      <>
+                        <button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white" onClick={() => save(item)} type="button"><Save size={15} />Salvar</button>
+                        <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700" onClick={() => { setEditingTenantId(""); void load(); }} type="button"><X size={15} />Cancelar</button>
+                      </>
+                    ) : (
+                      <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800" onClick={() => setEditingTenantId(item.id)} type="button"><Pencil size={15} />Editar</button>
+                    )}
+                    <button className="inline-flex h-10 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-800" onClick={() => changeStatus(item, "pausado")} type="button"><Pause size={15} />Pausar</button>
+                    <button className="inline-flex h-10 items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700" onClick={() => changeStatus(item, "cancelado")} type="button"><Trash2 size={15} />Excluir</button>
+                  </div>
                 </td>
               </tr>
               );
