@@ -5,6 +5,7 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import { TextField } from "@/components/ui/TextField";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import { canManageUsers } from "@/features/users/utils/accessRules";
+import { toTitleCaseBR } from "@/lib/formatters/br";
 import { changePassword, currentLoginProvider } from "../services/profileService";
 
 type Props = {
@@ -41,7 +42,7 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
     setSaving(true);
     setMessage("");
     try {
-      await onProfileSave(name, photoUrl);
+      await onProfileSave(toTitleCaseBR(name), photoUrl);
       setMessage("Perfil atualizado com sucesso.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível salvar o perfil.");
@@ -54,7 +55,7 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
     setSaving(true);
     setMessage("");
     try {
-      await onCompanySave(companyName);
+      await onCompanySave(toTitleCaseBR(companyName));
       setMessage("Empresa atualizada com sucesso.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível salvar a empresa.");
@@ -101,7 +102,7 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="font-semibold">Perfil</h3>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <TextField label="Nome" onChange={(event) => setName(event.target.value)} placeholder="Seu nome" value={name} />
+            <TextField label="Nome" onBlur={() => setName(toTitleCaseBR(name))} onChange={(event) => setName(event.target.value)} placeholder="Seu nome" value={name} />
             <TextField label="E-mail" placeholder="E-mail" value={user.email} />
           </div>
           <button className="mt-4 inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={saving} onClick={saveProfile} type="button"><Save size={16} />Salvar perfil</button>
@@ -120,7 +121,7 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
             </div>
           </div>
           <div className="mt-5">
-            <TextField label="Nome da empresa" onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" value={companyName} />
+            <TextField label="Nome da empresa" onBlur={() => setCompanyName(toTitleCaseBR(companyName))} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" value={companyName} />
           </div>
           <button className="mt-4 inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={saving || !canEditCompany} onClick={saveCompany} title={canEditCompany ? "Salvar empresa" : "Somente Proprietário pode alterar a empresa"} type="button"><Save size={16} />Salvar empresa</button>
         </section>

@@ -27,7 +27,7 @@ export function PurchaseForm({ boletoFiles, categoryError, categoryOptions, erro
         <button className="mt-7 h-11 shrink-0 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={onCategoryCreate} type="button">Criar</button>
       </div>
       <TextField label="Número da nota" onChange={(event) => onChange({ ...form, invoiceNumber: event.target.value.toLocaleUpperCase("pt-BR") })} placeholder="NF 0000" value={form.invoiceNumber} />
-      <TextField label="Descrição dos produtos" onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ex.: Vestidos, calças e acessórios" value={form.description} />
+      <TextField label="Descrição dos produtos" onBlur={() => onChange({ ...form, description: toTitleCaseBR(form.description) })} onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ex.: Vestidos, calças e acessórios" value={form.description} />
       <TextField label="Valor total" onBlur={() => onChange({ ...form, total: formatBRL(form.total) })} onChange={(event) => onChange({ ...form, total: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.total} />
       <TextField label="Data da compra" onChange={(event) => onChange({ ...form, issueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.issueDate} />
       <TextField label="Parcelas" onChange={(event) => onChange({ ...form, installments: event.target.value })} placeholder="1" type="number" value={form.installments} />

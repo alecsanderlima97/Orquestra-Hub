@@ -452,10 +452,10 @@ export function OrquestraHubApp() {
       contactName: toTitleCaseBR(supplierForm.contactName),
       email: supplierForm.email.trim().toLowerCase(),
       name: toTitleCaseBR(supplierForm.name.trim()),
-      notes: supplierForm.notes.trim(),
+      notes: toTitleCaseBR(supplierForm.notes),
       openAmount: "R$ 0,00",
       paymentMethod: supplierForm.paymentMethod,
-      paymentTerms: supplierForm.paymentTerms.trim(),
+      paymentTerms: toTitleCaseBR(supplierForm.paymentTerms),
       phone: formatPhone(supplierForm.phone || "00000000000"),
       pixKey: supplierForm.pixKey.trim(),
       status: "Ativo",
@@ -585,7 +585,7 @@ export function OrquestraHubApp() {
     const purchaseId = crypto.randomUUID();
     const selectedCategory = financialCategories.find((category) => category.id === purchaseForm.categoryId);
     const newPurchase: Omit<Purchase, "id"> = {
-      description: purchaseForm.description.trim(),
+      description: toTitleCaseBR(purchaseForm.description),
       installments,
       invoiceNumber: purchaseForm.invoiceNumber,
       issueDate: new Date(purchaseForm.issueDate).toLocaleDateString("pt-BR"),
@@ -954,11 +954,11 @@ export function OrquestraHubApp() {
         if (persist) await updateStore(defaultTenantId, editTarget.item.id, updates);
         setStoreList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       } else if (editTarget.kind === "supplier") {
-        const updates = { name: toTitleCaseBR(values.name), document: formatCnpj(values.document), contactName: toTitleCaseBR(values.contactName), phone: formatPhone(values.phone), email: values.email.toLowerCase(), address: toTitleCaseBR(values.address), paymentMethod: values.paymentMethod as Supplier["paymentMethod"], pixKey: values.pixKey, bank: toTitleCaseBR(values.bank), agency: values.agency, account: values.account, paymentTerms: values.paymentTerms, notes: values.notes };
+        const updates = { name: toTitleCaseBR(values.name), document: formatCnpj(values.document), contactName: toTitleCaseBR(values.contactName), phone: formatPhone(values.phone), email: values.email.toLowerCase(), address: toTitleCaseBR(values.address), paymentMethod: values.paymentMethod as Supplier["paymentMethod"], pixKey: values.pixKey, bank: toTitleCaseBR(values.bank), agency: values.agency, account: values.account, paymentTerms: toTitleCaseBR(values.paymentTerms), notes: toTitleCaseBR(values.notes) };
         if (persist) await updateSupplier(defaultTenantId, editTarget.item.id, updates);
         setSupplierList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       } else if (editTarget.kind === "purchase") {
-        const updates = { invoiceNumber: values.invoiceNumber.toUpperCase(), description: values.description.trim(), supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), issueDate: values.issueDate, total: values.total, installments: Number(values.installments) };
+        const updates = { invoiceNumber: values.invoiceNumber.toUpperCase(), description: toTitleCaseBR(values.description), supplier: toTitleCaseBR(values.supplier), store: toTitleCaseBR(values.store), issueDate: values.issueDate, total: values.total, installments: Number(values.installments) };
         if (persist) await updatePurchase(defaultTenantId, editTarget.item.id, updates);
         setPurchaseList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       } else if (editTarget.kind === "fixedExpense") {
@@ -1210,17 +1210,17 @@ export function OrquestraHubApp() {
           {showSupplierForm ? <div className="mb-4 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">
             <TextField label="Nome" onBlur={() => setSupplierForm((form) => ({ ...form, name: toTitleCaseBR(form.name) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, name: event.target.value }))} placeholder="Nome do Fornecedor" value={supplierForm.name} />
             <TextField label="CNPJ" onChange={(event) => setSupplierForm((form) => ({ ...form, document: formatCnpj(event.target.value) }))} placeholder="00.000.000/0000-00" value={supplierForm.document} />
-            <TextField label="Pessoa de contato" onChange={(event) => setSupplierForm((form) => ({ ...form, contactName: event.target.value }))} placeholder="Nome do contato" value={supplierForm.contactName} />
+            <TextField label="Pessoa de contato" onBlur={() => setSupplierForm((form) => ({ ...form, contactName: toTitleCaseBR(form.contactName) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, contactName: event.target.value }))} placeholder="Nome do contato" value={supplierForm.contactName} />
             <TextField label="Telefone" onChange={(event) => setSupplierForm((form) => ({ ...form, phone: formatPhone(event.target.value) }))} placeholder="(00) 00000-0000" value={supplierForm.phone} />
             <TextField label="E-mail" onChange={(event) => setSupplierForm((form) => ({ ...form, email: event.target.value }))} placeholder="financeiro@fornecedor.com" type="email" value={supplierForm.email} />
-            <TextField label="Endereço" onChange={(event) => setSupplierForm((form) => ({ ...form, address: event.target.value }))} placeholder="Rua, número e cidade" value={supplierForm.address} />
+            <TextField label="Endereço" onBlur={() => setSupplierForm((form) => ({ ...form, address: toTitleCaseBR(form.address) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, address: event.target.value }))} placeholder="Rua, número e cidade" value={supplierForm.address} />
             <label className="block"><span className="text-sm font-medium text-slate-700">Forma de pagamento</span><select className="mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => setSupplierForm((form) => ({ ...form, paymentMethod: event.target.value as NonNullable<Supplier["paymentMethod"]> }))} value={supplierForm.paymentMethod}><option>PIX</option><option>Boleto</option><option>Transferência</option><option>Dinheiro</option><option>Cartão</option></select></label>
             <TextField label="Chave PIX" onChange={(event) => setSupplierForm((form) => ({ ...form, pixKey: event.target.value }))} placeholder="CPF, CNPJ, e-mail ou chave" value={supplierForm.pixKey} />
-            <TextField label="Banco" onChange={(event) => setSupplierForm((form) => ({ ...form, bank: event.target.value }))} placeholder="Nome do banco" value={supplierForm.bank} />
+            <TextField label="Banco" onBlur={() => setSupplierForm((form) => ({ ...form, bank: toTitleCaseBR(form.bank) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, bank: event.target.value }))} placeholder="Nome do banco" value={supplierForm.bank} />
             <TextField label="Agência" onChange={(event) => setSupplierForm((form) => ({ ...form, agency: event.target.value }))} placeholder="0000" value={supplierForm.agency} />
             <TextField label="Conta" onChange={(event) => setSupplierForm((form) => ({ ...form, account: event.target.value }))} placeholder="00000-0" value={supplierForm.account} />
-            <TextField label="Condição de pagamento" onChange={(event) => setSupplierForm((form) => ({ ...form, paymentTerms: event.target.value }))} placeholder="Ex.: 30/60/90 dias" value={supplierForm.paymentTerms} />
-            <div className="md:col-span-2"><TextField label="Observações" onChange={(event) => setSupplierForm((form) => ({ ...form, notes: event.target.value }))} placeholder="Dados importantes para compras e pagamentos" value={supplierForm.notes} /></div>
+            <TextField label="Condição de pagamento" onBlur={() => setSupplierForm((form) => ({ ...form, paymentTerms: toTitleCaseBR(form.paymentTerms) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, paymentTerms: event.target.value }))} placeholder="Ex.: 30/60/90 dias" value={supplierForm.paymentTerms} />
+            <div className="md:col-span-2"><TextField label="Observações" onBlur={() => setSupplierForm((form) => ({ ...form, notes: toTitleCaseBR(form.notes) }))} onChange={(event) => setSupplierForm((form) => ({ ...form, notes: event.target.value }))} placeholder="Dados importantes para compras e pagamentos" value={supplierForm.notes} /></div>
             <button
               className="mt-7 h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
               onClick={addSupplier}
