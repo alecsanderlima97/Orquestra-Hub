@@ -120,7 +120,7 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
           </div>
 
           <div className="border-b border-cyan-100 bg-cyan-50 px-4 py-3 text-xs leading-5 text-cyan-950">
-            A empresa ganha 8 créditos iniciais. Cada pergunta consome 1 crédito. Ao acabar, contrate uma recarga para continuar usando a IA.
+            Cada pergunta consome 1 crédito IA. Os créditos inclusos variam conforme o plano e podem ser renovados ou recarregados.
           </div>
 
           <div className="flex flex-wrap gap-2 border-b border-slate-200 p-3">
