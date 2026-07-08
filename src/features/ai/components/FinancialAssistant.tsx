@@ -1,9 +1,10 @@
 "use client";
 
 import { Bot, Code2, Loader2, Send, Sparkles, X } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { auth } from "@/lib/firebase/config";
 import { buildAssistantSnapshot } from "../utils/assistantContext";
+import { getAiCreditBalance } from "../services/aiCreditService";
 import type { AssistantContext, AssistantCredits, AssistantUsage } from "../types/assistantTypes";
 
 type Message = { role: "assistant" | "user"; text: string };
@@ -33,6 +34,17 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
     },
   ]);
   const snapshot = useMemo(() => buildAssistantSnapshot(context), [context]);
+
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    void getAiCreditBalance(tenantId).then((balance) => {
+      if (alive) setCredits(balance);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open, tenantId]);
 
   async function askAssistant(text: string) {
     const prompt = text.trim();
@@ -114,7 +126,7 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
               <span className="text-slate-500">Uso estimado</span>
             </div>
             <div className="rounded-md bg-white p-2">
-              <strong className="block text-cyan-800">{credits?.balance ?? 8}</strong>
+              <strong className="block text-cyan-800">{credits?.balance ?? "-"}</strong>
               <span className="text-slate-500">Créditos IA</span>
             </div>
           </div>
