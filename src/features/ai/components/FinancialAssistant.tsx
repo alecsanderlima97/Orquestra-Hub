@@ -21,6 +21,24 @@ function formatUsage(usage?: AssistantUsage) {
   return `US$ ${usage.estimatedCostUsd.toFixed(4)}`;
 }
 
+function AssistantMessageText({ text }: { text: string }) {
+  return (
+    <div className="space-y-2">
+      {text.split(/\n{2,}/).map((block, blockIndex) => (
+        <div className="space-y-1" key={`${block.slice(0, 20)}-${blockIndex}`}>
+          {block.split("\n").filter(Boolean).map((line, lineIndex) => {
+            const title = line.match(/^\*\*(.+)\*\*$/);
+            const bullet = line.match(/^[-•]\s+(.+)/);
+            if (title) return <strong className="mt-2 block text-slate-950" key={lineIndex}>{title[1]}</strong>;
+            if (bullet) return <p className="pl-3 text-slate-700" key={lineIndex}>• {bullet[1]}</p>;
+            return <p key={lineIndex}>{line.replace(/\*\*/g, "")}</p>;
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function FinancialAssistant({ context, tenantId }: { context: AssistantContext; tenantId: string }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -155,7 +173,7 @@ export function FinancialAssistant({ context, tenantId }: { context: AssistantCo
                 className={`rounded-lg px-3 py-2 text-sm leading-6 shadow-sm ${message.role === "user" ? "ml-8 bg-slate-950 text-white" : "mr-8 border border-slate-200 bg-white text-slate-700"}`}
                 key={`${message.role}-${index}`}
               >
-                {message.text}
+                {message.role === "assistant" ? <AssistantMessageText text={message.text} /> : message.text}
               </div>
             ))}
             {loading ? (

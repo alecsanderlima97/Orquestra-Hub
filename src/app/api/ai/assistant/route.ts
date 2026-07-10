@@ -107,7 +107,7 @@ export async function POST(request: Request) {
         {
           content: [
             {
-              text: `Pergunta do usuário: ${question}\n\nContexto financeiro do sistema:\n${JSON.stringify(body.context || {}, null, 2)}`,
+              text: `Data atual em Brasilia: ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}\nPergunta do usuario: ${question}\n\nContexto financeiro do sistema:\n${JSON.stringify(body.context || {}, null, 2)}`,
               type: "input_text",
             },
           ],
@@ -128,6 +128,13 @@ export async function POST(request: Request) {
         "Inclua **Mensagem pronta** apenas se o usuario pedir texto para WhatsApp, cobranca, aviso ou comunicacao.",
         "Nao use tabelas grandes. Nao escreva paragrafos longos. Nao repita a pergunta do usuario.",
         "Se a pergunta for simples, responda em ate 8 linhas.",
+        "Responda com Markdown simples e quebras de linha reais.",
+        "Sempre deixe uma linha em branco entre secoes.",
+        "Nao escreva tudo em uma linha corrida.",
+        "Nao coloque titulos e conteudo na mesma linha.",
+        "Para WhatsApp, limite vencimentos a no maximo 5 itens e ordene por data.",
+        "Ao avaliar atraso, compare vencimentos com a data atual em Brasilia enviada no contexto.",
+        "Nao diga que nao existem atrasados se houver vencimento anterior a data atual.",
       ].join(" "),
       model: process.env.OPENAI_MODEL || "gpt-5-nano",
     };
