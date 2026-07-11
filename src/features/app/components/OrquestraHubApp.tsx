@@ -901,7 +901,13 @@ export function OrquestraHubApp() {
   }
 
   async function generateInvite(role: Invite["role"]) {
-    const invite = await createInvite(defaultTenantId, user?.companyName || "Empresa", role);
+    const planRules = getPlanRules(user?.planId);
+    const activeInviteCount = invites.filter((invite) => invite.status === "Ativo").length;
+    if (tenantUsers.length + activeInviteCount >= planRules.userLimit) {
+      window.alert(`Limite de usuarios do ${planRules.label} atingido.`);
+      return;
+    }
+    const invite = await createInvite(defaultTenantId, user?.companyName || "Empresa", role, user?.planId);
     setInvites((items) => [invite, ...items]);
     setHasSessionChanges(true);
   }
@@ -1317,7 +1323,7 @@ export function OrquestraHubApp() {
           <div className="space-y-5">
             {canManageUsers(user.role) ? <>
               <CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} />
-              <UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} users={tenantUsers} />
+              <UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} userLimit={plan.userLimit} users={tenantUsers} />
               <BackupPanel data={backupData} onImport={importBackup} />
             </> : null}
             <PrivacyPanel exportData={backupData} user={user} />

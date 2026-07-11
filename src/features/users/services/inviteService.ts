@@ -1,7 +1,8 @@
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { db, firebaseReady } from "@/lib/firebase/config";
 import type { AppUser } from "@/features/auth/types/authTypes";
-import type { PlanId } from "@/features/plans/planRules";
+import { getPlanRules, type PlanId } from "@/features/plans/planRules";
+import { tenantCollectionPath } from "@/lib/firebase/paths";
 import { isInviteAvailable } from "../utils/accessRules";
 
 export type Invite = {
@@ -19,8 +20,15 @@ export type Invite = {
   usedBy?: string;
 };
 
-export async function createInvite(tenantId: string, companyName: string, role: Invite["role"]) {
+export async function createInvite(tenantId: string, companyName: string, role: Invite["role"], planId?: PlanId) {
   if (!firebaseReady || !db) return { code: "DEMO1234", companyName, role, tenantId, status: "Ativo" as const };
+  const plan = getPlanRules(planId);
+  const [usersSnapshot, invitesSnapshot] = await Promise.all([
+    getDocs(collection(db, tenantCollectionPath(tenantId, "users"))),
+    getDocs(query(collection(db, "invites"), where("tenantId", "==", tenantId), where("status", "==", "Ativo"))),
+  ]);
+  const activeInviteCount = invitesSnapshot.docs.map((item) => item.data() as Invite).filter(isInviteAvailable).length;
+  if (usersSnapshot.size + activeInviteCount >= plan.userLimit) throw new Error(`Limite de usuarios do ${plan.label} atingido.`);
   const code = crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
   const invite: Invite = { code, companyName, role, tenantId, status: "Ativo", expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) };
   await setDoc(doc(db, "invites", code), { ...invite, createdAt: serverTimestamp() });
