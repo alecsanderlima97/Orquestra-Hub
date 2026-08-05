@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { EditModal, type EditField } from "@/components/ui/EditModal";
 import { FormAlert } from "@/components/ui/FormAlert";
@@ -77,6 +78,41 @@ const demoUserId = "demo-user";
 const salesWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
 const subscriptionGraceDays = 5;
 type EditTarget = { kind: "store"; item: Store } | { kind: "supplier"; item: Supplier } | { kind: "purchase"; item: Purchase } | { kind: "account"; item: AccountPayable } | { kind: "fixedExpense"; item: FixedExpense };
+
+function CollapsibleSettingsBlock({ children, defaultOpen = false, description, storageKey, title }: { children: ReactNode; defaultOpen?: boolean; description: string; storageKey: string; title: string }) {
+  const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined") return defaultOpen;
+    const saved = window.localStorage.getItem(storageKey);
+    return saved ? saved === "open" : defaultOpen;
+  });
+
+  function toggle() {
+    setOpen((current) => {
+      const next = !current;
+      window.localStorage.setItem(storageKey, next ? "open" : "closed");
+      return next;
+    });
+  }
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <button
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50"
+        onClick={toggle}
+        title={open ? "Ocultar esta seção" : "Mostrar esta seção"}
+        type="button"
+      >
+        <span>
+          <strong className="block text-base text-slate-950">{title}</strong>
+          <span className="mt-1 block text-sm text-slate-500">{description}</span>
+        </span>
+        <ChevronDown className={`shrink-0 text-slate-500 transition ${open ? "rotate-180" : ""}`} size={20} />
+      </button>
+      {open ? <div className="border-t border-slate-200 p-5">{children}</div> : null}
+    </section>
+  );
+}
 
 function parseMoney(value: string) {
   return parseBRL(value);
@@ -1101,7 +1137,7 @@ export function OrquestraHubApp() {
       : `Assinatura Orquestra.cs vence ${subscriptionDays === 0 ? "hoje" : `em ${subscriptionDays} dia(s)`}`;
 
   return (
-    <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} user={user}>
+    <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} showPlatformAdmin={isPlatformAdmin(user)} user={user}>
       <div className="space-y-8 px-5 py-6 sm:px-8">
         <Section description="Visao rapida do mes e dos pagamentos." id="dashboard" title="Dashboard">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -1322,16 +1358,35 @@ export function OrquestraHubApp() {
         <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações">
           <div className="space-y-5">
             {canManageUsers(user.role) ? <>
-              <CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} />
-              <UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} userLimit={plan.userLimit} users={tenantUsers} />
-              <BackupPanel data={backupData} onImport={importBackup} />
+              <CollapsibleSettingsBlock defaultOpen description="Gerencie empresas vinculadas e escolha o ambiente ativo." storageKey="settings-companies-open" title="Empresas e ambientes">
+                <CompaniesPanel companies={companies} currentTenantId={user.tenantId} onCreate={addCompany} onSelect={changeCompany} />
+              </CollapsibleSettingsBlock>
+              <CollapsibleSettingsBlock description="Convide usuários e defina quem pode administrar, lançar ou apenas consultar." storageKey="settings-users-open" title="Usuários e permissões">
+                <UsersPanel currentUserId={user.id} invites={invites} onCancelInvite={removeInvite} onCreateInvite={generateInvite} onRoleChange={changeUserRole} userLimit={plan.userLimit} users={tenantUsers} />
+              </CollapsibleSettingsBlock>
+              <CollapsibleSettingsBlock description="Baixe ou importe dados da empresa atual com cuidado." storageKey="settings-backup-open" title="Backup e exportação">
+                <BackupPanel data={backupData} onImport={importBackup} />
+              </CollapsibleSettingsBlock>
             </> : null}
-            <PrivacyPanel exportData={backupData} user={user} />
-            <SystemSettings companyName={user.companyName} planId={user.planId} tenantId={defaultTenantId} />
-            {isPlatformAdmin(user) ? <div className="mt-5"><PlatformAdminPanel /></div> : null}
-            {canManageUsers(user.role) ? <AuditPanel logs={auditLogs} /> : null}
+            <CollapsibleSettingsBlock defaultOpen description="Preferências visuais, plano contratado, IA financeira e suporte." storageKey="settings-system-open" title="Sistema, planos e suporte">
+              <SystemSettings companyName={user.companyName} planId={user.planId} tenantId={defaultTenantId} />
+            </CollapsibleSettingsBlock>
+            <CollapsibleSettingsBlock description="Privacidade, LGPD, exportação de dados e solicitações do titular." storageKey="settings-privacy-open" title="Privacidade e LGPD">
+              <PrivacyPanel exportData={backupData} user={user} />
+            </CollapsibleSettingsBlock>
+            {canManageUsers(user.role) ? (
+              <CollapsibleSettingsBlock description="Histórico das principais ações realizadas no sistema." storageKey="settings-audit-open" title="Últimas alterações">
+                <AuditPanel logs={auditLogs} />
+              </CollapsibleSettingsBlock>
+            ) : null}
           </div>
         </Section>
+
+        {isPlatformAdmin(user) ? (
+          <Section description="Central exclusiva da Orquestra.cs para clientes, planos, créditos e bloqueios." id="admin-orquestra" title="Admin Orquestra.cs">
+            <PlatformAdminPanel />
+          </Section>
+        ) : null}
       </div>
       {user.id !== demoUserId ? <GuideAssistant userId={user.id} /> : null}
       {user.id !== demoUserId && plan.aiEnabled ? (

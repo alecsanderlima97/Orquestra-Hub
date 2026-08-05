@@ -10,12 +10,13 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  ShieldCheck,
   Store,
   Truck,
   UserRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import type { CompanyMembership } from "@/features/auth/types/authTypes";
 import { UtilityDock } from "./UtilityDock";
@@ -38,14 +39,22 @@ export function AppShell({
   user,
   companies = [],
   onCompanyChange,
+  showPlatformAdmin = false,
 }: {
   children: ReactNode;
   onLogout?: () => void;
   user?: AppUser | null;
   companies?: CompanyMembership[];
   onCompanyChange?: (tenantId: string) => void;
+  showPlatformAdmin?: boolean;
 }) {
-  const [activeSection, setActiveSection] = useState(navigation[0].id);
+  const visibleNavigation = useMemo(
+    () => showPlatformAdmin
+      ? [...navigation, { description: "Central exclusiva da Orquestra.cs para clientes, planos e bloqueios.", id: "admin-orquestra", label: "Admin Orquestra", icon: ShieldCheck }]
+      : navigation,
+    [showPlatformAdmin],
+  );
+  const [activeSection, setActiveSection] = useState(visibleNavigation[0].id);
 
   useEffect(() => {
     function updateFromScroll() {
@@ -53,7 +62,7 @@ export function AppShell({
         setActiveSection("configuracoes");
         return;
       }
-      const current = navigation.map((item) => document.getElementById(item.id)).filter(Boolean).filter((section) => section!.getBoundingClientRect().top <= window.innerHeight * 0.38).at(-1);
+      const current = visibleNavigation.map((item) => document.getElementById(item.id)).filter(Boolean).filter((section) => section!.getBoundingClientRect().top <= window.innerHeight * 0.38).at(-1);
       if (current?.id) setActiveSection(current.id);
     }
     const observer = new IntersectionObserver(
@@ -66,7 +75,7 @@ export function AppShell({
       { rootMargin: "-20% 0px -55% 0px", threshold: [0.15, 0.35, 0.6] },
     );
 
-    navigation.forEach((item) => {
+    visibleNavigation.forEach((item) => {
       const section = document.getElementById(item.id);
       if (section) observer.observe(section);
     });
@@ -74,7 +83,7 @@ export function AppShell({
     updateFromScroll();
 
     return () => { observer.disconnect(); window.removeEventListener("scroll", updateFromScroll); };
-  }, []);
+  }, [visibleNavigation]);
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
@@ -89,7 +98,7 @@ export function AppShell({
           </div>
         </div>
         <nav className="mt-8 space-y-1">
-          {navigation.map(({ description, id, label, icon: Icon }) => {
+          {visibleNavigation.map(({ description, id, label, icon: Icon }) => {
             const isActive = activeSection === id;
             return (
               <a
