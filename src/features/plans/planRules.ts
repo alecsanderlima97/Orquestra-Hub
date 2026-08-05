@@ -33,7 +33,7 @@ export const plans: Record<PlanId, PlanRules> = {
     emailAutomation: false,
     id: "medio",
     initialAiCredits: 15,
-    label: "Plano Médio",
+    label: "Plano Profissional",
     monthlyAiCredits: 15,
     price: "R$ 120,00",
     storeLimit: 3,
