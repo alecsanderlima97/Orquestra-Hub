@@ -59,7 +59,7 @@ export function AppShell({
   useEffect(() => {
     function updateFromScroll() {
       if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24) {
-        setActiveSection("configuracoes");
+        setActiveSection(visibleNavigation.at(-1)?.id || "configuracoes");
         return;
       }
       const current = visibleNavigation.map((item) => document.getElementById(item.id)).filter(Boolean).filter((section) => section!.getBoundingClientRect().top <= window.innerHeight * 0.38).at(-1);

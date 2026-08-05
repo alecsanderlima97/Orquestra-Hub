@@ -58,7 +58,7 @@ export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName:
           </span>
           <div>
             <h3 className="font-semibold text-slate-950">IA Financeira Orquestra</h3>
-            <p className="mt-1 text-sm text-cyan-950">{plan.aiEnabled ? "Créditos mensais para análises, resumos e apoio nas decisões do caixa." : "Disponível a partir do Plano Médio."}</p>
+            <p className="mt-1 text-sm text-cyan-950">{plan.aiEnabled ? "Créditos mensais para análises, resumos e apoio nas decisões do caixa." : "Disponível a partir do Plano Profissional."}</p>
           </div>
         </div>
         <span className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-cyan-900 shadow-sm">

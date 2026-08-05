@@ -906,7 +906,7 @@ export function OrquestraHubApp() {
 
   function sendWhatsApp(account: AccountPayable) {
     if (!getPlanRules(user?.planId).whatsappEnabled) {
-      window.alert("WhatsApp não está disponível no Plano Inicial. Faça upgrade para o Plano Médio ou Premium.");
+      window.alert("WhatsApp não está disponível no Plano Inicial. Faça upgrade para o Plano Profissional ou Premium.");
       return;
     }
     const supplier = supplierList.find((item) => item.name === account.supplier);
