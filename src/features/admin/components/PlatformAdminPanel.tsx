@@ -27,6 +27,12 @@ function subscriptionStartFromNextBilling(date: string) {
   return new Date(year, month - 2, day).toLocaleDateString("pt-BR");
 }
 
+function formatInputDateBR(date: string) {
+  if (!date) return "";
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
+}
+
 function daysUntilBilling(date: string) {
   if (!date) return null;
   const [year, month, day] = date.split("-").map(Number);
@@ -342,7 +348,7 @@ export function PlatformAdminPanel() {
                 <td className="px-5 py-3">
                   <input className="h-10 rounded-md border border-slate-300 px-3 disabled:bg-slate-100 disabled:text-slate-500" disabled={!isEditing} onChange={(event) => updateTenantLocal(item.id, { nextBillingDate: event.target.value })} type="date" value={item.nextBillingDate || ""} />
                 </td>
-                <td className="px-5 py-3">{subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
+                <td className="px-5 py-3">{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
                 <td className="px-5 py-3">
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${calculatedStatus.tone}`}>{calculatedStatus.label}</span>
                 </td>
