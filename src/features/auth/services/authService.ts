@@ -30,13 +30,24 @@ function tenantPayload(name: string, ownerId: string, invite: Invite) {
   const plan = getPlanRules(invite.planId || defaultPlanId);
   return {
     aiCredits: { balance: plan.initialAiCredits, included: plan.initialAiCredits, renewalMonth: renewalMonth(), status: "Ativo", used: 0 },
+    billingDay: invite.billingDay || "",
+    city: invite.city || "",
+    commercialNotes: invite.commercialNotes || "",
+    contactEmail: invite.contactEmail || "",
+    contactName: invite.contactName || "",
+    contactPhone: invite.contactPhone || "",
     createdAt: serverTimestamp(),
+    document: invite.document || "",
     firstBillingDate: invite.nextBillingDate || "",
+    monthlyFee: invite.monthlyFee || plan.price,
     name,
     nextBillingDate: invite.nextBillingDate || "",
     ownerId,
+    paymentMethod: invite.paymentMethod || "PIX",
     planId: plan.id,
     status: "Ativo",
+    startDate: invite.startDate || "",
+    state: invite.state || "",
     subscriptionStatus: invite.subscriptionStatus || "trial",
   };
 }

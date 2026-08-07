@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { PlanId } from "@/features/plans/planRules";
 import { plans } from "@/features/plans/planRules";
 import { createCommercialInvite } from "@/features/users/services/inviteService";
-import { formatBRL, parseBRL } from "@/lib/formatters/br";
+import { formatBRL, formatCnpj, formatPhone, parseBRL, toTitleCaseBR } from "@/lib/formatters/br";
 import { confirmTenantPayment, listPlatformTenants, listTenantPayments, type PlatformPayment, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
@@ -84,6 +84,19 @@ function billingStatus(item: PlatformTenant) {
 }
 
 export function PlatformAdminPanel() {
+  const [commercialForm, setCommercialForm] = useState({
+    billingDay: "",
+    city: "",
+    commercialNotes: "",
+    contactEmail: "",
+    contactName: "",
+    contactPhone: "",
+    document: "",
+    monthlyFee: plans.medio.price,
+    paymentMethod: "PIX",
+    startDate: todayInput(),
+    state: "",
+  });
   const [inviteBillingDate, setInviteBillingDate] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [invitePlan, setInvitePlan] = useState<PlanId>("medio");
@@ -128,7 +141,7 @@ export function PlatformAdminPanel() {
   async function generateCommercialInvite() {
     setMessage("");
     try {
-      const invite = await createCommercialInvite(invitePlan, inviteStatus, inviteBillingDate);
+      const invite = await createCommercialInvite(invitePlan, inviteStatus, inviteBillingDate, commercialForm);
       setInviteCode(invite.code);
       setMessage("Convite comercial gerado. Envie o código para a cliente criar a empresa.");
     } catch {
@@ -139,7 +152,22 @@ export function PlatformAdminPanel() {
   async function save(item: PlatformTenant) {
     setMessage("");
     try {
-      await updateTenantSubscription(item.id, { nextBillingDate: item.nextBillingDate, planId: item.planId, subscriptionStatus: item.subscriptionStatus });
+      await updateTenantSubscription(item.id, {
+        billingDay: item.billingDay,
+        city: item.city,
+        commercialNotes: item.commercialNotes,
+        contactEmail: item.contactEmail,
+        contactName: item.contactName,
+        contactPhone: item.contactPhone,
+        document: item.document,
+        monthlyFee: item.monthlyFee,
+        nextBillingDate: item.nextBillingDate,
+        paymentMethod: item.paymentMethod,
+        planId: item.planId,
+        startDate: item.startDate,
+        state: item.state,
+        subscriptionStatus: item.subscriptionStatus,
+      });
       setEditingTenantId("");
       setMessage("Cliente atualizado com sucesso.");
     } catch {
@@ -163,7 +191,7 @@ export function PlatformAdminPanel() {
     setMessage("");
     setPaymentTenantId(item.id);
     setPaymentForm({
-      amount: plans[item.planId].price,
+      amount: item.monthlyFee || plans[item.planId].price,
       method: "PIX",
       nextBillingDate: addOneMonth(item.nextBillingDate || todayInput()),
       notes: "",
@@ -228,7 +256,11 @@ export function PlatformAdminPanel() {
         <h4 className="font-semibold">Novo convite comercial</h4>
         <p className="mt-1 text-sm text-slate-600">Use este convite para a cliente criar a própria empresa com o plano liberado por você.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => setInvitePlan(event.target.value as PlanId)} value={invitePlan}>
+          <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => {
+            const nextPlan = event.target.value as PlanId;
+            setInvitePlan(nextPlan);
+            setCommercialForm((form) => ({ ...form, monthlyFee: plans[nextPlan].price }));
+          }} value={invitePlan}>
             {Object.values(plans).map((plan) => <option key={plan.id} value={plan.id}>{plan.label} - {plan.price}</option>)}
           </select>
           <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => setInviteStatus(event.target.value as SubscriptionStatus)} value={inviteStatus}>
@@ -238,6 +270,24 @@ export function PlatformAdminPanel() {
           <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white" onClick={generateCommercialInvite} type="button">
             <TicketPlus size={16} />Gerar convite
           </button>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => setCommercialForm((form) => ({ ...form, contactName: toTitleCaseBR(form.contactName) }))} onChange={(event) => setCommercialForm((form) => ({ ...form, contactName: toTitleCaseBR(event.target.value) }))} placeholder="Responsável pelo contrato" value={commercialForm.contactName} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, contactPhone: formatPhone(event.target.value) }))} placeholder="WhatsApp" value={commercialForm.contactPhone} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, contactEmail: event.target.value.toLowerCase() }))} placeholder="E-mail comercial" type="email" value={commercialForm.contactEmail} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, document: formatCnpj(event.target.value) }))} placeholder="CNPJ/CPF" value={commercialForm.document} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => setCommercialForm((form) => ({ ...form, city: toTitleCaseBR(form.city) }))} onChange={(event) => setCommercialForm((form) => ({ ...form, city: toTitleCaseBR(event.target.value) }))} placeholder="Cidade" value={commercialForm.city} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm uppercase" maxLength={2} onChange={(event) => setCommercialForm((form) => ({ ...form, state: event.target.value.toUpperCase() }))} placeholder="UF" value={commercialForm.state} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => setCommercialForm((form) => ({ ...form, monthlyFee: formatBRL(form.monthlyFee) }))} onChange={(event) => setCommercialForm((form) => ({ ...form, monthlyFee: event.target.value }))} placeholder="Mensalidade" value={commercialForm.monthlyFee} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" maxLength={2} onChange={(event) => setCommercialForm((form) => ({ ...form, billingDay: event.target.value.replace(/\D/g, "").slice(0, 2) }))} placeholder="Dia venc." value={commercialForm.billingDay} />
+          <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, paymentMethod: event.target.value }))} value={commercialForm.paymentMethod}>
+            <option>PIX</option>
+            <option>Transferência</option>
+            <option>Dinheiro</option>
+            <option>Outro</option>
+          </select>
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, startDate: event.target.value }))} title="Data de início do cliente" type="date" value={commercialForm.startDate} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm md:col-span-2" onChange={(event) => setCommercialForm((form) => ({ ...form, commercialNotes: event.target.value }))} placeholder="Observações internas do cliente" value={commercialForm.commercialNotes} />
         </div>
         {inviteCode ? (
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-cyan-100 bg-cyan-50 px-4 py-3">
@@ -276,6 +326,8 @@ export function PlatformAdminPanel() {
                 <td className="px-5 py-3">
                   <strong>{item.name}</strong>
                   <p className="text-xs text-slate-500">{item.id}</p>
+                  <p className="mt-1 text-xs text-slate-600">{item.contactName || "Responsável não informado"}</p>
+                  <p className="text-xs text-slate-500">{item.contactPhone || item.contactEmail || "Contato não informado"}</p>
                 </td>
                 <td className="px-5 py-3">
                   <select className="h-10 rounded-md border border-slate-300 bg-white px-3 disabled:bg-slate-100 disabled:text-slate-500" disabled={!isEditing} onChange={(event) => updateTenantLocal(item.id, { planId: event.target.value as PlanId })} value={item.planId}>
@@ -315,6 +367,33 @@ export function PlatformAdminPanel() {
                   </div>
                 </td>
               </tr>,
+              isEditing ? (
+                <tr key={`${item.id}-commercial`}>
+                  <td className="bg-slate-50 px-5 py-4" colSpan={10}>
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
+                      <h4 className="font-semibold text-slate-950">Dados comerciais do cliente</h4>
+                      <div className="mt-4 grid gap-3 md:grid-cols-4">
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => updateTenantLocal(item.id, { contactName: toTitleCaseBR(item.contactName || "") })} onChange={(event) => updateTenantLocal(item.id, { contactName: toTitleCaseBR(event.target.value) })} placeholder="Responsável" value={item.contactName || ""} />
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { contactPhone: formatPhone(event.target.value) })} placeholder="WhatsApp" value={item.contactPhone || ""} />
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { contactEmail: event.target.value.toLowerCase() })} placeholder="E-mail comercial" type="email" value={item.contactEmail || ""} />
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { document: formatCnpj(event.target.value) })} placeholder="CNPJ/CPF" value={item.document || ""} />
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => updateTenantLocal(item.id, { city: toTitleCaseBR(item.city || "") })} onChange={(event) => updateTenantLocal(item.id, { city: toTitleCaseBR(event.target.value) })} placeholder="Cidade" value={item.city || ""} />
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm uppercase" maxLength={2} onChange={(event) => updateTenantLocal(item.id, { state: event.target.value.toUpperCase() })} placeholder="UF" value={item.state || ""} />
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => updateTenantLocal(item.id, { monthlyFee: formatBRL(item.monthlyFee || plans[item.planId].price) })} onChange={(event) => updateTenantLocal(item.id, { monthlyFee: event.target.value })} placeholder="Mensalidade" value={item.monthlyFee || ""} />
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" maxLength={2} onChange={(event) => updateTenantLocal(item.id, { billingDay: event.target.value.replace(/\D/g, "").slice(0, 2) })} placeholder="Dia venc." value={item.billingDay || ""} />
+                        <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { paymentMethod: event.target.value })} value={item.paymentMethod || "PIX"}>
+                          <option>PIX</option>
+                          <option>Transferência</option>
+                          <option>Dinheiro</option>
+                          <option>Outro</option>
+                        </select>
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { startDate: event.target.value })} title="Data de início do cliente" type="date" value={item.startDate || ""} />
+                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm md:col-span-2" onChange={(event) => updateTenantLocal(item.id, { commercialNotes: event.target.value })} placeholder="Observações internas" value={item.commercialNotes || ""} />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : null,
               paymentTenantId === item.id ? (
                 <tr key={`${item.id}-payment`}>
                   <td className="bg-emerald-50/60 px-5 py-4" colSpan={10}>

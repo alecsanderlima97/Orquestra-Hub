@@ -6,12 +6,23 @@ import { tenantCollectionPath } from "@/lib/firebase/paths";
 import { isInviteAvailable } from "../utils/accessRules";
 
 export type Invite = {
+  billingDay?: string;
+  city?: string;
   code: string;
+  commercialNotes?: string;
   companyName?: string;
+  contactEmail?: string;
+  contactName?: string;
+  contactPhone?: string;
+  document?: string;
   inviteType?: "commercial" | "user";
+  monthlyFee?: string;
   nextBillingDate?: string;
+  paymentMethod?: string;
   planId?: PlanId;
   role: Exclude<AppUser["role"], "Dono">;
+  startDate?: string;
+  state?: string;
   subscriptionStatus?: AppUser["subscriptionStatus"];
   tenantId?: string;
   status: "Ativo" | "Usado" | "Cancelado" | "Expirado";
@@ -35,10 +46,12 @@ export async function createInvite(tenantId: string, companyName: string, role: 
   return invite;
 }
 
-export async function createCommercialInvite(planId: PlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "trial", nextBillingDate = "") {
+export type CommercialInviteData = Pick<Invite, "billingDay" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "monthlyFee" | "paymentMethod" | "startDate" | "state">;
+
+export async function createCommercialInvite(planId: PlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "trial", nextBillingDate = "", commercialData: CommercialInviteData = {}) {
   if (!firebaseReady || !db) return { code: "DEMO1234", inviteType: "commercial" as const, planId, role: "Proprietário" as const, status: "Ativo" as const, subscriptionStatus };
   const code = crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
-  const invite: Invite = { code, inviteType: "commercial", nextBillingDate, planId, role: "Proprietário", status: "Ativo", subscriptionStatus, expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) };
+  const invite: Invite = { code, inviteType: "commercial", nextBillingDate, planId, role: "Proprietário", status: "Ativo", subscriptionStatus, ...commercialData, expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) };
   await setDoc(doc(db, "invites", code), { ...invite, createdAt: serverTimestamp() });
   return invite;
 }
