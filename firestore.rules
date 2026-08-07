@@ -66,6 +66,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /platformPayments/{tenantId}/payments/{paymentId} {
+      allow read, create: if isPlatformOwner();
+      allow update, delete: if false;
+    }
+
     match /invites/{code} {
       allow read: if signedIn() && (resource.data.status == 'Ativo' || resource.data.tenantId == null || isOwner(resource.data.tenantId));
       allow create: if signedIn() && (isPlatformOwner() || isOwner(request.resource.data.tenantId));

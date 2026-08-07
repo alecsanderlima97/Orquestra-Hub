@@ -1,11 +1,12 @@
 "use client";
 
-import { Copy, Pause, Pencil, RefreshCw, Save, Trash2, X, TicketPlus } from "lucide-react";
+import { CircleDollarSign, Copy, Pause, Pencil, RefreshCw, Save, Trash2, X, TicketPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { PlanId } from "@/features/plans/planRules";
 import { plans } from "@/features/plans/planRules";
 import { createCommercialInvite } from "@/features/users/services/inviteService";
-import { listPlatformTenants, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
+import { formatBRL, parseBRL } from "@/lib/formatters/br";
+import { confirmTenantPayment, listPlatformTenants, listTenantPayments, type PlatformPayment, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
 const graceDays = 5;
@@ -53,6 +54,24 @@ function businessDaysLate(date: string) {
   return count;
 }
 
+function todayInput() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function addOneMonth(date: string) {
+  const source = date || todayInput();
+  const [year, month, day] = source.split("-").map(Number);
+  const next = new Date(year, month, day);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+}
+
+function referenceFromBilling(date: string) {
+  const source = date || todayInput();
+  const [year, month] = source.split("-").map(Number);
+  return `${String(month).padStart(2, "0")}/${year}`;
+}
+
 function billingStatus(item: PlatformTenant) {
   if (["pausado", "bloqueado", "cancelado"].includes(item.subscriptionStatus)) return { label: item.subscriptionStatus === "pausado" ? "Pausado" : "Bloqueio manual", tone: "bg-rose-100 text-rose-800" };
   const days = daysUntilBilling(item.nextBillingDate || "");
@@ -73,6 +92,9 @@ export function PlatformAdminPanel() {
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [paymentTenantId, setPaymentTenantId] = useState("");
+  const [paymentForm, setPaymentForm] = useState({ amount: "", method: "PIX", nextBillingDate: "", notes: "", paidAt: todayInput(), referenceMonth: "" });
+  const [paymentsByTenant, setPaymentsByTenant] = useState<Record<string, PlatformPayment[]>>({});
 
   async function load() {
     setLoading(true);
@@ -137,6 +159,59 @@ export function PlatformAdminPanel() {
     await save(next);
   }
 
+  async function openPayment(item: PlatformTenant) {
+    setMessage("");
+    setPaymentTenantId(item.id);
+    setPaymentForm({
+      amount: plans[item.planId].price,
+      method: "PIX",
+      nextBillingDate: addOneMonth(item.nextBillingDate || todayInput()),
+      notes: "",
+      paidAt: todayInput(),
+      referenceMonth: referenceFromBilling(item.nextBillingDate || todayInput()),
+    });
+    if (!paymentsByTenant[item.id]) {
+      try {
+        const payments = await listTenantPayments(item.id);
+        setPaymentsByTenant((current) => ({ ...current, [item.id]: payments }));
+      } catch {
+        setMessage("Não foi possível carregar o histórico de pagamentos.");
+      }
+    }
+  }
+
+  async function confirmPayment(item: PlatformTenant) {
+    if (!paymentForm.amount || parseBRL(paymentForm.amount) <= 0) {
+      setMessage("Informe o valor pago antes de confirmar.");
+      return;
+    }
+    if (!paymentForm.paidAt || !paymentForm.nextBillingDate || !paymentForm.referenceMonth.trim()) {
+      setMessage("Informe data do pagamento, referência e próximo vencimento.");
+      return;
+    }
+    if (!window.confirm(`Confirmar pagamento de ${item.name} e liberar o sistema até ${paymentForm.nextBillingDate}?`)) return;
+    setMessage("");
+    try {
+      const payment = {
+        amount: paymentForm.amount,
+        method: paymentForm.method,
+        nextBillingDate: paymentForm.nextBillingDate,
+        notes: paymentForm.notes.trim(),
+        paidAt: paymentForm.paidAt,
+        planId: item.planId,
+        referenceMonth: paymentForm.referenceMonth.trim(),
+      };
+      await confirmTenantPayment(item.id, payment);
+      const savedPayment: PlatformPayment = { ...payment, id: crypto.randomUUID() };
+      setPaymentsByTenant((current) => ({ ...current, [item.id]: [savedPayment, ...(current[item.id] || [])] }));
+      updateTenantLocal(item.id, { nextBillingDate: payment.nextBillingDate, subscriptionStatus: "ativo" });
+      setPaymentTenantId("");
+      setMessage("Pagamento confirmado. Cliente liberado e vencimento atualizado.");
+    } catch {
+      setMessage("Não foi possível confirmar o pagamento.");
+    }
+  }
+
   return (
     <section className="rounded-lg border border-amber-200 bg-white shadow-sm">
       <header className="flex flex-col gap-3 border-b border-amber-100 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -196,7 +271,7 @@ export function PlatformAdminPanel() {
               const calculatedStatus = billingStatus(item);
               const isEditing = editingTenantId === item.id;
               const online = isOnline(item.lastSeenAt);
-              return (
+              return [
               <tr key={item.id}>
                 <td className="px-5 py-3">
                   <strong>{item.name}</strong>
@@ -234,12 +309,76 @@ export function PlatformAdminPanel() {
                     ) : (
                       <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800" onClick={() => setEditingTenantId(item.id)} type="button"><Pencil size={15} />Editar</button>
                     )}
+                    <button className="inline-flex h-10 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800" onClick={() => openPayment(item)} type="button"><CircleDollarSign size={15} />Confirmar pg.</button>
                     <button className="inline-flex h-10 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-800" onClick={() => changeStatus(item, "pausado")} type="button"><Pause size={15} />Pausar</button>
                     <button className="inline-flex h-10 items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700" onClick={() => changeStatus(item, "cancelado")} type="button"><Trash2 size={15} />Excluir</button>
                   </div>
                 </td>
-              </tr>
-              );
+              </tr>,
+              paymentTenantId === item.id ? (
+                <tr key={`${item.id}-payment`}>
+                  <td className="bg-emerald-50/60 px-5 py-4" colSpan={10}>
+                    <div className="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h4 className="font-semibold text-slate-950">Confirmar pagamento mensal</h4>
+                          <p className="mt-1 text-sm text-slate-600">Registra o pagamento, libera o cliente e atualiza o próximo vencimento.</p>
+                        </div>
+                        <button className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" onClick={() => setPaymentTenantId("")} type="button">Fechar</button>
+                      </div>
+                      <div className="mt-4 grid gap-3 md:grid-cols-6">
+                        <label className="block">
+                          <span className="text-xs font-semibold uppercase text-slate-500">Valor pago</span>
+                          <input className="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm" onBlur={() => setPaymentForm((form) => ({ ...form, amount: formatBRL(form.amount) }))} onChange={(event) => setPaymentForm((form) => ({ ...form, amount: event.target.value }))} value={paymentForm.amount} />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-semibold uppercase text-slate-500">Referência</span>
+                          <input className="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setPaymentForm((form) => ({ ...form, referenceMonth: event.target.value }))} placeholder="08/2026" value={paymentForm.referenceMonth} />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-semibold uppercase text-slate-500">Pago em</span>
+                          <input className="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setPaymentForm((form) => ({ ...form, paidAt: event.target.value }))} type="date" value={paymentForm.paidAt} />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-semibold uppercase text-slate-500">Próximo vencimento</span>
+                          <input className="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setPaymentForm((form) => ({ ...form, nextBillingDate: event.target.value }))} type="date" value={paymentForm.nextBillingDate} />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-semibold uppercase text-slate-500">Forma</span>
+                          <select className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => setPaymentForm((form) => ({ ...form, method: event.target.value }))} value={paymentForm.method}>
+                            <option>PIX</option>
+                            <option>Transferência</option>
+                            <option>Dinheiro</option>
+                            <option>Outro</option>
+                          </select>
+                        </label>
+                        <button className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800" onClick={() => confirmPayment(item)} type="button">
+                          <Save size={15} />Confirmar
+                        </button>
+                      </div>
+                      <label className="mt-3 block">
+                        <span className="text-xs font-semibold uppercase text-slate-500">Observação</span>
+                        <input className="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setPaymentForm((form) => ({ ...form, notes: event.target.value }))} placeholder="Ex.: pagamento confirmado por Pix" value={paymentForm.notes} />
+                      </label>
+                      <div className="mt-5">
+                        <h5 className="text-sm font-semibold text-slate-950">Histórico deste cliente</h5>
+                        <div className="mt-2 max-h-48 overflow-auto rounded-md border border-slate-100">
+                          {(paymentsByTenant[item.id] || []).length ? (paymentsByTenant[item.id] || []).map((payment) => (
+                            <div className="grid gap-2 border-b border-slate-100 px-3 py-2 text-sm last:border-b-0 md:grid-cols-5" key={payment.id}>
+                              <span><strong>{payment.referenceMonth}</strong></span>
+                              <span>{payment.amount}</span>
+                              <span>{payment.method}</span>
+                              <span>Pago em {payment.paidAt}</span>
+                              <span>Vence {payment.nextBillingDate}</span>
+                            </div>
+                          )) : <p className="px-3 py-4 text-sm text-slate-500">Nenhum pagamento registrado para este cliente.</p>}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : null,
+              ];
             })}
             {!tenants.length ? <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={10}>{loading ? "Carregando clientes..." : "Nenhum cliente encontrado."}</td></tr> : null}
           </tbody>

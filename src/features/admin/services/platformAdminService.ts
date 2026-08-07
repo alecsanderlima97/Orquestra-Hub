@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import type { PlanId } from "@/features/plans/planRules";
 import { db, firebaseReady } from "@/lib/firebase/config";
@@ -19,6 +19,18 @@ export type PlatformTenant = {
   ownerId?: string;
   planId: PlanId;
   subscriptionStatus: SubscriptionStatus;
+};
+
+export type PlatformPayment = {
+  amount: string;
+  createdAt?: number;
+  id: string;
+  method: string;
+  nextBillingDate: string;
+  notes?: string;
+  paidAt: string;
+  planId: PlanId;
+  referenceMonth: string;
 };
 
 export function isPlatformAdmin(user?: AppUser | null) {
@@ -53,4 +65,40 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
 export async function updateTenantSubscription(tenantId: string, updates: { nextBillingDate?: string; planId: PlanId; subscriptionStatus: SubscriptionStatus }) {
   if (!firebaseReady || !db) return;
   await updateDoc(doc(db, tenantPath(tenantId)), { ...updates, updatedAt: serverTimestamp() });
+}
+
+export async function listTenantPayments(tenantId: string): Promise<PlatformPayment[]> {
+  if (!firebaseReady || !db) return [];
+  const snapshot = await getDocs(query(collection(db, "platformPayments", tenantId, "payments"), orderBy("paidAt", "desc")));
+  return snapshot.docs.map((item) => {
+    const data = item.data();
+    return {
+      amount: String(data.amount || ""),
+      createdAt: timestampToMillis(data.createdAt),
+      id: item.id,
+      method: String(data.method || "PIX"),
+      nextBillingDate: String(data.nextBillingDate || ""),
+      notes: String(data.notes || ""),
+      paidAt: String(data.paidAt || ""),
+      planId: data.planId || "medio",
+      referenceMonth: String(data.referenceMonth || ""),
+    } as PlatformPayment;
+  });
+}
+
+export async function confirmTenantPayment(tenantId: string, payment: Omit<PlatformPayment, "createdAt" | "id">) {
+  if (!firebaseReady || !db) return;
+  const batch = writeBatch(db);
+  const tenantRef = doc(db, tenantPath(tenantId));
+  const paymentRef = doc(collection(db, "platformPayments", tenantId, "payments"));
+  batch.set(paymentRef, { ...payment, createdAt: serverTimestamp() });
+  batch.update(tenantRef, {
+    lastPaymentAt: payment.paidAt,
+    lastPaymentAmount: payment.amount,
+    nextBillingDate: payment.nextBillingDate,
+    planId: payment.planId,
+    subscriptionStatus: "ativo",
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
 }
