@@ -8,6 +8,7 @@ export type AccountPayable = {
   categoryId?: string;
   categoryName?: string;
   installment: string;
+  invoiceNumber?: string;
   dailyInterestAmount?: string;
   dailyInterestPercent?: string;
   lateFeeAmount?: string;

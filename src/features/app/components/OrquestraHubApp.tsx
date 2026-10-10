@@ -247,6 +247,7 @@ export function OrquestraHubApp() {
     dailyInterestPercent: "",
     description: "",
     dueDate: "2026-06-10",
+    installmentDueDates: ["2026-06-10", "2026-07-10", "2026-08-10"],
     installments: "3",
     invoiceNumber: "NF 1003",
     issueDate: "2026-06-08",
@@ -617,6 +618,11 @@ export function OrquestraHubApp() {
       setFormErrors((errors) => ({ ...errors, purchase: "Informe pelo menos uma parcela." }));
       return;
     }
+    const installmentDueDates = Array.from({ length: installments }, (_, index) => purchaseForm.installmentDueDates[index] || "");
+    if (installmentDueDates.some((dueDate) => !dueDate)) {
+      setFormErrors((errors) => ({ ...errors, purchase: "Informe o vencimento de todas as parcelas." }));
+      return;
+    }
     const installmentAmount = total / installments;
     const purchaseId = crypto.randomUUID();
     const selectedCategory = financialCategories.find((category) => category.id === purchaseForm.categoryId);
@@ -636,8 +642,9 @@ export function OrquestraHubApp() {
       categoryName: selectedCategory?.name,
       dailyInterestAmount: money.format(dailyInterestAmount),
       dailyInterestPercent: purchaseForm.dailyInterestPercent.trim(),
-      dueDate: addMonths(purchaseForm.dueDate, index),
+      dueDate: dateInputToBR(installmentDueDates[index] || addMonths(purchaseForm.dueDate, index)),
       installment: `${index + 1}/${installments}`,
+      invoiceNumber: purchaseForm.invoiceNumber,
       lateFeeAmount: money.format(lateFeeAmount),
       lateFeePercent: purchaseForm.lateFeePercent.trim(),
       protestAfterDays: purchaseForm.protestAfterDays.trim(),
@@ -982,7 +989,7 @@ export function OrquestraHubApp() {
     if (target.kind === "supplier") return [{ key: "name", label: "Nome", mask: "title", value: target.item.name }, { key: "document", label: "CNPJ", mask: "cnpj", value: target.item.document }, { key: "contactName", label: "Contato", mask: "title", value: target.item.contactName || "" }, { key: "phone", label: "Telefone", mask: "phone", value: target.item.phone }, { key: "email", label: "E-mail", value: target.item.email || "" }, { key: "address", label: "Endereço", mask: "title", value: target.item.address || "" }, { key: "paymentMethod", label: "Forma de pagamento", value: target.item.paymentMethod || "" }, { key: "pixKey", label: "Chave PIX", value: target.item.pixKey || "" }, { key: "bank", label: "Banco", mask: "title", value: target.item.bank || "" }, { key: "agency", label: "Agência", value: target.item.agency || "" }, { key: "account", label: "Conta", value: target.item.account || "" }, { key: "paymentTerms", label: "Condição de pagamento", value: target.item.paymentTerms || "" }, { key: "notes", label: "Observações", value: target.item.notes || "" }];
     if (target.kind === "purchase") return [{ key: "invoiceNumber", label: "Número da nota", mask: "upper", value: target.item.invoiceNumber }, { key: "description", label: "Descrição dos produtos", value: target.item.description }, { key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "issueDate", label: "Data", value: target.item.issueDate }, { key: "total", label: "Valor", mask: "currency", value: target.item.total }, { key: "installments", label: "Parcelas", type: "number", value: String(target.item.installments) }];
     if (target.kind === "fixedExpense") return [{ key: "name", label: "Despesa", mask: "title", value: target.item.name }, { key: "category", label: "Categoria", mask: "title", value: target.item.category }, { key: "payee", label: "Favorecido", mask: "title", value: target.item.payee }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "amount", label: "Valor mensal", mask: "currency", value: target.item.amount }, { key: "dueDay", label: "Dia do vencimento", type: "number", value: String(target.item.dueDay) }, { key: "alertDays", label: "Alertar com antecedência", type: "number", value: String(target.item.alertDays) }];
-    return [{ key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "categoryName", label: "Categoria", mask: "title", value: target.item.categoryName || "" }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "dailyInterestAmount", label: "Mora diaria (R$)", mask: "currency", value: target.item.dailyInterestAmount || "R$ 0,00" }, { key: "dailyInterestPercent", label: "Mora diaria (%)", value: target.item.dailyInterestPercent || "" }, { key: "lateFeeAmount", label: "Multa (R$)", mask: "currency", value: target.item.lateFeeAmount || "R$ 0,00" }, { key: "lateFeePercent", label: "Multa (%)", value: target.item.lateFeePercent || "" }, { key: "protestAfterDays", label: "Protesto apos dias", type: "number", value: target.item.protestAfterDays || "" }, { key: "installment", label: "Parcela", value: target.item.installment }];
+    return [{ key: "invoiceNumber", label: "Numero da nota", mask: "upper", value: target.item.invoiceNumber || "" }, { key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "categoryName", label: "Categoria", mask: "title", value: target.item.categoryName || "" }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "dailyInterestAmount", label: "Mora diaria (R$)", mask: "currency", value: target.item.dailyInterestAmount || "R$ 0,00" }, { key: "dailyInterestPercent", label: "Mora diaria (%)", value: target.item.dailyInterestPercent || "" }, { key: "lateFeeAmount", label: "Multa (R$)", mask: "currency", value: target.item.lateFeeAmount || "R$ 0,00" }, { key: "lateFeePercent", label: "Multa (%)", value: target.item.lateFeePercent || "" }, { key: "protestAfterDays", label: "Protesto apos dias", type: "number", value: target.item.protestAfterDays || "" }, { key: "installment", label: "Parcela", value: target.item.installment }];
   }
 
   async function saveEdit(values: Record<string, string>, password: string) {
@@ -1009,7 +1016,7 @@ export function OrquestraHubApp() {
         setFixedExpenses((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       } else {
         const matchedCategory = financialCategories.find((category) => category.name.toLocaleLowerCase("pt-BR") === values.categoryName.toLocaleLowerCase("pt-BR"));
-        const updates = { supplier: toTitleCaseBR(values.supplier), categoryColor: matchedCategory?.color || editTarget.item.categoryColor, categoryId: matchedCategory?.id || editTarget.item.categoryId, categoryName: toTitleCaseBR(values.categoryName), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, dailyInterestAmount: values.dailyInterestAmount, dailyInterestPercent: values.dailyInterestPercent, lateFeeAmount: values.lateFeeAmount, lateFeePercent: values.lateFeePercent, protestAfterDays: values.protestAfterDays, installment: values.installment };
+        const updates = { supplier: toTitleCaseBR(values.supplier), categoryColor: matchedCategory?.color || editTarget.item.categoryColor, categoryId: matchedCategory?.id || editTarget.item.categoryId, categoryName: toTitleCaseBR(values.categoryName), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, dailyInterestAmount: values.dailyInterestAmount, dailyInterestPercent: values.dailyInterestPercent, invoiceNumber: values.invoiceNumber.toUpperCase(), lateFeeAmount: values.lateFeeAmount, lateFeePercent: values.lateFeePercent, protestAfterDays: values.protestAfterDays, installment: values.installment };
         if (persist) await updateAccountPayable(defaultTenantId, editTarget.item.id, updates);
         setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
       }

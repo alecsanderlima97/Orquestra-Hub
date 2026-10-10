@@ -66,15 +66,16 @@ export function AccountsPayableTable({
       <table className="w-full table-fixed text-left text-xs lg:text-sm">
         <thead className="bg-slate-50 text-slate-600">
           <tr>
-            <th className="w-[13%] px-3 py-3 font-medium">Fornecedor</th>
-            <th className="w-[11%] px-3 py-3 font-medium">Categoria</th>
-            <th className="w-[13%] px-3 py-3 font-medium">Loja</th>
+            <th className="w-[9%] px-3 py-3 font-medium">Nota</th>
+            <th className="w-[12%] px-3 py-3 font-medium">Fornecedor</th>
+            <th className="w-[10%] px-3 py-3 font-medium">Categoria</th>
+            <th className="w-[11%] px-3 py-3 font-medium">Loja</th>
             <th className="w-[7%] px-3 py-3 font-medium">Parcela</th>
-            <th className="w-[11%] px-3 py-3 font-medium">Vencimento</th>
-            <th className="w-[10%] px-3 py-3 font-medium">Valor</th>
-            <th className="w-[13%] px-3 py-3 font-medium">Juros/Mora</th>
-            <th className="w-[10%] px-3 py-3 font-medium">Status</th>
-            <th className="w-[12%] px-3 py-3 text-center font-medium">Ações</th>
+            <th className="w-[10%] px-3 py-3 font-medium">Vencimento</th>
+            <th className="w-[9%] px-3 py-3 font-medium">Valor</th>
+            <th className="w-[12%] px-3 py-3 font-medium">Juros/Mora</th>
+            <th className="w-[9%] px-3 py-3 font-medium">Status</th>
+            <th className="w-[11%] px-3 py-3 text-center font-medium">Ações</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -85,6 +86,7 @@ export function AccountsPayableTable({
               const days = overdueDays(account);
               return (
                 <tr className={rowStyle(account)} key={account.id}>
+                  <td className="px-3 py-4 font-medium text-slate-950">{account.invoiceNumber || "Sem nota"}</td>
                   <td className="px-3 py-4 font-medium text-slate-950">{account.supplier}</td>
                   <td className="px-3 py-4 text-slate-700">
                     {account.categoryName ? <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: account.categoryColor || "#0891b2" }} /><span className="truncate">{account.categoryName}</span></span> : <span className="text-xs text-slate-400">Sem categoria</span>}
@@ -159,7 +161,7 @@ export function AccountsPayableTable({
             })
           ) : (
             <tr>
-              <td className="px-5 py-8 text-center text-slate-500" colSpan={9}>
+              <td className="px-5 py-8 text-center text-slate-500" colSpan={10}>
                 Nenhuma conta encontrada com os filtros selecionados.
               </td>
             </tr>

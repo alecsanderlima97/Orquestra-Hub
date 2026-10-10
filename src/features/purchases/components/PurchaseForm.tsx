@@ -4,10 +4,25 @@ import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { formatBRL, toTitleCaseBR } from "@/lib/formatters/br";
 
-export type PurchaseFormState = { categoryId: string; dailyInterestAmount: string; dailyInterestPercent: string; description: string; dueDate: string; installments: string; invoiceNumber: string; issueDate: string; lateFeeAmount: string; lateFeePercent: string; protestAfterDays: string; store: string; supplier: string; total: string };
+export type PurchaseFormState = { categoryId: string; dailyInterestAmount: string; dailyInterestPercent: string; description: string; dueDate: string; installmentDueDates: string[]; installments: string; invoiceNumber: string; issueDate: string; lateFeeAmount: string; lateFeePercent: string; protestAfterDays: string; store: string; supplier: string; total: string };
 const accept = "application/pdf,image/jpeg,image/png,image/webp";
 
+function addMonthsInput(date: string, months: number) {
+  if (!date) return "";
+  const [year, month, day] = date.split("-").map(Number);
+  const next = new Date(year, month - 1 + months, day);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+}
+
+function buildDueDates(firstDueDate: string, installments: string) {
+  const count = Math.max(Number(installments) || 1, 1);
+  return Array.from({ length: count }, (_, index) => addMonthsInput(firstDueDate, index));
+}
+
 export function PurchaseForm({ boletoFiles, categoryError, categoryOptions, error, form, invoiceFile, newCategoryName, onBoletoFilesChange, onCategoryCreate, onChange, onInvoiceFileChange, onNewCategoryNameChange, onSubmit, storeOptions, supplierOptions }: { boletoFiles: File[]; categoryError?: string; categoryOptions: { id: string; name: string }[]; error?: string; form: PurchaseFormState; invoiceFile: File | null; newCategoryName: string; onBoletoFilesChange: (files: File[]) => void; onCategoryCreate: () => void; onChange: (form: PurchaseFormState) => void; onInvoiceFileChange: (file: File | null) => void; onNewCategoryNameChange: (value: string) => void; onSubmit: () => void; storeOptions: string[]; supplierOptions: string[] }) {
+  const installmentCount = Math.max(Number(form.installments) || 1, 1);
+  const dueDates = Array.from({ length: installmentCount }, (_, index) => form.installmentDueDates[index] || addMonthsInput(form.dueDate, index));
+
   return <form className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <SelectField label="Fornecedor" onChange={(supplier) => onChange({ ...form, supplier })} options={supplierOptions} value={form.supplier} />
@@ -30,9 +45,34 @@ export function PurchaseForm({ boletoFiles, categoryError, categoryOptions, erro
       <TextField label="Descrição dos produtos" onBlur={() => onChange({ ...form, description: toTitleCaseBR(form.description) })} onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ex.: Vestidos, calças e acessórios" value={form.description} />
       <TextField label="Valor total" onBlur={() => onChange({ ...form, total: formatBRL(form.total) })} onChange={(event) => onChange({ ...form, total: formatBRL(event.target.value) })} placeholder="R$ 0,00" value={form.total} />
       <TextField label="Data da compra" onChange={(event) => onChange({ ...form, issueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.issueDate} />
-      <TextField label="Parcelas" onChange={(event) => onChange({ ...form, installments: event.target.value })} placeholder="1" type="number" value={form.installments} />
-      <TextField label="Primeiro vencimento" onChange={(event) => onChange({ ...form, dueDate: event.target.value })} placeholder="dd/mm/aaaa" type="date" value={form.dueDate} />
+      <TextField label="Parcelas" onChange={(event) => onChange({ ...form, installmentDueDates: buildDueDates(form.dueDate, event.target.value), installments: event.target.value })} placeholder="1" type="number" value={form.installments} />
+      <TextField label="Primeiro vencimento" onChange={(event) => onChange({ ...form, dueDate: event.target.value, installmentDueDates: buildDueDates(event.target.value, form.installments) })} placeholder="dd/mm/aaaa" type="date" value={form.dueDate} />
     </div>
+    {installmentCount > 1 ? <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-950">Vencimentos por parcela</h3>
+          <p className="mt-1 text-xs text-slate-600">O sistema preenche no padrão mensal. Ajuste aqui quando cada boleto tiver uma data diferente.</p>
+        </div>
+        <button className="mt-2 h-9 rounded-md border border-amber-300 bg-white px-3 text-xs font-semibold text-amber-900 hover:bg-amber-100 sm:mt-0" onClick={() => onChange({ ...form, installmentDueDates: buildDueDates(form.dueDate, form.installments) })} type="button">Voltar para padrão mensal</button>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {dueDates.map((dueDate, index) => (
+          <TextField
+            key={index}
+            label={`Parcela ${index + 1}/${installmentCount}`}
+            onChange={(event) => {
+              const nextDueDates = [...dueDates];
+              nextDueDates[index] = event.target.value;
+              onChange({ ...form, installmentDueDates: nextDueDates });
+            }}
+            placeholder="dd/mm/aaaa"
+            type="date"
+            value={dueDate}
+          />
+        ))}
+      </div>
+    </div> : null}
     <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
       <h3 className="text-sm font-semibold text-slate-950">Regras do boleto em atraso</h3>
       <p className="mt-1 text-xs text-slate-500">Preencha conforme o texto do boleto. Pode usar valor em reais, porcentagem ou ambos.</p>
