@@ -12,6 +12,7 @@ export type Purchase = {
 };
 
 export type PurchaseAttachment = {
+  installment?: string;
   name: string;
   type: string;
   size: number;

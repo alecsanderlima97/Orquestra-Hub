@@ -1,9 +1,12 @@
+import type { PurchaseAttachment } from "@/features/purchases/types/purchaseTypes";
+
 export type AccountPayable = {
   id: string;
   supplier: string;
   store: string;
   dueDate: string;
   amount: string;
+  boletoAttachment?: PurchaseAttachment | null;
   categoryColor?: string;
   categoryId?: string;
   categoryName?: string;
@@ -15,6 +18,7 @@ export type AccountPayable = {
   lateFeePercent?: string;
   protestAfterDays?: string;
   paidAt?: string;
+  purchaseId?: string;
   receiptName?: string;
   receiptPath?: string;
   receiptUrl?: string;

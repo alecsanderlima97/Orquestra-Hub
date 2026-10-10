@@ -45,6 +45,7 @@ function tenantPayload(name: string, ownerId: string, invite: Invite) {
     ownerId,
     paymentMethod: invite.paymentMethod || "PIX",
     planId: plan.id,
+    receiptRequiredOnPayment: false,
     status: "Ativo",
     startDate: invite.startDate || "",
     state: invite.state || "",

@@ -52,6 +52,7 @@ export function AccountsPayableTable({
   onMarkPaid,
   onEdit,
   onReceiptSelected,
+  receiptRequiredOnPayment = false,
   onWhatsApp,
 }: {
   accounts: AccountPayable[];
@@ -59,6 +60,7 @@ export function AccountsPayableTable({
   onMarkPaid?: (id: string) => void;
   onEdit?: (account: AccountPayable) => void;
   onReceiptSelected?: (id: string, file: File) => void;
+  receiptRequiredOnPayment?: boolean;
   onWhatsApp?: (account: AccountPayable) => void;
 }) {
   return (
@@ -129,7 +131,7 @@ export function AccountsPayableTable({
                         className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={account.status === "Pago"}
                         onClick={() => onMarkPaid?.(account.id)}
-                        title="Confirmar que este boleto foi pago e registrar a baixa."
+                        title={receiptRequiredOnPayment && !account.receiptName && !account.receiptPath ? "Anexe o comprovante antes de registrar a baixa." : "Confirmar que este boleto foi pago e registrar a baixa."}
                         type="button"
                       >
                         <CheckCircle2 size={16} />
@@ -154,6 +156,7 @@ export function AccountsPayableTable({
                         </label>
                       </button>
                       {account.receiptUrl ? <a className="col-span-3 text-center text-[11px] font-medium text-emerald-700" href={account.receiptUrl} rel="noreferrer" target="_blank">Comprovante</a> : account.receiptName ? <span className="col-span-3 text-center text-[11px] font-medium text-emerald-700">Comprovante</span> : null}
+                      {account.boletoAttachment?.url ? <a className="col-span-3 text-center text-[11px] font-medium text-cyan-700" href={account.boletoAttachment.url} rel="noreferrer" target="_blank">Boleto {account.installment}</a> : null}
                     </div>
                   </td>
                 </tr>

@@ -19,7 +19,7 @@ function buildDueDates(firstDueDate: string, installments: string) {
   return Array.from({ length: count }, (_, index) => addMonthsInput(firstDueDate, index));
 }
 
-export function PurchaseForm({ boletoFiles, categoryError, categoryOptions, error, form, invoiceFile, newCategoryName, onBoletoFilesChange, onCategoryCreate, onChange, onInvoiceFileChange, onNewCategoryNameChange, onSubmit, storeOptions, supplierOptions }: { boletoFiles: File[]; categoryError?: string; categoryOptions: { id: string; name: string }[]; error?: string; form: PurchaseFormState; invoiceFile: File | null; newCategoryName: string; onBoletoFilesChange: (files: File[]) => void; onCategoryCreate: () => void; onChange: (form: PurchaseFormState) => void; onInvoiceFileChange: (file: File | null) => void; onNewCategoryNameChange: (value: string) => void; onSubmit: () => void; storeOptions: string[]; supplierOptions: string[] }) {
+export function PurchaseForm({ boletoFiles, categoryError, categoryOptions, error, form, invoiceFile, newCategoryName, onBoletoFilesChange, onCategoryCreate, onChange, onInvoiceFileChange, onNewCategoryNameChange, onSubmit, storeOptions, supplierOptions }: { boletoFiles: Array<File | null>; categoryError?: string; categoryOptions: { id: string; name: string }[]; error?: string; form: PurchaseFormState; invoiceFile: File | null; newCategoryName: string; onBoletoFilesChange: (files: Array<File | null>) => void; onCategoryCreate: () => void; onChange: (form: PurchaseFormState) => void; onInvoiceFileChange: (file: File | null) => void; onNewCategoryNameChange: (value: string) => void; onSubmit: () => void; storeOptions: string[]; supplierOptions: string[] }) {
   const installmentCount = Math.max(Number(form.installments) || 1, 1);
   const dueDates = Array.from({ length: installmentCount }, (_, index) => form.installmentDueDates[index] || addMonthsInput(form.dueDate, index));
 
@@ -86,7 +86,19 @@ export function PurchaseForm({ boletoFiles, categoryError, categoryOptions, erro
     </div>
     <div className="mt-5 grid gap-4 md:grid-cols-2">
       <label className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-700"><span className="flex items-center gap-2 font-semibold"><FileText size={18} />Nota fiscal</span><span className="mt-1 block text-xs text-slate-500">PDF ou imagem, até 10 MB.</span><input accept={accept} className="mt-3 block w-full text-xs" onChange={(event) => onInvoiceFileChange(event.target.files?.[0] || null)} type="file" />{invoiceFile ? <strong className="mt-2 block text-xs text-cyan-700">{invoiceFile.name}</strong> : null}</label>
-      <label className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-700"><span className="flex items-center gap-2 font-semibold"><Paperclip size={18} />Boletos</span><span className="mt-1 block text-xs text-slate-500">Selecione um ou vários PDFs/imagens.</span><input accept={accept} className="mt-3 block w-full text-xs" multiple onChange={(event) => onBoletoFilesChange(Array.from(event.target.files || []))} type="file" />{boletoFiles.length ? <strong className="mt-2 block text-xs text-cyan-700">{boletoFiles.length} arquivo(s) selecionado(s)</strong> : null}</label>
+      <div className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-700">
+        <span className="flex items-center gap-2 font-semibold"><Paperclip size={18} />Boletos por parcela</span>
+        <span className="mt-1 block text-xs text-slate-500">Vincule cada boleto à parcela correspondente. O anexo é opcional.</span>
+        <div className="mt-3 grid gap-2">
+          {Array.from({ length: installmentCount }, (_, index) => (
+            <label className="flex flex-col gap-1 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs" key={index}>
+              <span className="font-semibold">Boleto da parcela {index + 1}/{installmentCount}</span>
+              <input accept={accept} className="block w-full text-xs" onChange={(event) => { const nextFiles = [...boletoFiles]; nextFiles[index] = event.target.files?.[0] || null; onBoletoFilesChange(nextFiles); }} type="file" />
+              {boletoFiles[index] ? <strong className="truncate text-cyan-700">{boletoFiles[index]?.name}</strong> : null}
+            </label>
+          ))}
+        </div>
+      </div>
     </div>
     <div className="mt-5 flex items-center justify-between gap-4"><FormAlert message={error} /><button className="h-11 rounded-md bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800" onClick={onSubmit} title="Lançar a nota, anexos e criar automaticamente as parcelas." type="button">Gerar parcelas</button></div>
   </form>;

@@ -26,6 +26,7 @@ export async function createCompany(user: AppUser, name: string): Promise<Compan
     name: companyName,
     ownerId: user.id,
     planId: defaultPlanId,
+    receiptRequiredOnPayment: false,
     status: "Ativo",
     subscriptionStatus: "ativo",
   });

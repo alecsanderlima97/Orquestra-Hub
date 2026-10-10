@@ -1,6 +1,6 @@
-import { collection, doc, getDocs, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import { db, firebaseReady } from "@/lib/firebase/config";
-import { tenantCollectionPath } from "@/lib/firebase/paths";
+import { tenantCollectionPath, tenantPath } from "@/lib/firebase/paths";
 
 const restorableCollections = [
   ["stores", "stores"],
@@ -25,6 +25,7 @@ export type BackupRestorePreview = {
 
 export type BackupPayload = Partial<Record<"accounts" | "auditLogs" | "financialCategories" | "fixedExpenses" | "purchases" | "stores" | "suppliers", unknown>> & {
   exportedAt?: string;
+  settings?: { receiptRequiredOnPayment?: boolean };
   version?: number;
 };
 
@@ -126,6 +127,13 @@ export async function restoreBackup(tenantId: string, payload: BackupPayload, mo
       else batch.set(operation.ref, operation.data);
     });
     await batch.commit();
+  }
+
+  if (typeof payload.settings?.receiptRequiredOnPayment === "boolean") {
+    await updateDoc(doc(db, tenantPath(tenantId)), {
+      receiptRequiredOnPayment: payload.settings.receiptRequiredOnPayment,
+      updatedAt: serverTimestamp(),
+    });
   }
 
   return previewBackupPayload(payload);

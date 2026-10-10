@@ -64,7 +64,12 @@ service cloud.firestore {
 
       match /accountsPayable/{accountId} {
         allow read: if belongsToTenant(tenantId);
-        allow create, update, delete: if canWrite(tenantId);
+        allow create, delete: if canWrite(tenantId);
+        allow update: if canWrite(tenantId)
+          && (get(/databases/$(database)/documents/tenants/$(tenantId)).data.receiptRequiredOnPayment != true
+            || resource.data.status == 'Pago'
+            || request.resource.data.status != 'Pago'
+            || (request.resource.data.keys().hasAll(['receiptName']) && request.resource.data.receiptName != ''));
       }
 
       match /fixedExpenses/{expenseId} {

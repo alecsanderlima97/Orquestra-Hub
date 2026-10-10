@@ -34,6 +34,7 @@ import type { AuditDetails, AuditLog } from "@/features/audit/types/auditTypes";
 import { MonthlyCashFlow } from "@/features/dashboard/components/MonthlyCashFlow";
 import { CompaniesPanel } from "@/features/companies/components/CompaniesPanel";
 import { createCompany } from "@/features/companies/services/companyService";
+import { getCompanySettings, updateCompanySettings } from "@/features/companies/services/companySettingsService";
 import { SummaryCard } from "@/features/dashboard/components/SummaryCard";
 import { FinancialAlertsPanel } from "@/features/dashboard/components/FinancialAlertsPanel";
 import { buildFinancialAlerts, type FinancialAlert } from "@/features/dashboard/utils/financialAlerts";
@@ -235,7 +236,8 @@ export function OrquestraHubApp() {
   const [formErrors, setFormErrors] = useState({ category: "", fixedExpense: "", purchase: "", store: "", supplier: "" });
   const [purchaseSearch, setPurchaseSearch] = useState("");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  const [boletoFiles, setBoletoFiles] = useState<File[]>([]);
+  const [boletoFiles, setBoletoFiles] = useState<Array<File | null>>([]);
+  const [receiptRequiredOnPayment, setReceiptRequiredOnPayment] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierForm, setSupplierForm] = useState({ account: "", address: "", agency: "", bank: "", contactName: "", document: "", email: "", name: "", notes: "", paymentMethod: "PIX" as NonNullable<Supplier["paymentMethod"]>, paymentTerms: "", phone: "", pixKey: "" });
   const [storeForm, setStoreForm] = useState<StoreFormState>({
@@ -343,7 +345,7 @@ export function OrquestraHubApp() {
     let cancelled = false;
     async function loadFirebaseData() {
       try {
-        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseCategories, firebaseAuditLogs, firebaseUsers, firebaseInvites] = await Promise.all([
+        const [firebaseStores, firebaseSuppliers, firebaseAccounts, firebasePurchases, firebaseFixedExpenses, firebaseCategories, firebaseAuditLogs, firebaseUsers, firebaseInvites, firebaseSettings] = await Promise.all([
           listStores(tenantId),
           listSuppliers(tenantId),
           listAccountsPayable(tenantId),
@@ -353,6 +355,7 @@ export function OrquestraHubApp() {
           canManage ? listAuditLogs(tenantId) : Promise.resolve([]),
           canManage ? listTenantUsers(tenantId, companyName) : Promise.resolve([]),
           canManage ? listInvites(tenantId) : Promise.resolve([]),
+          getCompanySettings(tenantId),
         ]);
         if (cancelled) return;
         const today = todaySaoPaulo();
@@ -377,6 +380,7 @@ export function OrquestraHubApp() {
         setAuditLogs(firebaseAuditLogs);
         setTenantUsers(firebaseUsers);
         setInvites(firebaseInvites);
+        setReceiptRequiredOnPayment(firebaseSettings.receiptRequiredOnPayment);
       } catch {
         setFormErrors((errors) => ({ ...errors, supplier: "Não foi possível carregar dados do Firebase." }));
       }
@@ -461,7 +465,7 @@ export function OrquestraHubApp() {
     [filteredAccounts.length, filteredOpenTotal, filteredOverdueTotal, filteredPaidTotal, filteredTotal],
   );
 
-  const backupData = { accounts: accountList, auditLogs, financialCategories, fixedExpenses, purchases: purchaseList, stores: storeList, suppliers: supplierList };
+  const backupData = { accounts: accountList, auditLogs, financialCategories, fixedExpenses, purchases: purchaseList, settings: { receiptRequiredOnPayment }, stores: storeList, suppliers: supplierList };
 
   function downloadBackupFile() {
     const payload = JSON.stringify({ exportedAt: new Date().toISOString(), version: 1, ...backupData }, null, 2);
@@ -694,17 +698,31 @@ export function OrquestraHubApp() {
       let attachmentError = false;
       let invoiceAttachment: PurchaseAttachment | undefined;
       let boletoAttachments: PurchaseAttachment[] = [];
+      const boletoAttachmentByIndex = new Map<number, PurchaseAttachment>();
       try {
         invoiceAttachment = invoiceFile ? await uploadPurchaseAttachment(defaultTenantId, finalId, "notas-fiscais", invoiceFile) : undefined;
-        boletoAttachments = await Promise.all(boletoFiles.map((file) => uploadPurchaseAttachment(defaultTenantId, finalId, "boletos", file)));
+        const uploadedBoletos = await Promise.all(boletoFiles.flatMap((file, index) => file ? [{ file, index }] : []).map(async ({ file, index }) => ({
+          attachment: { ...await uploadPurchaseAttachment(defaultTenantId, finalId, "boletos", file), installment: `${index + 1}/${installments}` },
+          index,
+        })));
+        uploadedBoletos.forEach(({ attachment, index }) => boletoAttachmentByIndex.set(index, attachment));
+        boletoAttachments = uploadedBoletos.map(({ attachment }) => attachment);
       } catch {
         attachmentError = true;
+      }
+      const accountBoletoUpdates = boletoAttachments.flatMap((attachment) => {
+        const installmentIndex = [...boletoAttachmentByIndex.entries()].find(([, item]) => item.path === attachment.path)?.[0];
+        const accountId = installmentIndex === undefined ? undefined : saved?.accountIds[installmentIndex];
+        return accountId ? [{ accountId, attachment }] : [];
+      });
+      if (accountBoletoUpdates.length) {
+        await Promise.all(accountBoletoUpdates.map(({ accountId, attachment }) => updateAccountPayable(defaultTenantId, accountId, { boletoAttachment: attachment })));
       }
       const attachments = { invoiceAttachment, boletoAttachments };
       if (saved?.purchaseId && (invoiceAttachment || boletoAttachments.length)) await updatePurchase(defaultTenantId, saved.purchaseId, attachments);
       setPurchaseList((current) => [{ id: finalId, ...newPurchase, ...attachments }, ...current]);
       setAccountList((current) => [
-        ...newAccounts.map((account, index) => ({ id: saved?.accountIds[index] || `${purchaseId}-${index + 1}`, ...account })),
+        ...newAccounts.map((account, index) => ({ id: saved?.accountIds[index] || `${purchaseId}-${index + 1}`, ...account, boletoAttachment: boletoAttachmentByIndex.get(index) || null })),
         ...current,
       ]);
       setInvoiceFile(null);
@@ -891,6 +909,10 @@ export function OrquestraHubApp() {
   function requestMarkPaid(id: string) {
     const account = accountList.find((item) => item.id === id);
     if (!account || account.status === "Pago") return;
+    if (receiptRequiredOnPayment && !account.receiptName && !account.receiptPath) {
+      window.alert("Esta empresa exige comprovante para registrar a baixa. Anexe o comprovante antes de confirmar o pagamento.");
+      return;
+    }
     setPaymentToConfirm(account);
     setPaymentDateTime(nowDateTimeBR());
   }
@@ -932,6 +954,16 @@ export function OrquestraHubApp() {
     });
   }
 
+  async function saveReceiptRequirement(required: boolean) {
+    if (!user || !canManageUsers(user.role)) throw new Error("Somente o Proprietário pode alterar esta configuração.");
+    await updateCompanySettings(defaultTenantId, { receiptRequiredOnPayment: required });
+    setReceiptRequiredOnPayment(required);
+    await recordChange(defaultTenantId, user, "editou", "configuração financeira", defaultTenantId, {
+      details: `Comprovante na baixa: ${required ? "obrigatório" : "opcional"}`,
+      metadata: { module: "financeiro" },
+    });
+  }
+
   async function handleReceiptSelected(id: string, file: File) {
     const currentAccount = accountList.find((account) => account.id === id);
     const attachment = await uploadPurchaseAttachment(defaultTenantId, id, "comprovantes", file);
@@ -966,8 +998,11 @@ export function OrquestraHubApp() {
     if (!attachment?.path || !window.confirm(`Excluir o boleto ${index + 1}?`)) return;
     const boletoAttachments = purchase.boletoAttachments?.filter((_, itemIndex) => itemIndex !== index) || [];
     if (firebaseReady && user?.id !== demoUserId) await updatePurchase(defaultTenantId, purchase.id, { boletoAttachments });
+    const linkedAccount = accountList.find((account) => account.purchaseId === purchase.id && (account.boletoAttachment?.path === attachment.path || account.installment === attachment.installment));
+    if (linkedAccount && firebaseReady && user?.id !== demoUserId) await updateAccountPayable(defaultTenantId, linkedAccount.id, { boletoAttachment: null });
     await deletePurchaseAttachment(attachment.path);
     setPurchaseList((items) => items.map((item) => item.id === purchase.id ? { ...item, boletoAttachments } : item));
+    if (linkedAccount) setAccountList((items) => items.map((item) => item.id === linkedAccount.id ? { ...item, boletoAttachment: null } : item));
     await recordChange(defaultTenantId, user, "excluiu", "boleto", purchase.id);
   }
 
@@ -1414,6 +1449,7 @@ export function OrquestraHubApp() {
               onEdit={canWrite ? (item) => setEditTarget({ kind: "account", item }) : undefined}
               onMarkPaid={canWrite ? requestMarkPaid : undefined}
               onReceiptSelected={canWrite ? handleReceiptSelected : undefined}
+              receiptRequiredOnPayment={receiptRequiredOnPayment}
               onWhatsApp={sendWhatsApp}
             />
           </div>
@@ -1442,7 +1478,7 @@ export function OrquestraHubApp() {
               </CollapsibleSettingsBlock>
             </> : null}
             <CollapsibleSettingsBlock defaultOpen description="Preferências visuais, plano contratado, IA financeira e suporte." storageKey="settings-system-open" title="Sistema, planos e suporte">
-              <SystemSettings companyName={user.companyName} planId={user.planId} tenantId={defaultTenantId} />
+              <SystemSettings canManageCompanySettings={canManageUsers(user.role)} companyName={user.companyName} onReceiptRequiredChange={saveReceiptRequirement} planId={user.planId} receiptRequiredOnPayment={receiptRequiredOnPayment} tenantId={defaultTenantId} />
             </CollapsibleSettingsBlock>
             <CollapsibleSettingsBlock description="Privacidade, LGPD, exportação de dados e solicitações do titular." storageKey="settings-privacy-open" title="Privacidade e LGPD">
               <PrivacyPanel exportData={backupData} user={user} />

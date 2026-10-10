@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Check, Clock3, Code2, Database, MessageCircle, Palette, ShieldCheck, Sparkles } from "lucide-react";
+import { Bell, Check, Clock3, Code2, Database, MessageCircle, Palette, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { AiCreditsPanel } from "@/features/ai/components/AiCreditsPanel";
 import { getPlanRules, plans, type PlanId } from "@/features/plans/planRules";
@@ -66,7 +66,8 @@ function applyTheme(theme: ThemeId) {
   window.localStorage.setItem("orquestra-theme", theme);
 }
 
-export function SystemSettings({ companyName, planId, tenantId }: { companyName: string; planId?: PlanId; tenantId: string }) {
+export function SystemSettings({ canManageCompanySettings, companyName, onReceiptRequiredChange, planId, receiptRequiredOnPayment, tenantId }: { canManageCompanySettings: boolean; companyName: string; onReceiptRequiredChange: (required: boolean) => Promise<void>; planId?: PlanId; receiptRequiredOnPayment: boolean; tenantId: string }) {
+  const [savingReceiptSetting, setSavingReceiptSetting] = useState(false);
   const [theme, setTheme] = useState<ThemeId>(() => {
     if (typeof window === "undefined") return "claro";
     const saved = (window.localStorage.getItem("orquestra-theme") || "claro") as ThemeId;
@@ -129,6 +130,36 @@ export function SystemSettings({ companyName, planId, tenantId }: { companyName:
           </article>
         ))}
       </div>
+
+      <section className="theme-surface flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="theme-accent-soft flex size-11 shrink-0 items-center justify-center rounded-md bg-cyan-50 text-cyan-700"><ReceiptText size={21} /></span>
+          <div>
+            <h3 className="font-semibold">Baixa financeira</h3>
+            <p className="theme-muted mt-1 text-sm text-slate-600">Defina se o comprovante será obrigatório antes de registrar um pagamento.</p>
+            <p className="mt-2 text-sm font-semibold text-slate-800">Comprovante: {receiptRequiredOnPayment ? "obrigatório" : "opcional"}</p>
+          </div>
+        </div>
+        <label className="inline-flex items-center gap-3 text-sm font-medium text-slate-700">
+          <input
+            checked={receiptRequiredOnPayment}
+            className="size-5 accent-cyan-700"
+            disabled={!canManageCompanySettings || savingReceiptSetting}
+            onChange={async (event) => {
+              setSavingReceiptSetting(true);
+              try {
+                await onReceiptRequiredChange(event.target.checked);
+              } catch (error) {
+                window.alert(error instanceof Error ? error.message : "Não foi possível salvar esta configuração.");
+              } finally {
+                setSavingReceiptSetting(false);
+              }
+            }}
+            type="checkbox"
+          />
+          Exigir comprovante
+        </label>
+      </section>
 
       <section className="theme-surface overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <header className="border-b border-slate-200 bg-slate-950 px-5 py-5 text-white">
