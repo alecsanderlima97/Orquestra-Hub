@@ -47,9 +47,34 @@ service cloud.firestore {
       match /auditLogs/{logId} { allow read: if isOwner(tenantId); allow create: if canWrite(tenantId); allow update, delete: if false; }
       match /privacyRequests/{requestId} { allow read: if isOwner(tenantId) || resource.data.userId == request.auth.uid; allow create: if belongsToTenant(tenantId) && request.resource.data.userId == request.auth.uid; allow update, delete: if false; }
 
-      match /{document=**} {
+      match /stores/{storeId} {
         allow read: if belongsToTenant(tenantId);
-        allow write: if canWrite(tenantId);
+        allow create, update, delete: if canWrite(tenantId);
+      }
+
+      match /suppliers/{supplierId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create, update, delete: if canWrite(tenantId);
+      }
+
+      match /purchases/{purchaseId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create, update, delete: if canWrite(tenantId);
+      }
+
+      match /accountsPayable/{accountId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create, update, delete: if canWrite(tenantId);
+      }
+
+      match /fixedExpenses/{expenseId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create, update, delete: if canWrite(tenantId);
+      }
+
+      match /financialCategories/{categoryId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create, update, delete: if canWrite(tenantId);
       }
     }
 

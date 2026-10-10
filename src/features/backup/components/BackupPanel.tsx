@@ -10,7 +10,7 @@ type BackupPanelProps = {
   onImport: (payload: BackupPayload, mode: BackupRestoreMode, password: string) => Promise<void>;
 };
 
-const emptyPreview: BackupRestorePreview = { accounts: 0, fixedExpenses: 0, purchases: 0, stores: 0, suppliers: 0 };
+const emptyPreview: BackupRestorePreview = { accounts: 0, auditLogs: 0, financialCategories: 0, fixedExpenses: 0, purchases: 0, stores: 0, suppliers: 0 };
 
 export function BackupPanel({ data, onImport }: BackupPanelProps) {
   const [payload, setPayload] = useState<BackupPayload | null>(null);
@@ -74,7 +74,7 @@ export function BackupPanel({ data, onImport }: BackupPanelProps) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h3 className="font-semibold">Backup completo</h3>
-          <p className="mt-1 text-sm text-slate-600">Exporta e restaura lojas, fornecedores, compras, contas e despesas em JSON.</p>
+          <p className="mt-1 text-sm text-slate-600">Exporta e restaura os dados financeiros e operacionais da empresa em JSON.</p>
         </div>
         <button className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white" onClick={downloadBackup} type="button">
           <Download size={17} />Baixar backup
@@ -86,7 +86,7 @@ export function BackupPanel({ data, onImport }: BackupPanelProps) {
           <FileJson className="text-cyan-700" size={18} />
           <h4 className="font-semibold">Importar backup</h4>
         </div>
-        <p className="mt-1 text-sm text-slate-600">Use apenas arquivos JSON baixados pelo Orquestra Hub. A importação exige senha do Proprietário.</p>
+        <p className="mt-1 text-sm text-slate-600">Use apenas arquivos JSON baixados pelo Orquestra Hub. A importação exige senha do Proprietário. Logs de auditoria são exportados para consulta, mas não são regravados para preservar o histórico.</p>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
           <input accept="application/json,.json" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onChange={(event) => void selectFile(event.target.files?.[0])} type="file" />
@@ -97,12 +97,14 @@ export function BackupPanel({ data, onImport }: BackupPanelProps) {
         </div>
 
         {payload ? (
-          <div className="mt-4 grid gap-2 rounded-md border border-cyan-100 bg-cyan-50/70 p-4 text-sm text-slate-700 sm:grid-cols-5">
+          <div className="mt-4 grid gap-2 rounded-md border border-cyan-100 bg-cyan-50/70 p-4 text-sm text-slate-700 sm:grid-cols-3 lg:grid-cols-4">
             <p><strong>{preview.stores}</strong><br />lojas</p>
             <p><strong>{preview.suppliers}</strong><br />fornecedores</p>
             <p><strong>{preview.purchases}</strong><br />compras</p>
             <p><strong>{preview.accounts}</strong><br />contas</p>
             <p><strong>{preview.fixedExpenses}</strong><br />despesas</p>
+            <p><strong>{preview.financialCategories}</strong><br />categorias</p>
+            <p><strong>{preview.auditLogs}</strong><br />logs exportados</p>
           </div>
         ) : null}
 

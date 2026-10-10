@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Printer, RotateCcw } from "lucide-react";
+import { Download, Printer, RotateCcw } from "lucide-react";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import { compareDateBR, parseBRL, parseDateBR } from "@/lib/formatters/br";
@@ -42,8 +42,22 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" })[char] || char);
 }
 
+function csvCell(value: string | number) {
+  return `"${String(value).replace(/"/g, "\"\"")}"`;
+}
+
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function FinancialReports({ accounts, purchases }: { accounts: AccountPayable[]; purchases: Purchase[] }) {
-  const [filters, setFilters] = useState({ category: all, end: "", start: "", status: all, store: all, supplier: all });
+  const [filters, setFilters] = useState({ category: all, end: "", invoice: "", start: "", status: all, store: all, supplier: all });
   const stores = options([...accounts.map((item) => item.store), ...purchases.map((item) => item.store)]);
   const suppliers = options([...accounts.map((item) => item.supplier), ...purchases.map((item) => item.supplier)]);
   const categories = options(accounts.map((item) => item.categoryName || "Sem categoria"));
@@ -53,6 +67,7 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
       && (filters.supplier === all || item.supplier === filters.supplier)
       && (filters.category === all || (item.categoryName || "Sem categoria") === filters.category)
       && (filters.status === all || item.status === filters.status)
+      && (!filters.invoice.trim() || (item.invoiceNumber || "").toLocaleLowerCase("pt-BR").includes(filters.invoice.trim().toLocaleLowerCase("pt-BR")))
       && inPeriod(item.dueDate, filters.start, filters.end),
     ),
     [accounts, filters],
@@ -61,6 +76,7 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
     () => purchases.filter((item) =>
       (filters.store === all || item.store === filters.store)
       && (filters.supplier === all || item.supplier === filters.supplier)
+      && (!filters.invoice.trim() || item.invoiceNumber.toLocaleLowerCase("pt-BR").includes(filters.invoice.trim().toLocaleLowerCase("pt-BR")))
       && inPeriod(item.issueDate, filters.start, filters.end),
     ),
     [purchases, filters],
@@ -72,11 +88,23 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
   const byStore = group(filteredAccounts, "store");
   const bySupplier = group(filteredAccounts, "supplier");
   const orderedAccounts = filteredAccounts.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate));
-  const clear = () => setFilters({ category: all, end: "", start: "", status: all, store: all, supplier: all });
+  const clear = () => setFilters({ category: all, end: "", invoice: "", start: "", status: all, store: all, supplier: all });
+  const filterLine = `Período: ${filters.start || "Início"} até ${filters.end || "Atual"} · Nota: ${filters.invoice || "Todas"} · Loja: ${filters.store} · Fornecedor: ${filters.supplier} · Categoria: ${filters.category} · Status: ${filters.status}`;
+  const exportExcel = () => downloadCsv(`relatorio-financeiro-${new Date().toISOString().slice(0, 10)}.csv`, [
+    ["Orquestra Hub - Relatório financeiro"],
+    [filterLine],
+    [],
+    ["Contas a pagar"],
+    ["Nota", "Fornecedor", "Categoria", "Loja", "Parcela", "Vencimento", "Valor", "Status", "Pago em", "Comprovante"],
+    ...orderedAccounts.map((item) => [item.invoiceNumber || "Sem nota", item.supplier, item.categoryName || "Sem categoria", item.store, item.installment, item.dueDate, item.amount, item.status, item.paidAt || "", item.receiptName || ""]),
+    [],
+    ["Compras e notas"],
+    ["Nota", "Data", "Fornecedor", "Loja", "Descrição", "Total"],
+    ...filteredPurchases.map((item) => [item.invoiceNumber, item.issueDate, item.supplier, item.store, item.description || "Não informado", item.total]),
+  ]);
   const printReport = () => {
     const reportWindow = window.open("", "_blank", "width=1100,height=800");
     if (!reportWindow) return;
-    const filterLine = `Período: ${filters.start || "Início"} até ${filters.end || "Atual"} · Loja: ${filters.store} · Fornecedor: ${filters.supplier} · Categoria: ${filters.category} · Status: ${filters.status}`;
     const accountRows = orderedAccounts.length ? orderedAccounts.map((item) => `<tr><td>${escapeHtml(item.invoiceNumber || "Sem nota")}</td><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(item.categoryName || "Sem categoria")}</td><td>${escapeHtml(item.store)}</td><td>${escapeHtml(item.installment)}</td><td>${escapeHtml(item.dueDate)}</td><td>${escapeHtml(item.amount)}</td><td>${escapeHtml(item.status)}</td></tr>`).join("") : `<tr><td colspan="8" class="empty">Nenhuma conta encontrada.</td></tr>`;
     const purchaseRows = filteredPurchases.length ? filteredPurchases.map((item) => `<tr><td>${escapeHtml(item.invoiceNumber)}</td><td>${escapeHtml(item.issueDate)}</td><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(item.store)}</td><td>${escapeHtml(item.description || "Não informado")}</td><td>${escapeHtml(item.total)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty">Nenhuma compra encontrada.</td></tr>`;
     const breakdownRows = (items: typeof byCategory) => items.length ? items.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.count}</td><td>${money.format(item.open)}</td><td>${money.format(item.paid)}</td><td>${money.format(item.overdue)}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">Nenhum dado no período.</td></tr>`;
@@ -101,19 +129,34 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
 
   return (
     <div className="printable-reports space-y-5" id="printable-reports">
-      <div className="no-print grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-6">
+      <div className="no-print space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span className="text-sm font-semibold text-slate-700">Visão do relatório</span>
+            <div className="mt-2 inline-flex flex-wrap rounded-md border border-slate-300 p-1" role="group">
+              {[{ label: "Geral", value: all }, { label: "A pagar", value: "Aberto" }, { label: "Pagos", value: "Pago" }, { label: "Atrasados", value: "Atrasado" }].map((mode) => (
+                <button aria-pressed={filters.status === mode.value} className={`rounded px-3 py-2 text-xs font-semibold transition ${filters.status === mode.value ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"}`} key={mode.value} onClick={() => setFilters((current) => ({ ...current, status: mode.value }))} type="button">{mode.label}</button>
+              ))}
+            </div>
+          </div>
+          <p className="text-sm text-slate-500">{filteredAccounts.length} conta(s) e {filteredPurchases.length} compra(s) encontradas</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
         <Filter label="Data inicial"><input className={fieldClass} onChange={(event) => setFilters({ ...filters, start: event.target.value })} type="date" value={filters.start} /></Filter>
         <Filter label="Data final"><input className={fieldClass} onChange={(event) => setFilters({ ...filters, end: event.target.value })} type="date" value={filters.end} /></Filter>
+        <Filter label="Número da nota"><input className={fieldClass} onChange={(event) => setFilters({ ...filters, invoice: event.target.value })} placeholder="NF 1003" type="search" value={filters.invoice} /></Filter>
         <Filter label="Loja"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, store: event.target.value })} value={filters.store}>{stores.map((item) => <option key={item}>{item}</option>)}</select></Filter>
         <Filter label="Fornecedor"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, supplier: event.target.value })} value={filters.supplier}>{suppliers.map((item) => <option key={item}>{item}</option>)}</select></Filter>
         <Filter label="Categoria"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, category: event.target.value })} value={filters.category}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Filter>
         <Filter label="Status"><select className={fieldClass} onChange={(event) => setFilters({ ...filters, status: event.target.value })} value={filters.status}><option>{all}</option><option>Aberto</option><option>Pago</option><option>Atrasado</option></select></Filter>
+        </div>
         <div className="flex gap-2 md:col-span-2 xl:col-span-6 xl:justify-end">
           <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50" onClick={clear} type="button"><RotateCcw size={16} />Limpar filtros</button>
+          <button className="inline-flex h-10 items-center gap-2 rounded-md border border-emerald-700 px-4 text-sm font-semibold text-emerald-800 hover:bg-emerald-50" onClick={exportExcel} title="Baixar os dados filtrados em CSV compatível com Excel" type="button"><Download size={17} />Exportar Excel</button>
           <button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={printReport} title="Imprimir ou salvar somente este relatório em PDF" type="button"><Printer size={17} />Imprimir relatório</button>
         </div>
       </div>
-      <div className="hidden print:block"><h2 className="text-xl font-bold">Orquestra Hub - Relatório financeiro</h2><p className="mt-1 text-sm">Período: {filters.start || "Início"} até {filters.end || "Atual"} - Loja: {filters.store} - Fornecedor: {filters.supplier} - Categoria: {filters.category} - Status: {filters.status}</p></div>
+      <div className="hidden print:block"><h2 className="text-xl font-bold">Orquestra Hub - Relatório financeiro</h2><p className="mt-1 text-sm">{filterLine}</p></div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><ReportCard label="Compras lançadas" value={String(filteredPurchases.length)} helper={money.format(filteredPurchases.reduce((sum, item) => sum + parseBRL(item.total), 0))} /><ReportCard label="Total em aberto" value={money.format(total(open))} helper={`${open.length} conta(s)`} /><ReportCard label="Total pago" value={money.format(total(paid))} helper={`${paid.length} baixa(s)`} /><ReportCard label="Total atrasado" value={money.format(total(overdue))} helper={`${overdue.length} vencida(s)`} /><ReportCard label="Com comprovante" value={String(filteredAccounts.filter((item) => item.receiptName).length)} helper="Pagamentos documentados" /></div>
       <div className="grid gap-5 xl:grid-cols-3"><Breakdown title="Detalhamento por categoria" items={byCategory} /><Breakdown title="Detalhamento por loja" items={byStore} /><Breakdown title="Detalhamento por fornecedor" items={bySupplier} /></div>
       <ReportTable accounts={orderedAccounts} />

@@ -6,6 +6,7 @@ import { ChevronDown, Plus, X } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { EditModal, type EditField } from "@/components/ui/EditModal";
 import { FormAlert } from "@/components/ui/FormAlert";
+import { ReasonModal } from "@/components/ui/ReasonModal";
 import { Section } from "@/components/ui/Section";
 import { TextField } from "@/components/ui/TextField";
 import { AccountsPayableFilters } from "@/features/accounts-payable/components/AccountsPayableFilters";
@@ -13,6 +14,7 @@ import type { AccountFilters } from "@/features/accounts-payable/components/Acco
 import { AccountsPayableExport } from "@/features/accounts-payable/components/AccountsPayableExport";
 import { AccountsPayableSummary } from "@/features/accounts-payable/components/AccountsPayableSummary";
 import type { AccountsPayableSummaryItem } from "@/features/accounts-payable/components/AccountsPayableSummary";
+import { AccountsPayableHistory } from "@/features/accounts-payable/components/AccountsPayableHistory";
 import { AccountsPayableTable } from "@/features/accounts-payable/components/AccountsPayableTable";
 import { PaymentConfirmModal } from "@/features/accounts-payable/components/PaymentConfirmModal";
 import { createAccountPayable, deleteAccountPayable, listAccountsByFixedExpense, listAccountsPayable, markAccountAsPaid, updateAccountPayable } from "@/features/accounts-payable/services/accountPayableService";
@@ -28,7 +30,7 @@ import { AuditPanel } from "@/features/audit/components/AuditPanel";
 import { BackupPanel } from "@/features/backup/components/BackupPanel";
 import { restoreBackup, type BackupPayload, type BackupRestoreMode } from "@/features/backup/services/backupRestoreService";
 import { listAuditLogs, recordAudit } from "@/features/audit/services/auditService";
-import type { AuditLog } from "@/features/audit/types/auditTypes";
+import type { AuditDetails, AuditLog } from "@/features/audit/types/auditTypes";
 import { MonthlyCashFlow } from "@/features/dashboard/components/MonthlyCashFlow";
 import { CompaniesPanel } from "@/features/companies/components/CompaniesPanel";
 import { createCompany } from "@/features/companies/services/companyService";
@@ -183,6 +185,18 @@ function sameName(a: string, b: string) {
   return a.trim().toLocaleLowerCase("pt-BR") === b.trim().toLocaleLowerCase("pt-BR");
 }
 
+function financialAuditDetails(account: Pick<AccountPayable, "amount" | "dueDate" | "installment" | "invoiceNumber" | "store" | "supplier">, extra?: string) {
+  return [
+    account.invoiceNumber ? `Nota ${account.invoiceNumber}` : "Sem nota",
+    account.supplier,
+    account.store,
+    `Parcela ${account.installment}`,
+    `Vencimento ${account.dueDate}`,
+    account.amount,
+    extra,
+  ].filter(Boolean).join(" · ");
+}
+
 function SubscriptionBlocked({ user }: { user: AppUser }) {
   const status = user.subscriptionStatus || "ativo";
   const message = `Olá, preciso regularizar a assinatura do Orquestra Hub. Empresa: ${user.companyName}. Status: ${status}.`;
@@ -217,6 +231,7 @@ export function OrquestraHubApp() {
   const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
   const [paymentDateTime, setPaymentDateTime] = useState("");
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AccountPayable | null>(null);
   const [formErrors, setFormErrors] = useState({ category: "", fixedExpense: "", purchase: "", store: "", supplier: "" });
   const [purchaseSearch, setPurchaseSearch] = useState("");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
@@ -458,9 +473,28 @@ export function OrquestraHubApp() {
     URL.revokeObjectURL(url);
   }
 
-  async function recordChange(tenantId: string, currentUser: AppUser | null, action: Parameters<typeof recordAudit>[2], entity: string, entityId: string) {
+  async function recordChange(tenantId: string, currentUser: AppUser | null, action: Parameters<typeof recordAudit>[2], entity: string, entityId: string, details?: AuditDetails) {
     setHasSessionChanges(true);
-    await recordAudit(tenantId, currentUser, action, entity, entityId);
+    if (currentUser) {
+      const optimisticId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      setAuditLogs((logs) => [{
+        action,
+        createdAt: { seconds: Math.floor(Date.now() / 1000) },
+        details: details?.details,
+        entity,
+        entityId,
+        id: `local-${optimisticId}`,
+        metadata: details?.metadata,
+        userEmail: currentUser.email,
+        userId: currentUser.id,
+        userName: currentUser.name,
+      }, ...logs].slice(0, 50));
+    }
+    try {
+      await recordAudit(tenantId, currentUser, action, entity, entityId, details);
+    } catch {
+      // A falha no histórico não pode impedir o lançamento financeiro principal.
+    }
   }
 
   async function addSupplier() {
@@ -683,7 +717,10 @@ export function OrquestraHubApp() {
       return;
     }
     setFormErrors((errors) => ({ ...errors, purchase: "" }));
-    await recordChange(defaultTenantId, user, "criou", "compra", purchaseId);
+    await recordChange(defaultTenantId, user, "criou", "compra", purchaseId, {
+      details: `Nota ${newPurchase.invoiceNumber} · ${newPurchase.supplier} · ${newPurchase.store} · ${newAccounts.length} parcela(s) gerada(s)`,
+      metadata: { module: "financeiro" },
+    });
     setShowPurchaseForm(false);
   }
 
@@ -746,7 +783,10 @@ export function OrquestraHubApp() {
     const saved = user.id !== demoUserId ? await createAccountPayable(defaultTenantId, account) : null;
     setAccountList((items) => [{ id: saved?.id || crypto.randomUUID(), ...account }, ...items]);
     setSubscriptionPromptDismissedKey(promptKey);
-    await recordChange(defaultTenantId, user, "criou", "conta", referenceMonth);
+    await recordChange(defaultTenantId, user, "criou", "conta", referenceMonth, {
+      details: financialAuditDetails(account),
+      metadata: { module: "financeiro" },
+    });
   }
 
   async function addSubscriptionFixedExpense() {
@@ -855,11 +895,25 @@ export function OrquestraHubApp() {
     setPaymentDateTime(nowDateTimeBR());
   }
 
-  async function removeAccountPayable(account: AccountPayable) {
+  function requestDeleteAccountPayable(account: AccountPayable) {
     if (!window.confirm(`Excluir o lançamento de ${account.supplier}, parcela ${account.installment}, no valor de ${account.amount}? Esta ação não apaga a recorrência fixa nem a nota de origem.`)) return;
-    if (firebaseReady && user?.id !== demoUserId) await deleteAccountPayable(defaultTenantId, account.id);
+    setDeleteTarget(account);
+  }
+
+  async function confirmDeleteAccountPayable(reason: string) {
+    if (!deleteTarget) return;
+    const account = deleteTarget;
+    try {
+      if (firebaseReady && user?.id !== demoUserId) await deleteAccountPayable(defaultTenantId, account.id);
+    } catch {
+      throw new Error("Não foi possível excluir a conta. Verifique sua conexão e tente novamente.");
+    }
     setAccountList((items) => items.filter((item) => item.id !== account.id));
-    await recordChange(defaultTenantId, user, "excluiu", "conta", account.id);
+    setDeleteTarget(null);
+    await recordChange(defaultTenantId, user, "excluiu", "conta", account.id, {
+      details: `${financialAuditDetails(account)} | Motivo: ${reason}`,
+      metadata: { module: "financeiro" },
+    });
   }
 
   async function confirmMarkPaid() {
@@ -872,7 +926,10 @@ export function OrquestraHubApp() {
     );
     setPaymentToConfirm(null);
     setPaymentDateTime("");
-    await recordChange(defaultTenantId, user, "pagou", "conta", paymentToConfirm.id);
+    await recordChange(defaultTenantId, user, "pagou", "conta", paymentToConfirm.id, {
+      details: financialAuditDetails(paymentToConfirm, `Baixa registrada em ${paymentDateTime}`),
+      metadata: { module: "financeiro" },
+    });
   }
 
   async function handleReceiptSelected(id: string, file: File) {
@@ -882,7 +939,10 @@ export function OrquestraHubApp() {
     if (firebaseReady && user?.id !== demoUserId) await updateAccountPayable(defaultTenantId, id, updates);
     setAccountList((current) => current.map((account) => (account.id === id ? { ...account, ...updates } : account)));
     if (currentAccount?.receiptPath && currentAccount.receiptPath !== attachment.path) await deletePurchaseAttachment(currentAccount.receiptPath);
-    await recordChange(defaultTenantId, user, "anexou", "comprovante", id);
+    await recordChange(defaultTenantId, user, "anexou", "comprovante", id, {
+      details: currentAccount ? financialAuditDetails(currentAccount, `Comprovante: ${attachment.name}`) : `Comprovante: ${attachment.name}`,
+      metadata: { module: "financeiro" },
+    });
   }
 
   async function replaceInvoiceAttachment(purchase: Purchase, file: File) {
@@ -992,10 +1052,11 @@ export function OrquestraHubApp() {
     return [{ key: "invoiceNumber", label: "Numero da nota", mask: "upper", value: target.item.invoiceNumber || "" }, { key: "supplier", label: "Fornecedor", mask: "title", value: target.item.supplier }, { key: "categoryName", label: "Categoria", mask: "title", value: target.item.categoryName || "" }, { key: "store", label: "Loja", mask: "title", value: target.item.store }, { key: "dueDate", label: "Vencimento", value: target.item.dueDate }, { key: "amount", label: "Valor", mask: "currency", value: target.item.amount }, { key: "dailyInterestAmount", label: "Mora diaria (R$)", mask: "currency", value: target.item.dailyInterestAmount || "R$ 0,00" }, { key: "dailyInterestPercent", label: "Mora diaria (%)", value: target.item.dailyInterestPercent || "" }, { key: "lateFeeAmount", label: "Multa (R$)", mask: "currency", value: target.item.lateFeeAmount || "R$ 0,00" }, { key: "lateFeePercent", label: "Multa (%)", value: target.item.lateFeePercent || "" }, { key: "protestAfterDays", label: "Protesto apos dias", type: "number", value: target.item.protestAfterDays || "" }, { key: "installment", label: "Parcela", value: target.item.installment }];
   }
 
-  async function saveEdit(values: Record<string, string>, password: string) {
+  async function saveEdit(values: Record<string, string>, password: string, reason = "") {
     if (!editTarget) return;
     try {
       const persist = firebaseReady && user?.id !== demoUserId;
+      let editAuditDetails: AuditDetails | undefined;
       if (user?.id !== demoUserId && !firebaseReady) throw new Error("Firebase não está pronto para salvar a edição.");
       if (editTarget.kind === "account" && editTarget.item.status === "Pago") await verifyCurrentPassword(password);
       if (editTarget.kind === "store") {
@@ -1019,9 +1080,13 @@ export function OrquestraHubApp() {
         const updates = { supplier: toTitleCaseBR(values.supplier), categoryColor: matchedCategory?.color || editTarget.item.categoryColor, categoryId: matchedCategory?.id || editTarget.item.categoryId, categoryName: toTitleCaseBR(values.categoryName), store: toTitleCaseBR(values.store), dueDate: values.dueDate, amount: values.amount, dailyInterestAmount: values.dailyInterestAmount, dailyInterestPercent: values.dailyInterestPercent, invoiceNumber: values.invoiceNumber.toUpperCase(), lateFeeAmount: values.lateFeeAmount, lateFeePercent: values.lateFeePercent, protestAfterDays: values.protestAfterDays, installment: values.installment };
         if (persist) await updateAccountPayable(defaultTenantId, editTarget.item.id, updates);
         setAccountList((items) => items.map((item) => item.id === editTarget.item.id ? { ...item, ...updates } : item));
+        editAuditDetails = {
+          details: `${reason ? `Motivo: ${reason} | ` : ""}Antes: ${financialAuditDetails(editTarget.item)} | Depois: ${financialAuditDetails({ ...editTarget.item, ...updates })}`,
+          metadata: { module: "financeiro" },
+        };
       }
       setEditTarget(null);
-      await recordChange(defaultTenantId, user, "editou", editTarget.kind, editTarget.item.id);
+      await recordChange(defaultTenantId, user, "editou", editTarget.kind, editTarget.item.id, editAuditDetails);
     } catch {
       throw new Error("Não foi possível salvar a edição. Verifique sua conexão e tente novamente.");
     }
@@ -1345,13 +1410,14 @@ export function OrquestraHubApp() {
           <div className="max-h-[560px] overflow-auto">
             <AccountsPayableTable
               accounts={filteredAccounts}
-              onDelete={canWrite ? removeAccountPayable : undefined}
+              onDelete={canWrite ? requestDeleteAccountPayable : undefined}
               onEdit={canWrite ? (item) => setEditTarget({ kind: "account", item }) : undefined}
               onMarkPaid={canWrite ? requestMarkPaid : undefined}
               onReceiptSelected={canWrite ? handleReceiptSelected : undefined}
               onWhatsApp={sendWhatsApp}
             />
           </div>
+          <AccountsPayableHistory logs={auditLogs} />
         </Section>
 
         <Section description="Cadastre despesas recorrentes e gere automaticamente a conta do mês com antecedência de alerta." id="despesas-fixas" title="Despesas fixas">
@@ -1406,7 +1472,8 @@ export function OrquestraHubApp() {
         paidAt={paymentDateTime}
         supplier={supplierList.find((item) => item.name === paymentToConfirm?.supplier)}
       />
-      {editTarget ? <EditModal fields={editFields(editTarget)} onClose={() => setEditTarget(null)} onSave={saveEdit} passwordRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} title={`Editar ${editTarget.kind === "store" ? "loja" : editTarget.kind === "supplier" ? "fornecedor" : editTarget.kind === "purchase" ? "nota" : editTarget.kind === "fixedExpense" ? "despesa fixa" : "conta a pagar"}`} /> : null}
+      {editTarget ? <EditModal fields={editFields(editTarget)} onClose={() => setEditTarget(null)} onSave={saveEdit} passwordRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} reasonRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} title={`Editar ${editTarget.kind === "store" ? "loja" : editTarget.kind === "supplier" ? "fornecedor" : editTarget.kind === "purchase" ? "nota" : editTarget.kind === "fixedExpense" ? "despesa fixa" : "conta a pagar"}`} /> : null}
+      {deleteTarget ? <ReasonModal description={`A exclusão será registrada no histórico financeiro. Conta: ${financialAuditDetails(deleteTarget)}`} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDeleteAccountPayable} title="Motivo da exclusão" /> : null}
     </AppShell>
   );
 }

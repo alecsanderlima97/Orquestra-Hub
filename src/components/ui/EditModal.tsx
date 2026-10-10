@@ -18,16 +18,19 @@ export function EditModal({
   onClose,
   onSave,
   passwordRequired = false,
+  reasonRequired = false,
   title,
 }: {
   fields: EditField[];
   onClose: () => void;
-  onSave: (values: Record<string, string>, password: string) => Promise<void> | void;
+  onSave: (values: Record<string, string>, password: string, reason: string) => Promise<void> | void;
   passwordRequired?: boolean;
+  reasonRequired?: boolean;
   title: string;
 }) {
   const [values, setValues] = useState(() => Object.fromEntries(fields.map((field) => [field.key, field.value])));
   const [password, setPassword] = useState("");
+  const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -36,10 +39,14 @@ export function EditModal({
       setError("Informe sua senha de login para editar uma conta paga.");
       return;
     }
+    if (reasonRequired && !reason.trim()) {
+      setError("Informe o motivo para editar uma conta paga.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
-      await onSave(values, password);
+      await onSave(values, password, reason.trim());
     } catch {
       setError("Não foi possível salvar. Verifique os dados e a senha informada.");
     } finally {
@@ -79,6 +86,12 @@ export function EditModal({
           ))}
           {passwordRequired ? (
             <TextField label="Senha de login" onChange={(event) => setPassword(event.target.value)} placeholder="Confirme sua senha" type="password" value={password} />
+          ) : null}
+          {reasonRequired ? (
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Motivo da edição <span aria-hidden="true">*</span></span>
+              <textarea aria-required="true" className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-2 focus:ring-slate-200" onChange={(event) => setReason(event.target.value)} placeholder="Descreva por que a conta paga precisa ser alterada" value={reason} />
+            </label>
           ) : null}
           {error ? <p className="rounded-md bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p> : null}
         </div>
