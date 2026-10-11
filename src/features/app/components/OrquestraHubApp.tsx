@@ -59,6 +59,9 @@ import { updateCompanyName, updateUserProfile } from "@/features/profile/service
 import { SystemSettings } from "@/features/settings/components/SystemSettings";
 import { FirstAccessOnboarding } from "@/features/onboarding/components/FirstAccessOnboarding";
 import { GuideAssistant } from "@/features/onboarding/components/GuideAssistant";
+import { ReleaseNotesModal } from "@/features/updates/components/ReleaseNotesModal";
+import { currentReleaseNotes } from "@/features/updates/releaseNotes";
+import { getLastSeenReleaseId, markReleaseAsSeen } from "@/features/updates/services/releaseNotesService";
 import { StoreForm } from "@/features/stores/components/StoreForm";
 import type { StoreFormState } from "@/features/stores/components/StoreForm";
 import { StoresPanel } from "@/features/stores/components/StoresPanel";
@@ -238,6 +241,9 @@ export function OrquestraHubApp() {
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [boletoFiles, setBoletoFiles] = useState<Array<File | null>>([]);
   const [receiptRequiredOnPayment, setReceiptRequiredOnPayment] = useState(false);
+  const [releaseNotesError, setReleaseNotesError] = useState("");
+  const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
+  const [releaseNotesSaving, setReleaseNotesSaving] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierForm, setSupplierForm] = useState({ account: "", address: "", agency: "", bank: "", contactName: "", document: "", email: "", name: "", notes: "", paymentMethod: "PIX" as NonNullable<Supplier["paymentMethod"]>, paymentTerms: "", phone: "", pixKey: "" });
   const [storeForm, setStoreForm] = useState<StoreFormState>({
@@ -388,6 +394,22 @@ export function OrquestraHubApp() {
     void loadFirebaseData();
     return () => { cancelled = true; };
   }, [userId, userTenantId, userRole, userCompanyName]);
+
+  useEffect(() => {
+    if (!firebaseReady || !user?.id || user.id === demoUserId || !user.tenantId || user.needsOnboarding) return;
+    let cancelled = false;
+    void getLastSeenReleaseId(user.tenantId, user.id)
+      .then((lastSeenReleaseId) => {
+        if (!cancelled) {
+          setReleaseNotesError("");
+          setReleaseNotesOpen(lastSeenReleaseId !== currentReleaseNotes.id);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setReleaseNotesOpen(false);
+      });
+    return () => { cancelled = true; };
+  }, [user?.id, user?.needsOnboarding, user?.tenantId]);
 
   const todayTime = todaySaoPaulo().getTime();
   const today = todaySaoPaulo();
@@ -1136,6 +1158,20 @@ export function OrquestraHubApp() {
     setUser(null);
   }
 
+  async function confirmReleaseNotes() {
+    if (!user?.tenantId || !user.id || releaseNotesSaving) return;
+    setReleaseNotesSaving(true);
+    setReleaseNotesError("");
+    try {
+      await markReleaseAsSeen(user.tenantId, user.id, currentReleaseNotes.id);
+      setReleaseNotesOpen(false);
+    } catch {
+      setReleaseNotesError("Não foi possível registrar a leitura. Verifique sua conexão e tente novamente.");
+    } finally {
+      setReleaseNotesSaving(false);
+    }
+  }
+
   function activateCompany(company?: CompanyMembership) {
     if (company && company.tenantId !== user?.tenantId) {
       setStoreList([]);
@@ -1510,6 +1546,7 @@ export function OrquestraHubApp() {
       />
       {editTarget ? <EditModal fields={editFields(editTarget)} onClose={() => setEditTarget(null)} onSave={saveEdit} passwordRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} reasonRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} title={`Editar ${editTarget.kind === "store" ? "loja" : editTarget.kind === "supplier" ? "fornecedor" : editTarget.kind === "purchase" ? "nota" : editTarget.kind === "fixedExpense" ? "despesa fixa" : "conta a pagar"}`} /> : null}
       {deleteTarget ? <ReasonModal description={`A exclusão será registrada no histórico financeiro. Conta: ${financialAuditDetails(deleteTarget)}`} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDeleteAccountPayable} title="Motivo da exclusão" /> : null}
+      <ReleaseNotesModal error={releaseNotesError} notes={currentReleaseNotes} onConfirm={confirmReleaseNotes} onDismiss={() => setReleaseNotesOpen(false)} open={releaseNotesOpen} saving={releaseNotesSaving} />
     </AppShell>
   );
 }
