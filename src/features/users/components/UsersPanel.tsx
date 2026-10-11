@@ -2,6 +2,7 @@
 
 import { Ban, Copy, RefreshCw, UserPlus } from "lucide-react";
 import { useState } from "react";
+import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVisibilityToggle";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import type { Invite } from "../services/inviteService";
 
@@ -18,9 +19,13 @@ type Props = {
 export function UsersPanel({ currentUserId, invites, onCancelInvite, onCreateInvite, onRoleChange, userLimit, users }: Props) {
   const [inviteRole, setInviteRole] = useState<Invite["role"]>("Financeiro");
   const [loading, setLoading] = useState(false);
+  const [showAllInvites, setShowAllInvites] = useState(false);
+  const [showAllUsers, setShowAllUsers] = useState(false);
   const activeInviteCount = invites.filter((invite) => invite.status === "Ativo").length;
   const usedUsers = users.length + activeInviteCount;
   const limitReached = usedUsers >= userLimit;
+  const visibleInvites = showAllInvites ? invites : invites.slice(0, DEFAULT_LIST_LIMIT);
+  const visibleUsers = showAllUsers ? users : users.slice(0, DEFAULT_LIST_LIMIT);
 
   async function generate() {
     if (limitReached) return;
@@ -60,8 +65,8 @@ export function UsersPanel({ currentUserId, invites, onCancelInvite, onCreateInv
 
       <div className="border-b border-slate-200 px-5 py-4">
         <h4 className="text-sm font-semibold">Convites</h4>
-        <div className="mt-3 space-y-2">
-          {invites.length ? invites.map((invite) => (
+        <div className={showAllInvites && invites.length > DEFAULT_LIST_LIMIT ? "mt-3 max-h-[560px] space-y-2 overflow-y-auto pr-1" : "mt-3 space-y-2"}>
+          {invites.length ? visibleInvites.map((invite) => (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-3" key={invite.code}>
               <div>
                 <strong className="text-sm">{invite.code}</strong>
@@ -76,10 +81,11 @@ export function UsersPanel({ currentUserId, invites, onCancelInvite, onCreateInv
             </div>
           )) : <p className="text-sm text-slate-500">Nenhum convite gerado.</p>}
         </div>
+        <ListVisibilityToggle expanded={showAllInvites} onToggle={() => setShowAllInvites((current) => !current)} total={invites.length} />
       </div>
 
-      <div className="divide-y divide-slate-100">
-        {users.map((item) => (
+      <div className={showAllUsers && users.length > DEFAULT_LIST_LIMIT ? "max-h-[560px] divide-y divide-slate-100 overflow-y-auto" : "divide-y divide-slate-100"}>
+        {visibleUsers.map((item) => (
           <div className="flex flex-col justify-between gap-3 px-5 py-4 sm:flex-row sm:items-center" key={item.id}>
             <div>
               <strong>{item.name}</strong>
@@ -92,6 +98,9 @@ export function UsersPanel({ currentUserId, invites, onCancelInvite, onCreateInv
             </select>
           </div>
         ))}
+      </div>
+      <div className="px-5 pb-4">
+        <ListVisibilityToggle expanded={showAllUsers} onToggle={() => setShowAllUsers((current) => !current)} total={users.length} />
       </div>
     </div>
   );

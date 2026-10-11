@@ -1,5 +1,6 @@
 import { Bell, CalendarClock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
+import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVisibilityToggle";
 import { SensitiveValue } from "@/components/ui/PrivacyContext";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
@@ -40,6 +41,8 @@ export function FixedExpensesPanel({
   storeOptions: string[];
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const visibleExpenses = showAll ? expenses : expenses.slice(0, DEFAULT_LIST_LIMIT);
   const activeExpenses = expenses.filter((expense) => expense.active !== false);
   const totalMonthly = activeExpenses.reduce((total, expense) => total + parseBRL(expense.amount), 0);
   const totalYearly = totalMonthly * 12;
@@ -98,9 +101,9 @@ export function FixedExpensesPanel({
           </div> : null}
         </div>
       ) : null}
-      <div className="max-h-[560px] overflow-y-auto pr-1">
+      <div className={showAll && expenses.length > DEFAULT_LIST_LIMIT ? "max-h-[680px] overflow-y-auto pr-1" : ""}>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {expenses.map((item) => (
+          {visibleExpenses.map((item) => (
         <article className="motion-card rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={item.id}>
             <div className="flex justify-between gap-3">
               <div>
@@ -124,6 +127,7 @@ export function FixedExpensesPanel({
           ))}
         </div>
       </div>
+      <ListVisibilityToggle expanded={showAll} onToggle={() => setShowAll((current) => !current)} total={expenses.length} />
     </div>
   );
 }

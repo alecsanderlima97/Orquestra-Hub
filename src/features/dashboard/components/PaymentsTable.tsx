@@ -1,5 +1,6 @@
 import { parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
 import { SensitiveValue } from "@/components/ui/PrivacyContext";
+import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVisibilityToggle";
 import { SortableHeader, type SortDirection } from "@/components/ui/SortableHeader";
 import { useMemo, useState } from "react";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
@@ -27,7 +28,9 @@ export function PaymentsTable({ accounts }: { accounts: AccountPayable[] }) {
     const right = sort.key === "dueDate" ? parseDateBR(b.dueDate).getTime() : sort.key === "amount" ? Number(b.amount.replace(/[^0-9,-]/g, "").replace(".", "").replace(",", ".")) : b[sort.key];
     const comparison = typeof left === "number" && typeof right === "number" ? left - right : String(left).localeCompare(String(right), "pt-BR", { numeric: true, sensitivity: "base" });
     return sort.direction === "asc" ? comparison : -comparison;
-  }).slice(0, 6), [accounts, sort]);
+  }), [accounts, sort]);
+  const [showAll, setShowAll] = useState(false);
+  const visiblePayments = showAll ? payments : payments.slice(0, DEFAULT_LIST_LIMIT);
   const requestSort = (key: "amount" | "dueDate" | "status" | "store" | "supplier") => setSort((current) => ({ direction: current.key === key && current.direction === "asc" ? "desc" : "asc", key }));
 
   return (
@@ -35,7 +38,7 @@ export function PaymentsTable({ accounts }: { accounts: AccountPayable[] }) {
       <div className="dashboard-panel-header border-b border-slate-200 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-950">Próximos vencimentos</h2>
       </div>
-      <div className="overflow-x-auto">
+      <div className={showAll && payments.length > DEFAULT_LIST_LIMIT ? "max-h-[560px] overflow-auto" : "overflow-x-auto"}>
         <table className="w-full min-w-[720px] border-collapse text-left text-sm">
           <thead className="dashboard-table-head bg-slate-50 text-slate-600">
             <tr>
@@ -48,7 +51,7 @@ export function PaymentsTable({ accounts }: { accounts: AccountPayable[] }) {
           </thead>
           <tbody className="dashboard-table-body divide-y divide-slate-100 text-slate-800">
             {payments.length ? (
-              payments.map((payment) => {
+              visiblePayments.map((payment) => {
                 const status = statusLabel(payment);
                 return (
                   <tr key={payment.id}>
@@ -73,6 +76,9 @@ export function PaymentsTable({ accounts }: { accounts: AccountPayable[] }) {
             )}
           </tbody>
         </table>
+      </div>
+      <div className="px-3 pb-3 sm:px-5">
+        <ListVisibilityToggle expanded={showAll} onToggle={() => setShowAll((current) => !current)} total={payments.length} />
       </div>
     </div>
   );

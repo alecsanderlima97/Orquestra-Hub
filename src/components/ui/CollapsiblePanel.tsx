@@ -40,7 +40,10 @@ export function CollapsiblePanel({
           <strong className="mt-1 block text-base text-slate-950">{title}</strong>
           <span className="mt-1 block text-sm text-slate-500">{description}</span>
         </span>
-        <ChevronDown className="shrink-0 text-cyan-700 transition-transform group-open:rotate-180" size={20} />
+        <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-cyan-700">
+          <span className="hidden sm:inline">{open ? "Ocultar" : "Mostrar"}</span>
+          <ChevronDown className="transition-transform group-open:rotate-180" size={20} />
+        </span>
       </summary>
       <div className="border-t border-cyan-100 p-4 sm:p-5">{children}</div>
     </details>

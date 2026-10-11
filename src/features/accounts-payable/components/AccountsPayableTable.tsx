@@ -1,5 +1,6 @@
 import { CheckCircle2, MessageCircle, Paperclip, Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVisibilityToggle";
 import { SortableHeader, type SortDirection } from "@/components/ui/SortableHeader";
 import { brCurrencyFormatter, formatFirebaseDateTime, parseBRL, parseDateBR, todaySaoPaulo } from "@/lib/formatters/br";
 import type { AccountPayable } from "../types/accountPayableTypes";
@@ -74,12 +75,14 @@ export function AccountsPayableTable({
     const comparison = typeof left === "number" && typeof right === "number" ? left - right : String(left).localeCompare(String(right), "pt-BR", { numeric: true, sensitivity: "base" });
     return sort.direction === "asc" ? comparison : -comparison;
   }), [accounts, sort]);
+  const [showAll, setShowAll] = useState(false);
+  const visibleAccounts = showAll ? orderedAccounts : orderedAccounts.slice(0, DEFAULT_LIST_LIMIT);
   const requestSort = (key: AccountSortKey) => setSort((current) => ({ direction: current.key === key && current.direction === "asc" ? "desc" : "asc", key }));
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="space-y-3 p-3 lg:hidden">
-        {orderedAccounts.length ? orderedAccounts.map((account) => {
+      <div className={`space-y-3 p-3 lg:hidden ${showAll && orderedAccounts.length > DEFAULT_LIST_LIMIT ? "max-h-[680px] overflow-y-auto" : ""}`}>
+        {orderedAccounts.length ? visibleAccounts.map((account) => {
           const label = dueLabel(account);
           const charges = lateCharge(account);
           const days = overdueDays(account);
@@ -115,7 +118,7 @@ export function AccountsPayableTable({
         }) : <p className="px-2 py-8 text-center text-sm text-slate-500">Nenhuma conta encontrada com os filtros selecionados.</p>}
       </div>
 
-      <div className="hidden overflow-x-auto lg:block">
+      <div className={`hidden overflow-x-auto lg:block ${showAll && orderedAccounts.length > DEFAULT_LIST_LIMIT ? "max-h-[680px] overflow-y-auto" : ""}`}>
       <table className="w-full table-fixed text-left text-xs lg:text-sm">
         <thead className="bg-slate-50 text-slate-600">
           <tr>
@@ -133,7 +136,7 @@ export function AccountsPayableTable({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {orderedAccounts.length ? (
-            orderedAccounts.map((account) => {
+            visibleAccounts.map((account) => {
               const label = dueLabel(account);
               const charges = lateCharge(account);
               const days = overdueDays(account);
@@ -222,6 +225,9 @@ export function AccountsPayableTable({
           )}
         </tbody>
       </table>
+      </div>
+      <div className="px-3 pb-3 sm:px-5">
+        <ListVisibilityToggle expanded={showAll} onToggle={() => setShowAll((current) => !current)} total={orderedAccounts.length} />
       </div>
     </div>
   );

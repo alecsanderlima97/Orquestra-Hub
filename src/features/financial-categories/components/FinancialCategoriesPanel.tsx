@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVisibilityToggle";
 import { TextField } from "@/components/ui/TextField";
 import { toTitleCaseBR } from "@/lib/formatters/br";
 import type { FinancialCategory } from "../types/financialCategoryTypes";
@@ -21,6 +22,8 @@ export function FinancialCategoriesPanel({
 }) {
   const [name, setName] = useState("");
   const [color, setColor] = useState(colors[0]);
+  const [showAll, setShowAll] = useState(false);
+  const visibleCategories = showAll ? categories : categories.slice(0, DEFAULT_LIST_LIMIT);
 
   async function submit() {
     const finalName = toTitleCaseBR(name.trim());
@@ -54,14 +57,17 @@ export function FinancialCategoriesPanel({
         </div>
       ) : null}
       {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {categories.length ? categories.map((item) => (
+      <div className={showAll && categories.length > DEFAULT_LIST_LIMIT ? "mt-4 max-h-[360px] overflow-y-auto pr-1" : "mt-4"}>
+        <div className="flex flex-wrap gap-2">
+        {categories.length ? visibleCategories.map((item) => (
           <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700" key={item.id}>
             <span className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} />
             {item.name}
           </span>
         )) : <p className="text-sm text-slate-500">Nenhuma categoria cadastrada ainda.</p>}
+        </div>
       </div>
+      <ListVisibilityToggle expanded={showAll} onToggle={() => setShowAll((current) => !current)} total={categories.length} />
     </section>
   );
 }

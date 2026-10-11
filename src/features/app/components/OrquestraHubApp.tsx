@@ -11,6 +11,7 @@ import { Section } from "@/components/ui/Section";
 import { TextField } from "@/components/ui/TextField";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import { SensitiveValue } from "@/components/ui/PrivacyContext";
+import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVisibilityToggle";
 import { AccountsPayableFilters } from "@/features/accounts-payable/components/AccountsPayableFilters";
 import type { AccountFilters } from "@/features/accounts-payable/components/AccountsPayableFilters";
 import { AccountsPayableExport } from "@/features/accounts-payable/components/AccountsPayableExport";
@@ -262,6 +263,7 @@ export function OrquestraHubApp() {
   });
   const [storePhoto, setStorePhoto] = useState<File | null>(null);
   const [showStoreForm, setShowStoreForm] = useState(false);
+  const [showAllStoreSummary, setShowAllStoreSummary] = useState(false);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [subscriptionPromptDismissedKey, setSubscriptionPromptDismissedKey] = useState("");
@@ -452,6 +454,7 @@ export function OrquestraHubApp() {
     result[item.store] = current;
     return result;
   }, {})).toSorted((a, b) => b.total - a.total);
+  const visibleStoreOpenSummary = showAllStoreSummary ? storeOpenSummary : storeOpenSummary.slice(0, DEFAULT_LIST_LIMIT);
   const overdueTotal = accountList.filter((item) => item.status !== "Pago" && accountDueTime(item.dueDate) < todayTime).reduce((total, item) => total + parseMoney(item.amount), 0);
   const financialAlerts = buildFinancialAlerts(accountList, fixedExpenses);
   const filteredAccounts = accountList
@@ -1389,8 +1392,9 @@ export function OrquestraHubApp() {
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{storeOpenSummary.length} unidade(s)</span>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {storeOpenSummary.length ? storeOpenSummary.map((store) => (
+            <div className={showAllStoreSummary && storeOpenSummary.length > DEFAULT_LIST_LIMIT ? "mt-4 max-h-[620px] overflow-y-auto pr-1" : "mt-4"}>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {storeOpenSummary.length ? visibleStoreOpenSummary.map((store) => (
                 <div className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3" key={store.name}>
                   <div className="flex items-start justify-between gap-3">
                     <strong className="text-sm text-slate-950">{store.name}</strong>
@@ -1400,7 +1404,9 @@ export function OrquestraHubApp() {
                   <small className="text-slate-500">Total ainda pendente nesta unidade</small>
                 </div>
               )) : <p className="rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-500">Nenhuma loja com saldo em aberto.</p>}
+              </div>
             </div>
+            <ListVisibilityToggle expanded={showAllStoreSummary} onToggle={() => setShowAllStoreSummary((current) => !current)} total={storeOpenSummary.length} />
           </section>
           <MonthlyCashFlow accounts={accountList} />
             </CollapsiblePanel>
@@ -1455,9 +1461,7 @@ export function OrquestraHubApp() {
               value={supplierSearch}
             />
           </div>
-          <div className="max-h-[520px] overflow-auto">
-            <SuppliersTable onDelete={canWrite ? removeSupplier : undefined} onEdit={canWrite ? (item) => setEditTarget({ kind: "supplier", item }) : undefined} suppliers={filteredSuppliers} />
-          </div>
+          <SuppliersTable onDelete={canWrite ? removeSupplier : undefined} onEdit={canWrite ? (item) => setEditTarget({ kind: "supplier", item }) : undefined} suppliers={filteredSuppliers} />
         </Section>
 
         <Section description="Lance a nota e gere parcelas automaticamente." id="compras" title="Compras e notas">
@@ -1487,15 +1491,13 @@ export function OrquestraHubApp() {
               value={purchaseSearch}
             />
           </div>
-          <div className="max-h-[560px] overflow-auto">
-            <PurchasesTable
-              onDeleteBoleto={canWrite ? removeBoletoAttachment : undefined}
-              onDeleteInvoice={canWrite ? removeInvoiceAttachment : undefined}
-              onEdit={canWrite ? (item) => setEditTarget({ kind: "purchase", item }) : undefined}
-              onReplaceInvoice={canWrite ? replaceInvoiceAttachment : undefined}
-              purchases={filteredPurchases}
-            />
-          </div>
+          <PurchasesTable
+            onDeleteBoleto={canWrite ? removeBoletoAttachment : undefined}
+            onDeleteInvoice={canWrite ? removeInvoiceAttachment : undefined}
+            onEdit={canWrite ? (item) => setEditTarget({ kind: "purchase", item }) : undefined}
+            onReplaceInvoice={canWrite ? replaceInvoiceAttachment : undefined}
+            purchases={filteredPurchases}
+          />
         </Section>
 
         <Section description="Controle vencimento, baixa e status." id="contas-a-pagar" title="Contas a pagar">
@@ -1507,17 +1509,15 @@ export function OrquestraHubApp() {
           />
           <AccountsPayableSummary items={accountSummary} />
           <AccountsPayableExport onExport={exportFilteredAccounts} />
-          <div className="max-h-[560px] overflow-auto">
-            <AccountsPayableTable
-              accounts={filteredAccounts}
-              onDelete={canWrite ? requestDeleteAccountPayable : undefined}
-              onEdit={canWrite ? (item) => setEditTarget({ kind: "account", item }) : undefined}
-              onMarkPaid={canWrite ? requestMarkPaid : undefined}
-              onReceiptSelected={canWrite ? handleReceiptSelected : undefined}
-              receiptRequiredOnPayment={receiptRequiredOnPayment}
-              onWhatsApp={sendWhatsApp}
-            />
-          </div>
+          <AccountsPayableTable
+            accounts={filteredAccounts}
+            onDelete={canWrite ? requestDeleteAccountPayable : undefined}
+            onEdit={canWrite ? (item) => setEditTarget({ kind: "account", item }) : undefined}
+            onMarkPaid={canWrite ? requestMarkPaid : undefined}
+            onReceiptSelected={canWrite ? handleReceiptSelected : undefined}
+            receiptRequiredOnPayment={receiptRequiredOnPayment}
+            onWhatsApp={sendWhatsApp}
+          />
         </Section>
 
         <Section description="Cadastre despesas recorrentes e gere automaticamente a conta do mês com antecedência de alerta." id="despesas-fixas" title="Despesas fixas">

@@ -1,5 +1,6 @@
 import { FileText, Paperclip, Pencil, Trash2, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
+import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVisibilityToggle";
 import { SortableHeader, type SortDirection } from "@/components/ui/SortableHeader";
 import { parseBRL, parseDateBR } from "@/lib/formatters/br";
 import type { Purchase } from "../types/purchaseTypes";
@@ -23,13 +24,15 @@ export function PurchasesTable({ onDeleteBoleto, onDeleteInvoice, onEdit, onRepl
     const comparison = typeof left === "number" && typeof right === "number" ? left - right : String(left).localeCompare(String(right), "pt-BR", { numeric: true, sensitivity: "base" });
     return sort.direction === "asc" ? comparison : -comparison;
   }), [purchases, sort]);
+  const [showAll, setShowAll] = useState(false);
+  const visiblePurchases = showAll ? orderedPurchases : orderedPurchases.slice(0, DEFAULT_LIST_LIMIT);
   const requestSort = (key: PurchaseSortKey) => setSort((current) => ({ direction: current.key === key && current.direction === "asc" ? "desc" : "asc", key }));
 
   return (
     <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4"><h3 className="text-base font-semibold text-slate-950">Notas lançadas</h3></div>
-      <div className="space-y-3 p-3 lg:hidden">
-        {orderedPurchases.length ? orderedPurchases.map((purchase) => (
+      <div className={`space-y-3 p-3 lg:hidden ${showAll && orderedPurchases.length > DEFAULT_LIST_LIMIT ? "max-h-[680px] overflow-y-auto" : ""}`}>
+        {orderedPurchases.length ? visiblePurchases.map((purchase) => (
           <article className="rounded-lg border border-slate-200 p-4" key={purchase.id}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -54,11 +57,11 @@ export function PurchasesTable({ onDeleteBoleto, onDeleteInvoice, onEdit, onRepl
         )) : <p className="px-2 py-8 text-center text-sm text-slate-500">Nenhuma nota lançada ainda.</p>}
       </div>
 
-      <div className="hidden max-h-[520px] overflow-auto lg:block">
+      <div className={`hidden overflow-auto lg:block ${showAll && orderedPurchases.length > DEFAULT_LIST_LIMIT ? "max-h-[680px]" : "max-h-[520px]"}`}>
       <table className="w-full min-w-[980px] text-left text-sm">
         <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600"><tr><SortableHeader active={sort.key === "invoiceNumber"} direction={sort.direction} label="Nota" onClick={() => requestSort("invoiceNumber")} className="px-5 py-3" /><SortableHeader active={sort.key === "supplier"} direction={sort.direction} label="Fornecedor" onClick={() => requestSort("supplier")} className="px-5 py-3" /><SortableHeader active={sort.key === "description"} direction={sort.direction} label="Produtos" onClick={() => requestSort("description")} className="px-5 py-3" /><SortableHeader active={sort.key === "store"} direction={sort.direction} label="Loja" onClick={() => requestSort("store")} className="px-5 py-3" /><SortableHeader active={sort.key === "issueDate"} direction={sort.direction} label="Data" onClick={() => requestSort("issueDate")} className="px-5 py-3" /><SortableHeader active={sort.key === "total"} direction={sort.direction} label="Valor" onClick={() => requestSort("total")} className="px-5 py-3" /><SortableHeader active={sort.key === "installments"} direction={sort.direction} label="Parcelas" onClick={() => requestSort("installments")} className="px-5 py-3" /><th className="px-5 py-3 font-medium">Anexos</th>{canManage ? <th className="px-5 py-3 font-medium">Ações</th> : null}</tr></thead>
         <tbody className="divide-y divide-slate-100">
-          {orderedPurchases.length ? orderedPurchases.map((purchase) => (
+          {orderedPurchases.length ? visiblePurchases.map((purchase) => (
             <tr key={purchase.id}>
               <td className="px-5 py-4 font-medium">{purchase.invoiceNumber}</td><td className="px-5 py-4">{purchase.supplier}</td><td className="max-w-[260px] px-5 py-4 text-slate-700">{purchase.description || "Não informado"}</td><td className="px-5 py-4">{purchase.store}</td><td className="px-5 py-4">{purchase.issueDate}</td><td className="px-5 py-4 font-medium">{purchase.total}</td><td className="px-5 py-4">{purchase.installments}</td>
               <td className="px-5 py-4"><div className="flex flex-wrap gap-2">
@@ -70,6 +73,9 @@ export function PurchasesTable({ onDeleteBoleto, onDeleteInvoice, onEdit, onRepl
           )) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={canManage ? 9 : 8}>Nenhuma nota lançada ainda.</td></tr>}
         </tbody>
       </table>
+      </div>
+      <div className="px-3 pb-3 sm:px-5">
+        <ListVisibilityToggle expanded={showAll} onToggle={() => setShowAll((current) => !current)} total={orderedPurchases.length} />
       </div>
     </div>
   );
