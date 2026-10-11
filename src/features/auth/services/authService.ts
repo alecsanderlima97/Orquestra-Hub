@@ -79,6 +79,7 @@ export async function touchTenantPresence(tenantId: string) {
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate = ""): AppUser {
   const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) || role === "Dono" ? ownerRole() : role;
   return {
+    authProvider: user.providerData.some((item) => item.providerId === "google.com") ? "google" : "password",
     companyName,
     email: user.email || "",
     id: user.uid,

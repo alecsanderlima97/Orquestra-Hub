@@ -9,6 +9,8 @@ import { FormAlert } from "@/components/ui/FormAlert";
 import { ReasonModal } from "@/components/ui/ReasonModal";
 import { Section } from "@/components/ui/Section";
 import { TextField } from "@/components/ui/TextField";
+import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import { SensitiveValue } from "@/components/ui/PrivacyContext";
 import { AccountsPayableFilters } from "@/features/accounts-payable/components/AccountsPayableFilters";
 import type { AccountFilters } from "@/features/accounts-payable/components/AccountsPayableFilters";
 import { AccountsPayableExport } from "@/features/accounts-payable/components/AccountsPayableExport";
@@ -396,8 +398,18 @@ export function OrquestraHubApp() {
   }, [userId, userTenantId, userRole, userCompanyName]);
 
   useEffect(() => {
-    if (!firebaseReady || !user?.id || user.id === demoUserId || !user.tenantId || user.needsOnboarding) return;
+    if (!user?.id || user.needsOnboarding) return;
+
     let cancelled = false;
+    if (user.id === demoUserId) {
+      const lastSeenReleaseId = window.localStorage.getItem("orquestra-demo-last-seen-release");
+      void Promise.resolve().then(() => {
+        if (!cancelled) setReleaseNotesOpen(lastSeenReleaseId !== currentReleaseNotes.id);
+      });
+      return () => { cancelled = true; };
+    }
+
+    if (!firebaseReady || !user.tenantId) return;
     void getLastSeenReleaseId(user.tenantId, user.id)
       .then((lastSeenReleaseId) => {
         if (!cancelled) {
@@ -1159,11 +1171,16 @@ export function OrquestraHubApp() {
   }
 
   async function confirmReleaseNotes() {
-    if (!user?.tenantId || !user.id || releaseNotesSaving) return;
+    if (!user?.id || releaseNotesSaving) return;
     setReleaseNotesSaving(true);
     setReleaseNotesError("");
     try {
-      await markReleaseAsSeen(user.tenantId, user.id, currentReleaseNotes.id);
+      if (user.id === demoUserId) {
+        window.localStorage.setItem("orquestra-demo-last-seen-release", currentReleaseNotes.id);
+      } else {
+        if (!user.tenantId) return;
+        await markReleaseAsSeen(user.tenantId, user.id, currentReleaseNotes.id);
+      }
       setReleaseNotesOpen(false);
     } catch {
       setReleaseNotesError("Não foi possível registrar a leitura. Verifique sua conexão e tente novamente.");
@@ -1280,34 +1297,40 @@ export function OrquestraHubApp() {
       : `Assinatura Orquestra.cs vence ${subscriptionDays === 0 ? "hoje" : `em ${subscriptionDays} dia(s)`}`;
 
   return (
-    <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} showPlatformAdmin={isPlatformAdmin(user)} user={user}>
-      <div className="space-y-8 px-5 py-6 sm:px-8">
+    <AppShell companies={companies} onCompanyChange={changeCompany} onLogout={handleLogout} onOpenReleaseNotes={() => { setReleaseNotesError(""); setReleaseNotesOpen(true); }} showPlatformAdmin={isPlatformAdmin(user)} user={user}>
+      <div className="space-y-10 px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
         <Section description="Visao rapida do mes e dos pagamentos." id="dashboard" title="Dashboard">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {summary.map((item) => (
               <SummaryCard item={item} key={item.label} />
             ))}
           </div>
-          <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3">
-            <div title="Soma tudo que já foi marcado como pago desde o início dos lançamentos.">
-              <p className="text-xs font-semibold uppercase text-slate-500">Total já pago desde o início</p>
-              <strong className="mt-1 block text-xl text-emerald-700">{money.format(paidTotal)}</strong>
-            </div>
-            <div title="Soma todas as contas ainda não pagas, incluindo vencidas, vencendo hoje, do mês e futuras.">
-              <p className="text-xs font-semibold uppercase text-slate-500">Total ainda a pagar</p>
-              <strong className="mt-1 block text-xl text-amber-800">{money.format(totalOpenDebt)}</strong>
-            </div>
-            <div title="Soma lançamentos em aberto sem recorrência fixa mais o valor mensal das despesas fixas ativas, evitando contar a mesma recorrência duas vezes.">
-              <p className="text-xs font-semibold uppercase text-slate-500">A pagar + despesas fixas</p>
-              <strong className="mt-1 block text-xl text-cyan-800">{money.format(totalOpenDebtWithFixed)}</strong>
-            </div>
+          <div className="mt-4">
+            <CollapsiblePanel description="Indicadores complementares para conferência do caixa." eyebrow="Visão complementar" storageKey="dashboard-totals-open" title="Totais acumulados">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div title="Soma tudo que já foi marcado como pago desde o início dos lançamentos.">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Total já pago desde o início</p>
+                  <strong className="mt-1 block text-xl text-emerald-700"><SensitiveValue value={money.format(paidTotal)} /></strong>
+                </div>
+                <div title="Soma todas as contas ainda não pagas, incluindo vencidas, vencendo hoje, do mês e futuras.">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Total ainda a pagar</p>
+                  <strong className="mt-1 block text-xl text-amber-800"><SensitiveValue value={money.format(totalOpenDebt)} /></strong>
+                </div>
+                <div title="Soma lançamentos em aberto sem recorrência fixa mais o valor mensal das despesas fixas ativas, evitando contar a mesma recorrência duas vezes.">
+                  <p className="text-xs font-semibold uppercase text-slate-500">A pagar + despesas fixas</p>
+                  <strong className="mt-1 block text-xl text-cyan-800"><SensitiveValue value={money.format(totalOpenDebtWithFixed)} /></strong>
+                </div>
+              </div>
+            </CollapsiblePanel>
           </div>
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <div className="mt-4">
+            <CollapsiblePanel defaultOpen description="Acompanhe os vencimentos próximos e os maiores saldos sem ocupar a tela inteira." eyebrow="Análises rápidas" storageKey="dashboard-quick-analysis-open" title="Prioridades financeiras">
+              <div className="grid gap-4 xl:grid-cols-2">
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" title="Soma contas não pagas com vencimento entre hoje e os próximos 7 dias.">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase text-slate-500">Próximos 7 dias</p>
-                  <strong className="mt-1 block text-2xl text-slate-950">{money.format(nextSevenDaysTotal)}</strong>
+                  <strong className="mt-1 block text-2xl text-slate-950"><SensitiveValue value={money.format(nextSevenDaysTotal)} /></strong>
                 </div>
                 <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">{nextSevenDaysAccounts.length} vencimento(s)</span>
               </div>
@@ -1332,11 +1355,13 @@ export function OrquestraHubApp() {
                 {topSuppliersToPay.length ? topSuppliersToPay.map((supplier) => (
                   <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm" key={supplier.name}>
                     <span className="min-w-0"><strong className="block truncate">{supplier.name}</strong><small className="text-slate-500">{supplier.count} conta(s) em aberto</small></span>
-                    <strong className="shrink-0 text-slate-950">{money.format(supplier.total)}</strong>
+                    <strong className="shrink-0 text-slate-950"><SensitiveValue value={money.format(supplier.total)} /></strong>
                   </div>
                 )) : <p className="rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-500">Nenhum fornecedor com saldo em aberto.</p>}
               </div>
             </section>
+              </div>
+            </CollapsiblePanel>
           </div>
           {showSubscriptionPrompt ? (
             <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm shadow-sm">
@@ -1353,8 +1378,10 @@ export function OrquestraHubApp() {
               </div>
             </div>
           ) : null}
-          <FinancialAlertsPanel alerts={financialAlerts} onWhatsApp={sendAlertWhatsApp} />
-          <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" title="Mostra quanto cada loja ainda tem em aberto, sem repetir a lista de próximos vencimentos.">
+          <FinancialAlertsPanel alerts={financialAlerts} onWhatsApp={sendAlertWhatsApp} storageKey={`dashboard-financial-alerts-${user.id}-open`} />
+          <div className="mt-6">
+            <CollapsiblePanel description="Valores por unidade e evolução mensal do caixa, sem repetir os próximos vencimentos." eyebrow="Visão operacional" storageKey="dashboard-operational-open" title="Resumo por loja e fluxo mensal">
+          <section title="Mostra quanto cada loja ainda tem em aberto, sem repetir a lista de próximos vencimentos.">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-slate-950">Resumo por loja</h2>
@@ -1376,6 +1403,8 @@ export function OrquestraHubApp() {
             </div>
           </section>
           <MonthlyCashFlow accounts={accountList} />
+            </CollapsiblePanel>
+          </div>
         </Section>
 
         <Section description="Separacao financeira por unidade." id="lojas" title="Lojas">
@@ -1489,7 +1518,6 @@ export function OrquestraHubApp() {
               onWhatsApp={sendWhatsApp}
             />
           </div>
-          <AccountsPayableHistory logs={auditLogs} />
         </Section>
 
         <Section description="Cadastre despesas recorrentes e gere automaticamente a conta do mês com antecedência de alerta." id="despesas-fixas" title="Despesas fixas">
@@ -1498,6 +1526,12 @@ export function OrquestraHubApp() {
 
         <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">
           <FinancialReports accounts={accountList} purchases={purchaseList} />
+        </Section>
+        <Section description="Acompanhe quem lançou, editou, pagou ou alterou informações financeiras." id="auditoria" title="Auditoria e histórico financeiro">
+          <div className="space-y-5">
+            <AccountsPayableHistory logs={auditLogs} />
+            {canManageUsers(user.role) ? <AuditPanel logs={auditLogs} /> : null}
+          </div>
         </Section>
         <Section description="Dados, perfil de acesso e identificação do usuário." id="perfil" title="Perfil do usuário"><UserProfile onCompanySave={saveCompanyName} onProfileSave={saveProfile} user={user} /></Section>
         <Section description="Preferências e situação das integrações do Orquestra Hub." id="configuracoes" title="Configurações">
@@ -1519,11 +1553,6 @@ export function OrquestraHubApp() {
             <CollapsibleSettingsBlock description="Privacidade, LGPD, exportação de dados e solicitações do titular." storageKey="settings-privacy-open" title="Privacidade e LGPD">
               <PrivacyPanel exportData={backupData} user={user} />
             </CollapsibleSettingsBlock>
-            {canManageUsers(user.role) ? (
-              <CollapsibleSettingsBlock description="Histórico das principais ações realizadas no sistema." storageKey="settings-audit-open" title="Últimas alterações">
-                <AuditPanel logs={auditLogs} />
-              </CollapsibleSettingsBlock>
-            ) : null}
           </div>
         </Section>
 

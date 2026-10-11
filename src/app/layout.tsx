@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Orquestra Hub | SaaS modular",
-  description: "Sistema SaaS modular para gestao financeira, operacional e comercial.",
+  title: "Orquestra.cs | Orquestra Hub",
+  description: "Orquestra Hub: gestão financeira empresarial da Orquestra.cs.",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Orquestra Hub" },
   icons: {
     apple: "/icons/orquestra-icon-192.png",

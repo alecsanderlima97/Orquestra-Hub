@@ -1,4 +1,5 @@
 import type { AuditLog } from "@/features/audit/types/auditTypes";
+import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 
 const financialEntities = new Set(["anexo da nota fiscal", "boleto", "comprovante", "conta", "compra", "despesa fixa"]);
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -11,11 +12,8 @@ export function AccountsPayableHistory({ logs }: { logs: AuditLog[] }) {
   const financialLogs = logs.filter(isFinancialLog).slice(0, 10);
 
   return (
-    <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <h3 className="font-semibold">Histórico financeiro</h3>
-        <p className="mt-1 text-sm text-slate-500">Acompanhe quem lançou, editou, pagou ou anexou documentos.</p>
-      </div>
+    <div className="mt-5">
+      <CollapsiblePanel description="Acompanhe quem lançou, editou, pagou ou anexou documentos." eyebrow="Auditoria" storageKey="accounts-payable-history-open" title="Histórico financeiro">
       <div className="divide-y divide-slate-100">
         {financialLogs.length ? financialLogs.map((log) => (
           <article className="px-5 py-3" key={log.id}>
@@ -27,6 +25,7 @@ export function AccountsPayableHistory({ logs }: { logs: AuditLog[] }) {
           </article>
         )) : <p className="px-5 py-6 text-sm text-slate-500">Nenhuma movimentação financeira registrada nesta sessão.</p>}
       </div>
-    </section>
+      </CollapsiblePanel>
+    </div>
   );
 }

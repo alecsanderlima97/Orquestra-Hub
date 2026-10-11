@@ -1,4 +1,6 @@
-import { Bell, CalendarClock, Pencil, Trash2 } from "lucide-react";
+import { Bell, CalendarClock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useState } from "react";
+import { SensitiveValue } from "@/components/ui/PrivacyContext";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { formatBRL, parseBRL, todaySaoPaulo, toTitleCaseBR } from "@/lib/formatters/br";
@@ -37,6 +39,7 @@ export function FixedExpensesPanel({
   onSubmit: () => void;
   storeOptions: string[];
 }) {
+  const [showForm, setShowForm] = useState(false);
   const activeExpenses = expenses.filter((expense) => expense.active !== false);
   const totalMonthly = activeExpenses.reduce((total, expense) => total + parseBRL(expense.amount), 0);
   const totalYearly = totalMonthly * 12;
@@ -53,29 +56,36 @@ export function FixedExpensesPanel({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <article className="rounded-lg border border-cyan-100 bg-cyan-50/70 p-4">
+        <article className="motion-card rounded-lg border border-cyan-100 bg-cyan-50/70 p-4">
           <p className="text-xs font-semibold uppercase text-cyan-800">Total mensal ativo</p>
-          <strong className="mt-2 block text-2xl text-slate-950">{money.format(totalMonthly)}</strong>
+          <strong className="mt-2 block text-2xl text-slate-950"><SensitiveValue value={money.format(totalMonthly)} /></strong>
         </article>
-        <article className="rounded-lg border border-amber-100 bg-amber-50/70 p-4" title="Projecao de 12 meses considerando as recorrencias fixas ativas de hoje.">
+        <article className="motion-card rounded-lg border border-amber-100 bg-amber-50/70 p-4" title="Projecao de 12 meses considerando as recorrencias fixas ativas de hoje.">
           <p className="text-xs font-semibold uppercase text-amber-800">Total anual estimado</p>
-          <strong className="mt-2 block text-2xl text-slate-950">{money.format(totalYearly)}</strong>
+          <strong className="mt-2 block text-2xl text-slate-950"><SensitiveValue value={money.format(totalYearly)} /></strong>
         </article>
-        <article className="rounded-lg border border-slate-200 bg-white p-4">
+        <article className="motion-card rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase text-slate-500">Recorrências ativas</p>
           <strong className="mt-2 block text-2xl text-slate-950">{activeExpenses.length}</strong>
         </article>
-        <article className="rounded-lg border border-slate-200 bg-white p-4">
+        <article className="motion-card rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase text-slate-500">Próximo vencimento</p>
           <strong className="mt-2 block text-base text-slate-950">{nextExpense ? `${nextExpense.name} - dia ${nextExpense.dueDay}` : "Nenhum"}</strong>
         </article>
-        <article className="rounded-lg border border-slate-200 bg-white p-4">
+        <article className="motion-card rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase text-slate-500">Maior despesa</p>
-          <strong className="mt-2 block text-base text-slate-950">{largestExpense ? `${largestExpense.name} - ${largestExpense.amount}` : "Nenhuma"}</strong>
+          <strong className="mt-2 block text-base text-slate-950"><SensitiveValue value={largestExpense ? `${largestExpense.name} - ${largestExpense.amount}` : "Nenhuma"} /></strong>
         </article>
       </div>
       {canWrite ? (
-        <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-4">
+        <div>
+          <div className="flex justify-end">
+            <button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => setShowForm((current) => !current)} type="button">
+              {showForm ? <X size={18} /> : <Plus size={18} />}
+              {showForm ? "Cancelar lançamento" : "Cadastrar nova despesa"}
+            </button>
+          </div>
+          {showForm ? <div className="mt-4 grid gap-4 rounded-lg border border-cyan-200 bg-cyan-50/30 p-5 shadow-[0_0_18px_rgba(34,211,238,0.12)] md:grid-cols-2 xl:grid-cols-4">
           <TextField label="Despesa" onBlur={() => onChange({ ...form, name: toTitleCaseBR(form.name) })} onChange={(event) => onChange({ ...form, name: event.target.value })} placeholder="Ex.: Aluguel" value={form.name} />
           <TextField label="Categoria" onBlur={() => onChange({ ...form, category: toTitleCaseBR(form.category) })} onChange={(event) => onChange({ ...form, category: event.target.value })} placeholder="Ex.: Estrutura" value={form.category} />
           <TextField label="Favorecido" onBlur={() => onChange({ ...form, payee: toTitleCaseBR(form.payee) })} onChange={(event) => onChange({ ...form, payee: event.target.value })} placeholder="Nome ou empresa" value={form.payee} />
@@ -85,12 +95,13 @@ export function FixedExpensesPanel({
           <TextField label="Alertar com antecedencia" onChange={(event) => onChange({ ...form, alertDays: event.target.value })} placeholder="5" type="number" value={form.alertDays} />
           <button className="mt-7 h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white" onClick={onSubmit} type="button">Cadastrar recorrencia</button>
           {error ? <p className="rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 md:col-span-2 xl:col-span-4">{error}</p> : null}
+          </div> : null}
         </div>
       ) : null}
       <div className="max-h-[560px] overflow-y-auto pr-1">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {expenses.map((item) => (
-            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={item.id}>
+        <article className="motion-card rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={item.id}>
             <div className="flex justify-between gap-3">
               <div>
                 <span className="text-xs font-semibold uppercase text-cyan-700">{item.category}</span>

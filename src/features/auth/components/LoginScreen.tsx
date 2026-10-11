@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, BarChart3, Building2, LogIn, PackageCheck, ReceiptText } from "lucide-react";
+import { ArrowLeft, ArrowRight, BarChart3, Building2, LogIn, Mail, PackageCheck, ReceiptText } from "lucide-react";
 import { useState } from "react";
+import { OrquestraBrand } from "@/components/branding/OrquestraBrand";
 import { TextField } from "@/components/ui/TextField";
 import { firebaseReady } from "@/lib/firebase/config";
 import { loginWithEmail, loginWithGoogle, registerWithEmail, resetPassword } from "../services/authService";
@@ -58,6 +59,7 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
   const [companyName, setCompanyName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [loginMethod, setLoginMethod] = useState<"choice" | "email">("choice");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -86,6 +88,15 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  function continueWithEmail() {
+    if (!email.trim()) {
+      setMessage("Informe seu e-mail para continuar.");
+      return;
+    }
+    setMessage("");
+    setLoginMethod("email");
   }
 
   async function handleGoogle() {
@@ -123,10 +134,7 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
       <section className="relative hidden overflow-hidden bg-[#071521] px-12 py-12 text-white lg:flex lg:flex-col">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_38%_44%,rgba(23,135,203,0.22),transparent_44%)]" />
         <div className="login-score" aria-hidden="true"><span /><span /><span /><span /><span /></div>
-        <div className="relative">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">Orquestra.cs</p>
-          <h1 className="mt-3 text-4xl font-bold">Orquestra Hub</h1>
-        </div>
+        <OrquestraBrand className="relative" tone="dark" />
         <div className="relative flex flex-1 flex-col justify-center py-8">
           <div className="grid items-center gap-8 xl:grid-cols-[260px_1fr]">
             <div className="crystal-stage"><div className="crystal-o" aria-label="O de Orquestra">O</div></div>
@@ -142,10 +150,10 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
       </section>
       <section className="flex items-center justify-center px-5 py-10">
         <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-7 shadow-lg shadow-slate-200/60">
-          <div className="mx-auto flex size-20 items-center justify-center lg:hidden"><div className="crystal-o crystal-o-small">O</div></div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-cyan-700">Orquestra Hub</p>
+          <div className="mb-5 lg:hidden"><OrquestraBrand compact /></div>
+          <div className="hidden lg:block"><OrquestraBrand compact /></div>
           <h2 className="mt-3 text-2xl font-semibold">{mode === "login" ? "Acessar sistema" : "Criar empresa"}</h2>
-          <p className="mt-2 text-sm text-slate-600">{mode === "login" ? "Entre com seu usuario para acessar o ambiente financeiro." : "Cadastre seu acesso ao Orquestra Hub."}</p>
+          <p className="mt-2 text-sm text-slate-600">{mode === "login" ? "Escolha como deseja acessar o ambiente financeiro." : "Cadastre seu acesso ao Orquestra Hub."}</p>
           <div className="mt-6 space-y-4">
             {mode === "register" ? <>
               <TextField label="Nome da empresa" onChange={(event) => setCompanyName(event.target.value)} placeholder="Nome da empresa" value={companyName} />
@@ -153,26 +161,32 @@ export function LoginScreen({ onLogin }: { onLogin: (user: AppUser) => void }) {
               <TextField label="Seu nome" onChange={(event) => setName(event.target.value)} placeholder="Seu nome" value={name} />
             </> : null}
             <TextField label="E-mail" onChange={(event) => setEmail(event.target.value)} placeholder="email@empresa.com" type="email" value={email} />
-            <TextField label="Senha" onChange={(event) => setPassword(event.target.value)} placeholder="Senha" type="password" value={password} />
+            {mode === "register" || loginMethod === "email" ? <TextField label={mode === "register" ? "Senha de acesso" : "Senha de login"} onChange={(event) => setPassword(event.target.value)} placeholder="Senha" type="password" value={password} /> : null}
             {mode === "register" ? <label className="flex items-start gap-3 text-sm text-slate-600"><input checked={acceptedTerms} className="mt-1 size-4" onChange={(event) => setAcceptedTerms(event.target.checked)} type="checkbox" /><span>Li e aceito os <a className="font-semibold text-cyan-700 underline" href="/termos" target="_blank">Termos de Uso</a> e a <a className="font-semibold text-cyan-700 underline" href="/privacidade" target="_blank">Politica de Privacidade</a>.</span></label> : null}
             {message ? <p className="rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">{message}</p> : null}
-            {mode === "login" ? <button className="login-glow-link text-sm font-semibold text-cyan-700" onClick={handleReset} type="button">Esqueci minha senha</button> : null}
-            <button className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#087ec1] px-4 text-sm font-semibold text-white hover:bg-[#066da8] disabled:opacity-70" disabled={loading || (mode === "register" && !acceptedTerms)} onClick={handleSubmit} type="button"><LogIn size={18} />{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}</button>
-            <button className="group relative flex h-12 w-full items-center justify-center gap-3 overflow-hidden rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 shadow-md shadow-slate-200/70 transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-100 disabled:opacity-70" disabled={loading} onClick={handleGoogle} type="button">
+            {mode === "login" && loginMethod === "choice" ? <p className="rounded-md border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-900">A conta Google não usa senha do Orquestra Hub. Para contas com senha, escolha continuar com e-mail.</p> : null}
+            {mode === "login" && loginMethod === "email" ? <button className="motion-button login-glow-link text-sm font-semibold text-cyan-700" onClick={handleReset} type="button">Esqueci minha senha</button> : null}
+            {mode === "login" && loginMethod === "choice" ? (
+              <button className="motion-button inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-4 text-sm font-semibold text-cyan-900 hover:border-cyan-400 hover:bg-cyan-100" onClick={continueWithEmail} type="button"><Mail size={18} />Continuar com e-mail<ArrowRight size={16} /></button>
+            ) : (
+              <button className="motion-button inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#087ec1] px-4 text-sm font-semibold text-white hover:bg-[#066da8] disabled:opacity-70" disabled={loading || (mode === "register" && !acceptedTerms)} onClick={handleSubmit} type="button"><LogIn size={18} />{loading ? "Aguarde..." : mode === "login" ? "Entrar com e-mail" : "Criar conta"}</button>
+            )}
+            <button className="motion-button group relative flex h-12 w-full items-center justify-center gap-3 overflow-hidden rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 shadow-md shadow-slate-200/70 transition hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-100 disabled:opacity-70" disabled={loading} onClick={handleGoogle} type="button">
               <span className="flex size-7 items-center justify-center rounded-full bg-white shadow-sm">
                 <span className="text-[18px] font-black leading-none text-[#4285f4]">G</span>
               </span>
               Continuar com Google
               <span className="absolute inset-x-6 bottom-0 h-0.5 bg-gradient-to-r from-[#4285f4] via-[#fbbc05] to-[#34a853] opacity-80 transition group-hover:inset-x-3" />
             </button>
+            {mode === "login" && loginMethod === "email" ? <button className="motion-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800" onClick={() => { setLoginMethod("choice"); setPassword(""); setMessage(""); }} type="button"><ArrowLeft size={16} />Usar outra forma de acesso</button> : null}
             {mode === "login" ? (
-              <button className="login-glow-link w-full text-sm font-semibold text-cyan-700" onClick={() => { setMode("register"); setMessage(""); }} type="button">Ainda nao tenho uma conta</button>
+              <button className="motion-button login-glow-link w-full text-sm font-semibold text-cyan-700" onClick={() => { setMode("register"); setLoginMethod("email"); setMessage(""); }} type="button">Ainda nao tenho uma conta</button>
             ) : (
-              <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 text-sm font-semibold text-cyan-800 hover:bg-cyan-100" onClick={() => { setMode("login"); setMessage(""); }} type="button">
+              <button className="motion-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 text-sm font-semibold text-cyan-800 hover:bg-cyan-100" onClick={() => { setMode("login"); setLoginMethod("choice"); setMessage(""); }} type="button">
                 <ArrowLeft size={16} />Voltar para o login
               </button>
             )}
-            <button className="h-11 w-full rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => finishLogin(demoUser)} type="button">Entrar em modo demo</button>
+            <button className="motion-button h-11 w-full rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => finishLogin(demoUser)} type="button">Entrar em modo demo</button>
           </div>
         </div>
       </section>

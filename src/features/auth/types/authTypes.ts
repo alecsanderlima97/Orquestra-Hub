@@ -5,6 +5,7 @@ export type AppUser = {
   role: "Proprietário" | "Dono" | "Financeiro" | "Consulta";
   tenantId: string;
   companyName: string;
+  authProvider?: "google" | "password";
   planId?: "inicial" | "medio" | "premium";
   nextBillingDate?: string;
   subscriptionStatus?: "trial" | "ativo" | "pausado" | "vencido" | "bloqueado" | "cancelado";

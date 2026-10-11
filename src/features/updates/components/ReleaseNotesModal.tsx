@@ -31,7 +31,7 @@ export function ReleaseNotesModal({
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Atualização do sistema</p>
               <h2 className="mt-1 text-xl font-bold sm:text-2xl" id="release-notes-title">{notes.title}</h2>
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-300"><Clock3 size={14} /> Publicada em {notes.publishedAt}</p>
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-300"><span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold text-cyan-100">v{notes.version}</span><Clock3 size={14} /> Publicada em {notes.publishedAt}</p>
             </div>
           </div>
           <button aria-label="Ler depois" className="rounded-md p-1.5 text-slate-300 transition hover:bg-white/10 hover:text-white" onClick={onDismiss} title="Ler depois" type="button"><X size={20} /></button>

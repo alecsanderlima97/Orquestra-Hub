@@ -12,10 +12,13 @@ export function Section({
   id: string;
 }) {
   return (
-    <section className="scroll-mt-6" id={id}>
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm text-slate-600">{description}</p>
+    <section aria-labelledby={`${id}-title`} className="scroll-mt-28 lg:scroll-mt-6" id={id}>
+      <div className="mb-5 border-b border-slate-200 pb-4">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
+          <span>Orquestra Hub</span>
+        </div>
+        <h2 className="mt-2 text-xl font-semibold text-slate-950" id={`${id}-title`}>{title}</h2>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
       </div>
       {children}
     </section>

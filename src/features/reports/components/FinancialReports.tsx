@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Printer, RotateCcw } from "lucide-react";
+import { Download, Plus, Printer, RotateCcw, X } from "lucide-react";
+import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import { SensitiveValue } from "@/components/ui/PrivacyContext";
+import { SortableHeader, type SortDirection } from "@/components/ui/SortableHeader";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import { compareDateBR, parseBRL, parseDateBR } from "@/lib/formatters/br";
@@ -58,6 +61,7 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
 
 export function FinancialReports({ accounts, purchases }: { accounts: AccountPayable[]; purchases: Purchase[] }) {
   const [filters, setFilters] = useState({ category: all, end: "", invoice: "", start: "", status: all, store: all, supplier: all });
+  const [showReportForm, setShowReportForm] = useState(false);
   const stores = options([...accounts.map((item) => item.store), ...purchases.map((item) => item.store)]);
   const suppliers = options([...accounts.map((item) => item.supplier), ...purchases.map((item) => item.supplier)]);
   const categories = options(accounts.map((item) => item.categoryName || "Sem categoria"));
@@ -129,7 +133,13 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
 
   return (
     <div className="printable-reports space-y-5" id="printable-reports">
-      <div className="no-print space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="no-print flex justify-end">
+        <button className="inline-flex h-11 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800" onClick={() => setShowReportForm((current) => !current)} type="button">
+          {showReportForm ? <X size={18} /> : <Plus size={18} />}
+          {showReportForm ? "Ocultar filtros" : "Gerar novo relatório"}
+        </button>
+      </div>
+      {showReportForm ? <div className="no-print space-y-4 rounded-lg border border-cyan-200 bg-cyan-50/30 p-5 shadow-[0_0_18px_rgba(34,211,238,0.12)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <span className="text-sm font-semibold text-slate-700">Visão do relatório</span>
@@ -155,10 +165,10 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
           <button className="inline-flex h-10 items-center gap-2 rounded-md border border-emerald-700 px-4 text-sm font-semibold text-emerald-800 hover:bg-emerald-50" onClick={exportExcel} title="Baixar os dados filtrados em CSV compatível com Excel" type="button"><Download size={17} />Exportar Excel</button>
           <button className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={printReport} title="Imprimir ou salvar somente este relatório em PDF" type="button"><Printer size={17} />Imprimir relatório</button>
         </div>
-      </div>
+      </div> : null}
       <div className="hidden print:block"><h2 className="text-xl font-bold">Orquestra Hub - Relatório financeiro</h2><p className="mt-1 text-sm">{filterLine}</p></div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><ReportCard label="Compras lançadas" value={String(filteredPurchases.length)} helper={money.format(filteredPurchases.reduce((sum, item) => sum + parseBRL(item.total), 0))} /><ReportCard label="Total em aberto" value={money.format(total(open))} helper={`${open.length} conta(s)`} /><ReportCard label="Total pago" value={money.format(total(paid))} helper={`${paid.length} baixa(s)`} /><ReportCard label="Total atrasado" value={money.format(total(overdue))} helper={`${overdue.length} vencida(s)`} /><ReportCard label="Com comprovante" value={String(filteredAccounts.filter((item) => item.receiptName).length)} helper="Pagamentos documentados" /></div>
-      <div className="grid gap-5 xl:grid-cols-3"><Breakdown title="Detalhamento por categoria" items={byCategory} /><Breakdown title="Detalhamento por loja" items={byStore} /><Breakdown title="Detalhamento por fornecedor" items={bySupplier} /></div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><ReportCard label="Compras lançadas" tone="neutral" value={String(filteredPurchases.length)} helper={money.format(filteredPurchases.reduce((sum, item) => sum + parseBRL(item.total), 0))} /><ReportCard label="Total em aberto" tone="warning" value={money.format(total(open))} helper={`${open.length} conta(s)`} /><ReportCard label="Total pago" tone="success" value={money.format(total(paid))} helper={`${paid.length} baixa(s)`} /><ReportCard label="Total atrasado" tone="danger" value={money.format(total(overdue))} helper={`${overdue.length} vencida(s)`} /><ReportCard label="Com comprovante" tone="neutral" value={String(filteredAccounts.filter((item) => item.receiptName).length)} helper="Pagamentos documentados" /></div>
+      <div className="grid gap-5 xl:grid-cols-3"><Breakdown storageKey="reports-breakdown-category" title="Detalhamento por categoria" items={byCategory} /><Breakdown storageKey="reports-breakdown-store" title="Detalhamento por loja" items={byStore} /><Breakdown storageKey="reports-breakdown-supplier" title="Detalhamento por fornecedor" items={bySupplier} /></div>
       <ReportTable accounts={orderedAccounts} />
       <PurchasesReportTable purchases={filteredPurchases} />
     </div>
@@ -166,7 +176,46 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
 }
 
 function Filter({ children, label }: { children: React.ReactNode; label: string }) { return <label className="block"><span className="text-sm font-medium text-slate-700">{label}</span>{children}</label>; }
-function ReportCard({ label, value, helper }: { label: string; value: string; helper: string }) { return <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{label}</p><strong className="mt-2 block text-xl">{value}</strong><span className="mt-1 block text-xs text-slate-500">{helper}</span></article>; }
-function Breakdown({ items, title }: { items: { name: string; open: number; overdue: number; paid: number; count: number }[]; title: string }) { return <div className="rounded-lg border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h3 className="font-semibold">{title}</h3></div><div className="divide-y divide-slate-100">{items.length ? items.map((item) => <div className="px-5 py-4" key={item.name}><div className="flex justify-between gap-4"><strong>{item.name}</strong><span className="text-sm text-slate-500">{item.count} conta(s)</span></div><div className="mt-2 grid grid-cols-3 gap-2 text-xs"><span>Aberto: <b>{money.format(item.open)}</b></span><span>Pago: <b>{money.format(item.paid)}</b></span><span>Atrasado: <b className="text-rose-700">{money.format(item.overdue)}</b></span></div></div>) : <p className="px-5 py-8 text-center text-sm text-slate-500">Nenhum dado no período.</p>}</div></div>; }
-function ReportTable({ accounts }: { accounts: AccountPayable[] }) { return <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h3 className="font-semibold">Pagamentos do período</h3></div><div className="max-h-[460px] overflow-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="sticky top-0 z-10 bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">Nota</th><th className="px-5 py-3">Fornecedor</th><th className="px-5 py-3">Categoria</th><th className="px-5 py-3">Loja</th><th className="px-5 py-3">Parcela</th><th className="px-5 py-3">Vencimento</th><th className="px-5 py-3">Valor</th><th className="px-5 py-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{accounts.length ? accounts.map((item) => <tr key={item.id}><td className="px-5 py-3 font-medium">{item.invoiceNumber || "Sem nota"}</td><td className="px-5 py-3 font-medium">{item.supplier}</td><td className="px-5 py-3">{item.categoryName || "Sem categoria"}</td><td className="px-5 py-3">{item.store}</td><td className="px-5 py-3">{item.installment}</td><td className="px-5 py-3">{item.dueDate}</td><td className="px-5 py-3 font-medium">{item.amount}</td><td className="px-5 py-3">{item.status}</td></tr>) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={8}>Nenhum pagamento encontrado.</td></tr>}</tbody></table></div></div>; }
-function PurchasesReportTable({ purchases }: { purchases: Purchase[] }) { return <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 px-5 py-4"><h3 className="font-semibold">Compras/notas lançadas no período</h3></div><div className="max-h-[460px] overflow-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="sticky top-0 z-10 bg-slate-50 text-slate-600"><tr><th className="px-5 py-3">Nota</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Fornecedor</th><th className="px-5 py-3">Loja</th><th className="px-5 py-3">Descrição</th><th className="px-5 py-3">Total</th></tr></thead><tbody className="divide-y divide-slate-100">{purchases.length ? purchases.map((item) => <tr key={item.id}><td className="px-5 py-3 font-medium">{item.invoiceNumber}</td><td className="px-5 py-3">{item.issueDate}</td><td className="px-5 py-3">{item.supplier}</td><td className="px-5 py-3">{item.store}</td><td className="px-5 py-3">{item.description || "Não informado"}</td><td className="px-5 py-3 font-medium">{item.total}</td></tr>) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={6}>Nenhuma compra/nota encontrada.</td></tr>}</tbody></table></div></div>; }
+function ReportCard({ helper, label, tone, value }: { helper: string; label: string; tone: "danger" | "neutral" | "success" | "warning"; value: string }) {
+  const toneStyles = {
+    danger: "dashboard-card-danger border-rose-200 bg-rose-50 text-rose-950",
+    neutral: "dashboard-card-neutral border-slate-200 bg-white text-slate-900",
+    success: "dashboard-card-success border-emerald-200 bg-emerald-50 text-emerald-950",
+    warning: "dashboard-card-warning border-amber-200 bg-amber-50 text-amber-950",
+  };
+  return <article className={`motion-card min-w-0 rounded-lg border p-5 shadow-sm ${toneStyles[tone]}`}><p className="break-words text-sm font-medium text-slate-600">{label}</p><strong className="mt-2 block text-xl"><SensitiveValue className="whitespace-nowrap" value={value} /></strong><span className="mt-1 block text-xs text-slate-600"><SensitiveValue showToggle={false} value={helper} /></span></article>;
+}
+function Breakdown({ items, storageKey, title }: { items: { name: string; open: number; overdue: number; paid: number; count: number }[]; storageKey: string; title: string }) {
+  return <CollapsiblePanel description="Valores abertos, pagos e atrasados agrupados para conferência." eyebrow="Detalhamento" storageKey={storageKey} title={title}>
+    <div className="max-h-[360px] divide-y divide-slate-100 overflow-y-auto pr-1">{items.length ? items.map((item) => <div className="px-1 py-4 first:pt-0 last:pb-0" key={item.name}><div className="flex justify-between gap-4"><strong className="break-words text-slate-950">{item.name}</strong><span className="shrink-0 text-sm text-slate-500">{item.count} conta(s)</span></div><div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3"><span>Aberto: <b>{money.format(item.open)}</b></span><span>Pago: <b>{money.format(item.paid)}</b></span><span>Atrasado: <b className="text-rose-700">{money.format(item.overdue)}</b></span></div></div>) : <p className="px-1 py-5 text-center text-sm text-slate-500">Nenhum dado no período.</p>}</div>
+  </CollapsiblePanel>;
+}
+type ReportAccountSortKey = "amount" | "categoryName" | "dueDate" | "installment" | "invoiceNumber" | "status" | "store" | "supplier";
+
+function ReportTable({ accounts }: { accounts: AccountPayable[] }) {
+  const [sort, setSort] = useState<{ direction: SortDirection; key: ReportAccountSortKey }>({ direction: "asc", key: "dueDate" });
+  const orderedAccounts = useMemo(() => accounts.toSorted((a, b) => {
+    const left = sort.key === "amount" ? parseBRL(a.amount) : sort.key === "dueDate" ? parseDateBR(a.dueDate).getTime() : (a[sort.key] || "");
+    const right = sort.key === "amount" ? parseBRL(b.amount) : sort.key === "dueDate" ? parseDateBR(b.dueDate).getTime() : (b[sort.key] || "");
+    const comparison = typeof left === "number" && typeof right === "number" ? left - right : String(left).localeCompare(String(right), "pt-BR", { numeric: true, sensitivity: "base" });
+    return sort.direction === "asc" ? comparison : -comparison;
+  }), [accounts, sort]);
+  const requestSort = (key: ReportAccountSortKey) => setSort((current) => ({ direction: current.key === key && current.direction === "asc" ? "desc" : "asc", key }));
+
+  return <CollapsiblePanel defaultOpen description="Contas a pagar filtradas por vencimento, nota, loja, fornecedor e status." eyebrow="Financeiro" storageKey="reports-payments-open" title="Pagamentos do período"><div className="max-h-[460px] overflow-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="sticky top-0 z-10 bg-slate-50 text-slate-600"><tr><SortableHeader active={sort.key === "invoiceNumber"} direction={sort.direction} label="Nota" onClick={() => requestSort("invoiceNumber")} className="px-5 py-3" /><SortableHeader active={sort.key === "supplier"} direction={sort.direction} label="Fornecedor" onClick={() => requestSort("supplier")} className="px-5 py-3" /><SortableHeader active={sort.key === "categoryName"} direction={sort.direction} label="Categoria" onClick={() => requestSort("categoryName")} className="px-5 py-3" /><SortableHeader active={sort.key === "store"} direction={sort.direction} label="Loja" onClick={() => requestSort("store")} className="px-5 py-3" /><SortableHeader active={sort.key === "installment"} direction={sort.direction} label="Parcela" onClick={() => requestSort("installment")} className="px-5 py-3" /><SortableHeader active={sort.key === "dueDate"} direction={sort.direction} label="Vencimento" onClick={() => requestSort("dueDate")} className="px-5 py-3" /><SortableHeader active={sort.key === "amount"} direction={sort.direction} label="Valor" onClick={() => requestSort("amount")} className="px-5 py-3" /><SortableHeader active={sort.key === "status"} direction={sort.direction} label="Status" onClick={() => requestSort("status")} className="px-5 py-3" /></tr></thead><tbody className="divide-y divide-slate-100">{orderedAccounts.length ? orderedAccounts.map((item) => <tr key={item.id}><td className="px-5 py-3 font-medium">{item.invoiceNumber || "Sem nota"}</td><td className="px-5 py-3 font-medium">{item.supplier}</td><td className="px-5 py-3">{item.categoryName || "Sem categoria"}</td><td className="px-5 py-3">{item.store}</td><td className="px-5 py-3">{item.installment}</td><td className="px-5 py-3">{item.dueDate}</td><td className="px-5 py-3 font-medium">{item.amount}</td><td className="px-5 py-3">{item.status}</td></tr>) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={8}>Nenhum pagamento encontrado.</td></tr>}</tbody></table></div></CollapsiblePanel>;
+}
+
+type ReportPurchaseSortKey = "description" | "invoiceNumber" | "issueDate" | "store" | "supplier" | "total";
+
+function PurchasesReportTable({ purchases }: { purchases: Purchase[] }) {
+  const [sort, setSort] = useState<{ direction: SortDirection; key: ReportPurchaseSortKey }>({ direction: "desc", key: "issueDate" });
+  const orderedPurchases = useMemo(() => purchases.toSorted((a, b) => {
+    const left = sort.key === "total" ? parseBRL(a.total) : sort.key === "issueDate" ? parseDateBR(a.issueDate).getTime() : a[sort.key];
+    const right = sort.key === "total" ? parseBRL(b.total) : sort.key === "issueDate" ? parseDateBR(b.issueDate).getTime() : b[sort.key];
+    const comparison = typeof left === "number" && typeof right === "number" ? left - right : String(left).localeCompare(String(right), "pt-BR", { numeric: true, sensitivity: "base" });
+    return sort.direction === "asc" ? comparison : -comparison;
+  }), [purchases, sort]);
+  const requestSort = (key: ReportPurchaseSortKey) => setSort((current) => ({ direction: current.key === key && current.direction === "asc" ? "desc" : "asc", key }));
+
+  return <CollapsiblePanel description="Notas fiscais e compras lançadas dentro do período selecionado." eyebrow="Compras" storageKey="reports-purchases-open" title="Compras/notas lançadas no período"><div className="max-h-[460px] overflow-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="sticky top-0 z-10 bg-slate-50 text-slate-600"><tr><SortableHeader active={sort.key === "invoiceNumber"} direction={sort.direction} label="Nota" onClick={() => requestSort("invoiceNumber")} className="px-5 py-3" /><SortableHeader active={sort.key === "issueDate"} direction={sort.direction} label="Data" onClick={() => requestSort("issueDate")} className="px-5 py-3" /><SortableHeader active={sort.key === "supplier"} direction={sort.direction} label="Fornecedor" onClick={() => requestSort("supplier")} className="px-5 py-3" /><SortableHeader active={sort.key === "store"} direction={sort.direction} label="Loja" onClick={() => requestSort("store")} className="px-5 py-3" /><SortableHeader active={sort.key === "description"} direction={sort.direction} label="Descrição" onClick={() => requestSort("description")} className="px-5 py-3" /><SortableHeader active={sort.key === "total"} direction={sort.direction} label="Total" onClick={() => requestSort("total")} className="px-5 py-3" /></tr></thead><tbody className="divide-y divide-slate-100">{orderedPurchases.length ? orderedPurchases.map((item) => <tr key={item.id}><td className="px-5 py-3 font-medium">{item.invoiceNumber}</td><td className="px-5 py-3">{item.issueDate}</td><td className="px-5 py-3">{item.supplier}</td><td className="px-5 py-3">{item.store}</td><td className="px-5 py-3">{item.description || "Não informado"}</td><td className="px-5 py-3 font-medium">{item.total}</td></tr>) : <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={6}>Nenhuma compra/nota encontrada.</td></tr>}</tbody></table></div></CollapsiblePanel>;
+}

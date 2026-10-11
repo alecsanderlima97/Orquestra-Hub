@@ -35,7 +35,7 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
   const [nextPassword, setNextPassword] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  const provider = useMemo(() => currentLoginProvider(), []);
+  const provider = useMemo(() => user.authProvider || currentLoginProvider(), [user.authProvider]);
   const canEditCompany = canManageUsers(user.role);
 
   async function saveProfile() {
@@ -126,10 +126,12 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
           <button className="mt-4 inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={saving || !canEditCompany} onClick={saveCompany} title={canEditCompany ? "Salvar empresa" : "Somente Proprietário pode alterar a empresa"} type="button"><Save size={16} />Salvar empresa</button>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="font-semibold">Senha de login</h3>
-          {provider === "google" ? <p className="mt-2 text-sm text-slate-600">Esta conta entra pelo Google. A senha é gerenciada na sua conta Google.</p> : <div className="mt-5 grid gap-4 sm:grid-cols-2"><TextField label="Senha atual" onChange={(event) => setCurrentPassword(event.target.value)} placeholder="Senha atual" type="password" value={currentPassword} /><TextField label="Nova senha" onChange={(event) => setNextPassword(event.target.value)} placeholder="Mínimo 6 caracteres" type="password" value={nextPassword} /><button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-60 sm:col-span-2" disabled={saving || !currentPassword || !nextPassword} onClick={submitPassword} type="button"><KeyRound size={16} />Alterar senha</button></div>}
-        </section>
+        {provider === "google" ? <p className="rounded-md border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">Login conectado ao Google. A senha é administrada pela sua conta Google.</p> : (
+          <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="font-semibold">Senha de login</h3>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2"><TextField label="Senha atual" onChange={(event) => setCurrentPassword(event.target.value)} placeholder="Senha atual" type="password" value={currentPassword} /><TextField label="Nova senha" onChange={(event) => setNextPassword(event.target.value)} placeholder="Mínimo 6 caracteres" type="password" value={nextPassword} /><button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-60 sm:col-span-2" disabled={saving || !currentPassword || !nextPassword} onClick={submitPassword} type="button"><KeyRound size={16} />Alterar senha</button></div>
+          </section>
+        )}
 
         {message ? <p className="rounded-md bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">{message}</p> : null}
       </div>
