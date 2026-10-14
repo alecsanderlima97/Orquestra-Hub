@@ -3,6 +3,7 @@ import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, u
 import { defaultPlanId, getPlanRules, normalizePlanId } from "@/features/plans/planRules";
 import { consumeInvite, getInvite, type Invite } from "@/features/users/services/inviteService";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
+import { normalizeDateInput } from "@/lib/formatters/br";
 import { tenantPath } from "@/lib/firebase/paths";
 import { defaultTenantId } from "@/lib/tenant/tenant";
 import type { AppUser, CompanyMembership } from "../types/authTypes";
@@ -76,7 +77,7 @@ export async function touchTenantPresence(tenantId: string) {
   await updateDoc(doc(db, tenantPath(tenantId)), { lastSeenAt: serverTimestamp() }).catch(() => undefined);
 }
 
-export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate = ""): AppUser {
+export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate: unknown = ""): AppUser {
   const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) || role === "Dono" ? ownerRole() : role;
   return {
     authProvider: user.providerData.some((item) => item.providerId === "google.com") ? "google" : "password",
@@ -84,7 +85,7 @@ export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", 
     email: user.email || "",
     id: user.uid,
     name: user.displayName || user.email || "Usuário",
-    nextBillingDate,
+    nextBillingDate: normalizeDateInput(nextBillingDate),
     photoUrl: user.photoURL || "",
     planId: normalizePlanId(planId),
     role: effectiveRole,
@@ -278,6 +279,6 @@ export async function listUserCompanies(userId: string): Promise<CompanyMembersh
       getDoc(doc(firestore, tenantPath(membership.id))),
     ]);
     const role = platformOwnerEmails.has(currentEmail) || tenant.data()?.ownerId === userId ? ownerRole() : access.data()?.role || membership.data().role || "Consulta";
-    return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", nextBillingDate: tenant.data()?.nextBillingDate || "", planId: normalizePlanId(tenant.data()?.planId), role: role === "Dono" ? ownerRole() : role, subscriptionStatus: tenant.data()?.subscriptionStatus || "ativo", tenantId: membership.id };
+    return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", nextBillingDate: normalizeDateInput(tenant.data()?.nextBillingDate), planId: normalizePlanId(tenant.data()?.planId), role: role === "Dono" ? ownerRole() : role, subscriptionStatus: tenant.data()?.subscriptionStatus || "ativo", tenantId: membership.id };
   }));
 }

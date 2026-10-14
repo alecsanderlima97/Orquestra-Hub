@@ -5,7 +5,7 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import { TextField } from "@/components/ui/TextField";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import { canManageUsers } from "@/features/users/utils/accessRules";
-import { toTitleCaseBR } from "@/lib/formatters/br";
+import { formatDateInputBR, toTitleCaseBR } from "@/lib/formatters/br";
 import { changePassword, currentLoginProvider } from "../services/profileService";
 
 type Props = {
@@ -117,7 +117,7 @@ export function UserProfile({ onCompanySave, onProfileSave, user }: Props) {
             </div>
             <div>
               <span className="text-xs font-semibold uppercase text-slate-500">Proximo vencimento</span>
-              <strong className="mt-1 block text-slate-950">{user.nextBillingDate || "Nao informado"}</strong>
+              <strong className="mt-1 block text-slate-950">{formatDateInputBR(user.nextBillingDate) || "Nao informado"}</strong>
             </div>
           </div>
           <div className="mt-5">

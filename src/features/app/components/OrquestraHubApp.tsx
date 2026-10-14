@@ -79,7 +79,7 @@ import { createSupplier, deleteSupplier, listSuppliers, updateSupplier } from "@
 import type { Supplier } from "@/features/suppliers/types/supplierTypes";
 import { accountsPayable, fixedExpenses as demoFixedExpenses, purchases, stores, suppliers } from "@/lib/data/mockData";
 import { firebaseReady } from "@/lib/firebase/config";
-import { compareDateBR, formatCnpj, formatPhone, nowDateTimeBR, parseBRL, parseDateBR, todaySaoPaulo, toTitleCaseBR } from "@/lib/formatters/br";
+import { compareDateBR, formatCnpj, formatDateInputBR, formatPhone, nowDateTimeBR, parseBRL, parseDateBR, todaySaoPaulo, toTitleCaseBR } from "@/lib/formatters/br";
 import { defaultTenantId as legacyTenantId } from "@/lib/tenant/tenant";
 
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
@@ -137,10 +137,8 @@ function accountDueTime(dueDate: string) {
   return dueDate.includes("-") ? new Date(`${dueDate}T00:00:00`).getTime() : parseDateBR(dueDate).getTime();
 }
 
-function dateInputToBR(date: string) {
-  if (!date.includes("-")) return date;
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
+function dateInputToBR(date: unknown) {
+  return formatDateInputBR(date);
 }
 
 function daysUntilInputDate(date: string) {

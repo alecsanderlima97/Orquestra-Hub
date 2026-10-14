@@ -1,3 +1,5 @@
+import type { FirebaseTimestampLike } from "@/lib/formatters/br";
+
 export type AuditAction = "criou" | "editou" | "pagou" | "anexou" | "excluiu";
 export type AuditDetails = {
   details?: string;
@@ -7,7 +9,7 @@ export type AuditDetails = {
 export type AuditLog = {
   id: string;
   action: AuditAction;
-  createdAt?: { seconds: number };
+  createdAt?: FirebaseTimestampLike;
   details?: string;
   entity: string;
   entityId: string;

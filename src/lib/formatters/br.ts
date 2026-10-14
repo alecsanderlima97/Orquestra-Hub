@@ -21,6 +21,36 @@ export const brDateTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
   year: "numeric",
 });
 
+export type FirebaseTimestampLike = {
+  nanoseconds?: number;
+  seconds?: number;
+  toDate?: () => Date;
+  toMillis?: () => number;
+};
+
+function validDate(value: Date) {
+  return !Number.isNaN(value.getTime()) ? value : null;
+}
+
+export function firebaseValueToDate(value: unknown): Date | null {
+  if (value instanceof Date) return validDate(value);
+  if (typeof value === "number") return validDate(new Date(value));
+  if (typeof value === "string") return validDate(new Date(value));
+  if (!value || typeof value !== "object") return null;
+
+  const candidate = value as FirebaseTimestampLike;
+  try {
+    if (typeof candidate.toDate === "function") return validDate(candidate.toDate());
+    if (typeof candidate.toMillis === "function") return validDate(new Date(candidate.toMillis()));
+    if (typeof candidate.seconds === "number") {
+      return validDate(new Date(candidate.seconds * 1000 + Math.floor((candidate.nanoseconds || 0) / 1_000_000)));
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -76,13 +106,27 @@ export function formatDateBR(value: string) {
 export function formatFirebaseDateTime(value: unknown) {
   if (!value) return "";
   if (typeof value === "string") return value;
-  if (value instanceof Date) return brDateTimeFormatter.format(value);
-  if (typeof value === "object") {
-    const candidate = value as { nanoseconds?: number; seconds?: number; toDate?: () => Date };
-    if (typeof candidate.toDate === "function") return brDateTimeFormatter.format(candidate.toDate());
-    if (typeof candidate.seconds === "number") return brDateTimeFormatter.format(new Date(candidate.seconds * 1000 + Math.floor((candidate.nanoseconds || 0) / 1000000)));
-  }
-  return String(value);
+  const date = firebaseValueToDate(value);
+  return date ? brDateTimeFormatter.format(date) : "";
+}
+
+export function normalizeDateInput(value: unknown) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  const date = firebaseValueToDate(value);
+  if (!date) return "";
+  const parts = brDateFormatter.formatToParts(date).reduce<Record<string, string>>((result, part) => {
+    result[part.type] = part.value;
+    return result;
+  }, {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function formatDateInputBR(value: unknown) {
+  if (!value) return "";
+  if (typeof value === "string") return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatDateBR(value) : value;
+  const normalized = normalizeDateInput(value);
+  return normalized ? formatDateBR(normalized) : "";
 }
 
 export function parseDateBR(value: string) {

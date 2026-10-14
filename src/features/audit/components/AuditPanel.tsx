@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVisibilityToggle";
+import { firebaseValueToDate } from "@/lib/formatters/br";
 import type { AuditLog } from "../types/auditTypes";
 
 export function AuditPanel({ logs }: { logs: AuditLog[] }) {
@@ -16,7 +17,7 @@ export function AuditPanel({ logs }: { logs: AuditLog[] }) {
         {visibleLogs.length ? visibleLogs.map((log) => (
           <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 px-5 py-3 text-sm" key={log.id}>
             <span className="min-w-0"><strong>{log.userName || log.userEmail}</strong> <span className="text-slate-500">({log.userEmail})</span> {log.action} {log.entity}<span className="text-slate-500">: {log.details || log.entityId}</span></span>
-            {log.createdAt?.seconds ? <time className="shrink-0 text-xs text-slate-500" dateTime={new Date(log.createdAt.seconds * 1000).toISOString()}>{new Date(log.createdAt.seconds * 1000).toLocaleString("pt-BR")}</time> : null}
+            {(() => { const createdAt = firebaseValueToDate(log.createdAt); return createdAt ? <time className="shrink-0 text-xs text-slate-500" dateTime={createdAt.toISOString()}>{createdAt.toLocaleString("pt-BR")}</time> : null; })()}
           </div>
         )) : <p className="px-5 py-6 text-sm text-slate-500">Nenhuma alteração registrada.</p>}
         </div>
