@@ -13,7 +13,12 @@ async function fetchJson(url: string) {
 
 function isGoogleMapsHost(hostname: string) {
   const host = hostname.toLowerCase();
-  return host === "google.com" || host.endsWith(".google.com") || host === "goo.gl" || host.endsWith(".goo.gl");
+  return host === "google.com" || host.endsWith(".google.com") || host === "share.google" || host === "goo.gl" || host.endsWith(".goo.gl");
+}
+
+function isGoogleMapsLocation(url: URL) {
+  const host = url.hostname.toLowerCase();
+  return (host === "google.com" || host.endsWith(".google.com")) && (host.startsWith("maps.") || url.pathname === "/maps" || url.pathname.startsWith("/maps/"));
 }
 
 async function resolveMapsUrl(rawUrl: string) {
@@ -76,6 +81,9 @@ export async function GET(request: Request) {
       }
       if (!isGoogleMapsHost(mapsUrl.hostname)) return NextResponse.json({ error: "Use um link do Google Maps." }, { status: 400 });
       const resolvedUrl = await resolveMapsUrl(rawValue);
+      if (!isGoogleMapsLocation(new URL(resolvedUrl))) {
+        return NextResponse.json({ error: "Esse link veio da Pesquisa Google e não contém os dados da ficha. Abra o local no Google Maps e copie o link da localização." }, { status: 422 });
+      }
       return NextResponse.json(parseGoogleMapsLink(resolvedUrl));
     }
 
