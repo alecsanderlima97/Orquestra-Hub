@@ -349,18 +349,30 @@ export function PlatformAdminPanel() {
       /> : null}
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1480px] text-left text-sm">
+        <table className="w-full table-fixed text-left text-xs sm:text-sm">
+          <colgroup>
+            <col className="w-[29%] 2xl:w-[20%]" />
+            <col className="w-[13%] 2xl:w-[8%]" />
+            <col className="w-[10%] 2xl:w-[7%]" />
+            <col className="w-[13%] 2xl:w-[9%]" />
+            <col className="hidden w-[9%] 2xl:table-column 2xl:w-[9%]" />
+            <col className="w-[15%] 2xl:w-[12%]" />
+            <col className="hidden w-[10%] 2xl:table-column 2xl:w-[10%]" />
+            <col className="hidden w-[7%] 2xl:table-column 2xl:w-[7%]" />
+            <col className="hidden w-[7%] 2xl:table-column 2xl:w-[7%]" />
+            <col className="w-[20%] 2xl:w-[11%]" />
+          </colgroup>
           <thead className="bg-slate-50 text-slate-600">
             <tr>
               <th className="px-5 py-3">Cliente</th>
               <th className="px-5 py-3">Plano</th>
               <th className="px-5 py-3">Status</th>
               <th className="px-5 py-3">Vencimento</th>
-              <th className="px-5 py-3">Inscricao</th>
+              <th className="hidden px-5 py-3 2xl:table-cell">Inscricao</th>
               <th className="px-5 py-3">Situacao calculada</th>
-              <th className="px-5 py-3">Ultimo acesso</th>
-              <th className="px-5 py-3">Online</th>
-              <th className="px-5 py-3">Créditos IA</th>
+              <th className="hidden px-5 py-3 2xl:table-cell">Ultimo acesso</th>
+              <th className="hidden px-5 py-3 2xl:table-cell">Online</th>
+              <th className="hidden px-5 py-3 2xl:table-cell">Créditos IA</th>
               <th className="px-5 py-3">Ação</th>
             </tr>
           </thead>
@@ -375,6 +387,7 @@ export function PlatformAdminPanel() {
                   <p className="text-xs text-slate-500">{item.id}</p>
                   <p className="mt-1 text-xs text-slate-600">{item.contactName || "Responsável não informado"}</p>
                   <p className="text-xs text-slate-500">{item.contactPhone || item.contactEmail || "Contato não informado"}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500 2xl:hidden">Acesso: {formatDateTime(item.lastAccessAt)} · {online ? "Online" : "Offline"} · IA {item.aiBalance}/{item.aiIncluded}</p>
                 </td>
                 <td className="px-5 py-3">
                   <span className="font-medium text-slate-950">{plans[item.planId].label}</span>
@@ -385,15 +398,15 @@ export function PlatformAdminPanel() {
                 <td className="px-5 py-3">
                   {item.nextBillingDate ? formatInputDateBR(item.nextBillingDate) : "Sem vencimento"}
                 </td>
-                <td className="px-5 py-3">{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
+                <td className="hidden px-5 py-3 2xl:table-cell">{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
                 <td className="px-5 py-3">
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${calculatedStatus.tone}`}>{calculatedStatus.label}</span>
                 </td>
-                <td className="px-5 py-3">{formatDateTime(item.lastAccessAt)}</td>
-                <td className="px-5 py-3">
+                <td className="hidden px-5 py-3 2xl:table-cell">{formatDateTime(item.lastAccessAt)}</td>
+                <td className="hidden px-5 py-3 2xl:table-cell">
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>{online ? "Online agora" : "Offline"}</span>
                 </td>
-                <td className="px-5 py-3">{item.aiBalance}/{item.aiIncluded}</td>
+                <td className="hidden px-5 py-3 2xl:table-cell">{item.aiBalance}/{item.aiIncluded}</td>
                 <td className="px-5 py-3">
                   <div className="flex flex-wrap gap-2">
                     <button className="inline-flex h-10 items-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-3 text-xs font-semibold text-cyan-800 hover:bg-cyan-100" onClick={() => setEditingTenantId(item.id)} type="button"><Pencil size={15} />Abrir cadastro</button>

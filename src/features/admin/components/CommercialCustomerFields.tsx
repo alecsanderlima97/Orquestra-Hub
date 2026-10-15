@@ -14,29 +14,34 @@ type Props = {
 const inputClass = "h-10 rounded-md border border-slate-300 bg-white px-3 text-sm";
 
 export function CommercialCustomerFields({ onChange, value }: Props) {
-  const [loading, setLoading] = useState<"cep" | "cnpj" | "" >("");
+  const [loading, setLoading] = useState<"cep" | "cnpj" | "maps" | "" >("");
   const [message, setMessage] = useState("");
 
   function update(key: keyof CommercialProfile, next: string) {
     onChange({ [key]: next });
   }
 
-  async function lookup(type: "cep" | "cnpj") {
-    const raw = type === "cep" ? value.cep || "" : value.document || "";
+  async function lookup(type: "cep" | "cnpj" | "maps") {
+    const raw = type === "cep" ? value.cep || "" : type === "cnpj" ? value.document || "" : value.mapUrl || "";
     const expectedLength = type === "cep" ? 8 : 14;
     const clean = raw.replace(/\D/g, "");
-    if (clean.length !== expectedLength) {
+    if (type !== "maps" && clean.length !== expectedLength) {
       setMessage(type === "cep" ? "Informe um CEP com 8 números." : "Informe um CNPJ com 14 números.");
+      return;
+    }
+    if (type === "maps" && !raw.trim()) {
+      setMessage("Cole um link do Google Maps antes de importar.");
       return;
     }
     setLoading(type);
     setMessage("");
     try {
-      const response = await fetch(`/api/lookup?type=${type}&value=${clean}`);
+      const requestValue = type === "maps" ? raw.trim() : clean;
+      const response = await fetch(`/api/lookup?type=${type}&value=${encodeURIComponent(requestValue)}`);
       const data = await response.json() as CommercialProfile & { error?: string };
       if (!response.ok) throw new Error(data.error || "lookup-failed");
       onChange(data);
-      setMessage(type === "cep" ? "Endereço preenchido. Confira antes de salvar." : "Dados da empresa encontrados. Confira antes de salvar.");
+      setMessage(type === "cep" ? "Endereço preenchido. Confira antes de salvar." : type === "cnpj" ? "Dados da empresa encontrados. Confira antes de salvar." : "Dados encontrados no link do Maps. Confira antes de salvar.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível consultar os dados.");
     } finally {
@@ -65,6 +70,14 @@ export function CommercialCustomerFields({ onChange, value }: Props) {
         <p className="mt-1 text-xs text-slate-600">Consulte os dados quando desejar e confirme antes de salvar. Todos os campos continuam editáveis.</p>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="md:col-span-4">
+          <span className="text-sm font-medium text-slate-700">Link do Google Maps</span>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input aria-label="Link do Google Maps" className={`${inputClass} min-w-0 flex-1`} onChange={(event) => update("mapUrl", event.target.value)} placeholder="Cole aqui o link compartilhado do Google Maps" value={value.mapUrl || ""} />
+            <button aria-label="Importar dados do Google Maps" className="inline-flex h-10 shrink-0 items-center justify-center gap-1 rounded-md border border-cyan-200 bg-white px-3 text-xs font-semibold text-cyan-800 hover:bg-cyan-50" disabled={loading === "maps"} onClick={() => void lookup("maps")} title="Preencher os dados disponíveis no link do Google Maps" type="button">{loading === "maps" ? <LoaderCircle className="animate-spin" size={15} /> : <MapPinned size={15} />}Importar dados</button>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">O Hub aproveita o nome e o endereço que estiverem disponíveis no link. Confira tudo antes de salvar.</p>
+        </div>
         <div className="md:col-span-2">
           <span className="text-sm font-medium text-slate-700">Documento</span>
           <div className="mt-2 flex gap-2">
