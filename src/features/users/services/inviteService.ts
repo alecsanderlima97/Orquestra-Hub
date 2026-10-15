@@ -6,7 +6,11 @@ import { tenantCollectionPath } from "@/lib/firebase/paths";
 import { isInviteAvailable } from "../utils/accessRules";
 
 export type Invite = {
+  address?: string;
+  addressComplement?: string;
+  addressNumber?: string;
   billingDay?: string;
+  cep?: string;
   city?: string;
   code: string;
   commercialNotes?: string;
@@ -15,8 +19,12 @@ export type Invite = {
   contactName?: string;
   contactPhone?: string;
   document?: string;
+  documentType?: "CPF" | "CNPJ";
   inviteType?: "commercial" | "user";
   monthlyFee?: string;
+  legalName?: string;
+  mapUrl?: string;
+  neighborhood?: string;
   nextBillingDate?: string;
   paymentMethod?: string;
   planId?: PlanId;
@@ -25,6 +33,7 @@ export type Invite = {
   state?: string;
   subscriptionStatus?: AppUser["subscriptionStatus"];
   tenantId?: string;
+  tradeName?: string;
   status: "Ativo" | "Usado" | "Cancelado" | "Expirado";
   expiresAt?: Timestamp;
   createdAt?: Timestamp;
@@ -46,7 +55,7 @@ export async function createInvite(tenantId: string, companyName: string, role: 
   return invite;
 }
 
-export type CommercialInviteData = Pick<Invite, "billingDay" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "monthlyFee" | "paymentMethod" | "startDate" | "state">;
+export type CommercialInviteData = Pick<Invite, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "legalName" | "mapUrl" | "monthlyFee" | "neighborhood" | "paymentMethod" | "startDate" | "state" | "tradeName">;
 
 export async function createCommercialInvite(planId: PlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "trial", nextBillingDate = "", commercialData: CommercialInviteData = {}) {
   if (!firebaseReady || !db) return { code: "DEMO1234", inviteType: "commercial" as const, planId, role: "Proprietário" as const, status: "Ativo" as const, subscriptionStatus };

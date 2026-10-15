@@ -73,6 +73,16 @@ export function formatCnpj(value: string) {
     .replace(/(\d{4})(\d)/, "$1-$2");
 }
 
+export function formatCpf(value: string) {
+  const digits = onlyDigits(value).slice(0, 11);
+  return digits.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1-$2");
+}
+
+export function formatDocument(value: string) {
+  const digits = onlyDigits(value).slice(0, 14);
+  return digits.length > 11 ? formatCnpj(digits) : formatCpf(digits);
+}
+
 export function formatPhone(value: string) {
   const digits = onlyDigits(value).slice(0, 11);
   if (digits.length <= 10) {

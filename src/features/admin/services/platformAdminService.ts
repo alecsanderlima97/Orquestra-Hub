@@ -9,19 +9,27 @@ export const platformAdminEmails = new Set(["limaalecsander@gmail.com"]);
 export type SubscriptionStatus = NonNullable<AppUser["subscriptionStatus"]>;
 
 export type PlatformTenant = {
+  address?: string;
+  addressComplement?: string;
+  addressNumber?: string;
   aiBalance: number;
   aiIncluded: number;
   billingDay?: string;
+  cep?: string;
   city?: string;
   commercialNotes?: string;
   contactEmail?: string;
   contactName?: string;
   contactPhone?: string;
   document?: string;
+  documentType?: "CPF" | "CNPJ";
   id: string;
   lastAccessAt?: number;
   lastSeenAt?: number;
+  legalName?: string;
+  mapUrl?: string;
   monthlyFee?: string;
+  neighborhood?: string;
   name: string;
   nextBillingDate?: string;
   ownerId?: string;
@@ -30,6 +38,7 @@ export type PlatformTenant = {
   startDate?: string;
   state?: string;
   subscriptionStatus: SubscriptionStatus;
+  tradeName?: string;
 };
 
 export type PlatformPayment = {
@@ -61,17 +70,25 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
     return {
       aiBalance: Number(aiCredits.balance || 0),
       aiIncluded: Number(aiCredits.included || 0),
+      address: data.address || "",
+      addressComplement: data.addressComplement || "",
+      addressNumber: data.addressNumber || "",
       billingDay: data.billingDay || "",
+      cep: data.cep || "",
       city: data.city || "",
       commercialNotes: data.commercialNotes || "",
       contactEmail: data.contactEmail || "",
       contactName: data.contactName || "",
       contactPhone: data.contactPhone || "",
       document: data.document || "",
+      documentType: data.documentType || "",
       id: item.id,
       lastAccessAt: timestampToMillis(data.lastAccessAt),
       lastSeenAt: timestampToMillis(data.lastSeenAt),
+      legalName: data.legalName || "",
+      mapUrl: data.mapUrl || "",
       monthlyFee: data.monthlyFee || "",
+      neighborhood: data.neighborhood || "",
       name: String(data.name || "Empresa"),
       nextBillingDate: data.nextBillingDate || "",
       ownerId: data.ownerId || "",
@@ -80,11 +97,12 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
       startDate: data.startDate || "",
       state: data.state || "",
       subscriptionStatus: data.subscriptionStatus || "ativo",
+      tradeName: data.tradeName || "",
     } as PlatformTenant;
   });
 }
 
-export async function updateTenantSubscription(tenantId: string, updates: Partial<Pick<PlatformTenant, "billingDay" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "monthlyFee" | "nextBillingDate" | "paymentMethod" | "planId" | "startDate" | "state" | "subscriptionStatus">> & { planId: PlanId; subscriptionStatus: SubscriptionStatus }) {
+export async function updateTenantSubscription(tenantId: string, updates: Partial<Pick<PlatformTenant, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "legalName" | "mapUrl" | "monthlyFee" | "neighborhood" | "nextBillingDate" | "paymentMethod" | "planId" | "startDate" | "state" | "subscriptionStatus" | "tradeName">> & { planId: PlanId; subscriptionStatus: SubscriptionStatus }) {
   if (!firebaseReady || !db) return;
   await updateDoc(doc(db, tenantPath(tenantId)), { ...updates, updatedAt: serverTimestamp() });
 }

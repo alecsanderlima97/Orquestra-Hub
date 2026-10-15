@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import type { PlanId } from "@/features/plans/planRules";
 import { plans } from "@/features/plans/planRules";
 import { createCommercialInvite } from "@/features/users/services/inviteService";
-import { formatBRL, formatCnpj, formatPhone, parseBRL, toTitleCaseBR } from "@/lib/formatters/br";
+import { formatBRL, formatPhone, parseBRL, toTitleCaseBR } from "@/lib/formatters/br";
+import type { CommercialDocumentType } from "../types/commercialProfile";
+import { CommercialCustomerFields } from "./CommercialCustomerFields";
 import { confirmTenantPayment, listPlatformTenants, listTenantPayments, type PlatformPayment, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
@@ -91,6 +93,9 @@ function billingStatus(item: PlatformTenant) {
 
 export function PlatformAdminPanel() {
   const [commercialForm, setCommercialForm] = useState({
+    address: "",
+    addressComplement: "",
+    addressNumber: "",
     billingDay: "",
     city: "",
     commercialNotes: "",
@@ -98,10 +103,15 @@ export function PlatformAdminPanel() {
     contactName: "",
     contactPhone: "",
     document: "",
+    documentType: "CNPJ" as CommercialDocumentType,
+    legalName: "",
+    mapUrl: "",
     monthlyFee: plans.medio.price,
+    neighborhood: "",
     paymentMethod: "PIX",
     startDate: todayInput(),
     state: "",
+    tradeName: "",
   });
   const [inviteBillingDate, setInviteBillingDate] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -159,20 +169,29 @@ export function PlatformAdminPanel() {
     setMessage("");
     try {
       await updateTenantSubscription(item.id, {
+        address: item.address,
+        addressComplement: item.addressComplement,
+        addressNumber: item.addressNumber,
         billingDay: item.billingDay,
+        cep: item.cep,
         city: item.city,
         commercialNotes: item.commercialNotes,
         contactEmail: item.contactEmail,
         contactName: item.contactName,
         contactPhone: item.contactPhone,
         document: item.document,
+        documentType: item.documentType,
+        legalName: item.legalName,
+        mapUrl: item.mapUrl,
         monthlyFee: item.monthlyFee,
+        neighborhood: item.neighborhood,
         nextBillingDate: item.nextBillingDate,
         paymentMethod: item.paymentMethod,
         planId: item.planId,
         startDate: item.startDate,
         state: item.state,
         subscriptionStatus: item.subscriptionStatus,
+        tradeName: item.tradeName,
       });
       setEditingTenantId("");
       setMessage("Cliente atualizado com sucesso.");
@@ -281,9 +300,6 @@ export function PlatformAdminPanel() {
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => setCommercialForm((form) => ({ ...form, contactName: toTitleCaseBR(form.contactName) }))} onChange={(event) => setCommercialForm((form) => ({ ...form, contactName: toTitleCaseBR(event.target.value) }))} placeholder="Responsável pelo contrato" value={commercialForm.contactName} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, contactPhone: formatPhone(event.target.value) }))} placeholder="WhatsApp" value={commercialForm.contactPhone} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, contactEmail: event.target.value.toLowerCase() }))} placeholder="E-mail comercial" type="email" value={commercialForm.contactEmail} />
-          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, document: formatCnpj(event.target.value) }))} placeholder="CNPJ/CPF" value={commercialForm.document} />
-          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => setCommercialForm((form) => ({ ...form, city: toTitleCaseBR(form.city) }))} onChange={(event) => setCommercialForm((form) => ({ ...form, city: toTitleCaseBR(event.target.value) }))} placeholder="Cidade" value={commercialForm.city} />
-          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm uppercase" maxLength={2} onChange={(event) => setCommercialForm((form) => ({ ...form, state: event.target.value.toUpperCase() }))} placeholder="UF" value={commercialForm.state} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => setCommercialForm((form) => ({ ...form, monthlyFee: formatBRL(form.monthlyFee) }))} onChange={(event) => setCommercialForm((form) => ({ ...form, monthlyFee: event.target.value }))} placeholder="Mensalidade" value={commercialForm.monthlyFee} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" maxLength={2} onChange={(event) => setCommercialForm((form) => ({ ...form, billingDay: event.target.value.replace(/\D/g, "").slice(0, 2) }))} placeholder="Dia venc." value={commercialForm.billingDay} />
           <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, paymentMethod: event.target.value }))} value={commercialForm.paymentMethod}>
@@ -295,6 +311,7 @@ export function PlatformAdminPanel() {
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, startDate: event.target.value }))} title="Data de início do cliente" type="date" value={commercialForm.startDate} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm md:col-span-2" onChange={(event) => setCommercialForm((form) => ({ ...form, commercialNotes: event.target.value }))} placeholder="Observações internas do cliente" value={commercialForm.commercialNotes} />
         </div>
+        <CommercialCustomerFields onChange={(updates) => setCommercialForm((form) => ({ ...form, ...updates }))} value={commercialForm} />
         {inviteCode ? (
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-cyan-100 bg-cyan-50 px-4 py-3">
             <span className="text-sm text-slate-600">Código:</span>
@@ -382,9 +399,6 @@ export function PlatformAdminPanel() {
                         <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => updateTenantLocal(item.id, { contactName: toTitleCaseBR(item.contactName || "") })} onChange={(event) => updateTenantLocal(item.id, { contactName: toTitleCaseBR(event.target.value) })} placeholder="Responsável" value={item.contactName || ""} />
                         <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { contactPhone: formatPhone(event.target.value) })} placeholder="WhatsApp" value={item.contactPhone || ""} />
                         <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { contactEmail: event.target.value.toLowerCase() })} placeholder="E-mail comercial" type="email" value={item.contactEmail || ""} />
-                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { document: formatCnpj(event.target.value) })} placeholder="CNPJ/CPF" value={item.document || ""} />
-                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => updateTenantLocal(item.id, { city: toTitleCaseBR(item.city || "") })} onChange={(event) => updateTenantLocal(item.id, { city: toTitleCaseBR(event.target.value) })} placeholder="Cidade" value={item.city || ""} />
-                        <input className="h-10 rounded-md border border-slate-300 px-3 text-sm uppercase" maxLength={2} onChange={(event) => updateTenantLocal(item.id, { state: event.target.value.toUpperCase() })} placeholder="UF" value={item.state || ""} />
                         <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => updateTenantLocal(item.id, { monthlyFee: formatBRL(item.monthlyFee || plans[item.planId].price) })} onChange={(event) => updateTenantLocal(item.id, { monthlyFee: event.target.value })} placeholder="Mensalidade" value={item.monthlyFee || ""} />
                         <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" maxLength={2} onChange={(event) => updateTenantLocal(item.id, { billingDay: event.target.value.replace(/\D/g, "").slice(0, 2) })} placeholder="Dia venc." value={item.billingDay || ""} />
                         <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { paymentMethod: event.target.value })} value={item.paymentMethod || "PIX"}>
@@ -396,6 +410,7 @@ export function PlatformAdminPanel() {
                         <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => updateTenantLocal(item.id, { startDate: event.target.value })} title="Data de início do cliente" type="date" value={item.startDate || ""} />
                         <input className="h-10 rounded-md border border-slate-300 px-3 text-sm md:col-span-2" onChange={(event) => updateTenantLocal(item.id, { commercialNotes: event.target.value })} placeholder="Observações internas" value={item.commercialNotes || ""} />
                       </div>
+                      <CommercialCustomerFields onChange={(updates) => updateTenantLocal(item.id, updates)} value={item} />
                     </div>
                   </td>
                 </tr>

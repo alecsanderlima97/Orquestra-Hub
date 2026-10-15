@@ -30,8 +30,12 @@ function renewalMonth() {
 function tenantPayload(name: string, ownerId: string, invite: Invite) {
   const plan = getPlanRules(invite.planId || defaultPlanId);
   return {
+    address: invite.address || "",
+    addressComplement: invite.addressComplement || "",
+    addressNumber: invite.addressNumber || "",
     aiCredits: { balance: plan.initialAiCredits, included: plan.initialAiCredits, renewalMonth: renewalMonth(), status: "Ativo", used: 0 },
     billingDay: invite.billingDay || "",
+    cep: invite.cep || "",
     city: invite.city || "",
     commercialNotes: invite.commercialNotes || "",
     contactEmail: invite.contactEmail || "",
@@ -39,9 +43,13 @@ function tenantPayload(name: string, ownerId: string, invite: Invite) {
     contactPhone: invite.contactPhone || "",
     createdAt: serverTimestamp(),
     document: invite.document || "",
+    documentType: invite.documentType || "",
     firstBillingDate: invite.nextBillingDate || "",
+    legalName: invite.legalName || "",
+    mapUrl: invite.mapUrl || "",
     monthlyFee: invite.monthlyFee || plan.price,
     name,
+    neighborhood: invite.neighborhood || "",
     nextBillingDate: invite.nextBillingDate || "",
     ownerId,
     paymentMethod: invite.paymentMethod || "PIX",
@@ -51,6 +59,7 @@ function tenantPayload(name: string, ownerId: string, invite: Invite) {
     startDate: invite.startDate || "",
     state: invite.state || "",
     subscriptionStatus: invite.subscriptionStatus || "trial",
+    tradeName: invite.tradeName || "",
   };
 }
 
