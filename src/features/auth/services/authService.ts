@@ -8,11 +8,16 @@ import { tenantPath } from "@/lib/firebase/paths";
 import { defaultTenantId } from "@/lib/tenant/tenant";
 import type { AppUser, CompanyMembership } from "../types/authTypes";
 
-const platformOwnerEmails = new Set(["limaalecsander@gmail.com"]);
+const platformOwnerEmails = new Set(["orquestracs@gmail.com"]);
+const platformAdminTenantId = "orquestra-platform-admin";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+export function isPlatformOwnerEmail(email?: string | null) {
+  return Boolean(email && platformOwnerEmails.has(normalizeEmail(email)));
 }
 
 function ownerRole(): AppUser["role"] {
@@ -87,7 +92,7 @@ export async function touchTenantPresence(tenantId: string) {
 }
 
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate: unknown = ""): AppUser {
-  const effectiveRole = platformOwnerEmails.has((user.email || "").toLowerCase()) || role === "Dono" ? ownerRole() : role;
+  const effectiveRole = isPlatformOwnerEmail(user.email) || role === "Dono" ? ownerRole() : role;
   return {
     authProvider: user.providerData.some((item) => item.providerId === "google.com") ? "google" : "password",
     companyName,
@@ -109,6 +114,12 @@ function cacheUser(user: AppUser) {
 }
 
 async function mapUserWithRole(user: User, allowOnboarding = false) {
+  if (isPlatformOwnerEmail(user.email)) {
+    return cacheUser({
+      ...mapFirebaseUser(user, ownerRole(), platformAdminTenantId, "Orquestra.cs Admin", "premium", "ativo"),
+      needsOnboarding: false,
+    });
+  }
   if (!db) return mapFirebaseUser(user);
   const memberships = await getDocs(collection(db, `userTenants/${user.uid}/memberships`));
   if (!memberships.empty) {
@@ -118,7 +129,7 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
       getDoc(doc(db, `${tenantPath(membership.id)}/users/${user.uid}`)),
       getDoc(doc(db, tenantPath(membership.id))),
     ]);
-    const role = platformOwnerEmails.has((user.email || "").toLowerCase()) || tenant.data()?.ownerId === user.uid
+    const role = isPlatformOwnerEmail(user.email) || tenant.data()?.ownerId === user.uid
       ? ownerRole()
       : access.data()?.role || data.role || "Consulta";
     const mapped = {
@@ -287,7 +298,7 @@ export async function listUserCompanies(userId: string): Promise<CompanyMembersh
       getDoc(doc(firestore, `${tenantPath(membership.id)}/users/${userId}`)),
       getDoc(doc(firestore, tenantPath(membership.id))),
     ]);
-    const role = platformOwnerEmails.has(currentEmail) || tenant.data()?.ownerId === userId ? ownerRole() : access.data()?.role || membership.data().role || "Consulta";
+    const role = isPlatformOwnerEmail(currentEmail) || tenant.data()?.ownerId === userId ? ownerRole() : access.data()?.role || membership.data().role || "Consulta";
     return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", nextBillingDate: normalizeDateInput(tenant.data()?.nextBillingDate), planId: normalizePlanId(tenant.data()?.planId), role: role === "Dono" ? ownerRole() : role, subscriptionStatus: tenant.data()?.subscriptionStatus || "ativo", tenantId: membership.id };
   }));
 }

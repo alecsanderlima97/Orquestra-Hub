@@ -4,7 +4,7 @@ import type { PlanId } from "@/features/plans/planRules";
 import { db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
 
-export const platformAdminEmails = new Set(["limaalecsander@gmail.com"]);
+export const platformAdminEmails = new Set(["orquestracs@gmail.com"]);
 
 export type SubscriptionStatus = NonNullable<AppUser["subscriptionStatus"]>;
 
@@ -54,7 +54,7 @@ export type PlatformPayment = {
 };
 
 export function isPlatformAdmin(user?: AppUser | null) {
-  return Boolean(user?.email && platformAdminEmails.has(user.email.toLowerCase()));
+  return Boolean(user?.email && platformAdminEmails.has(user.email.trim().toLowerCase()));
 }
 
 function timestampToMillis(value: unknown) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, CircleDollarSign, Copy, Pause, Pencil, RefreshCw, Save, Trash2, TicketPlus } from "lucide-react";
+import { Archive, ChevronDown, ChevronUp, CircleDollarSign, Copy, Pause, Pencil, RefreshCw, Save, TicketPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { PlanId } from "@/features/plans/planRules";
 import { plans } from "@/features/plans/planRules";
@@ -127,6 +127,8 @@ export function PlatformAdminPanel() {
   const [paymentForm, setPaymentForm] = useState({ amount: "", method: "PIX", nextBillingDate: "", notes: "", paidAt: todayInput(), referenceMonth: "" });
   const [paymentsByTenant, setPaymentsByTenant] = useState<Record<string, PlatformPayment[]>>({});
   const editingTenant = editingTenantId ? tenants.find((tenant) => tenant.id === editingTenantId) : undefined;
+  const activeTenants = tenants.filter((tenant) => tenant.subscriptionStatus !== "cancelado");
+  const inactiveTenants = tenants.filter((tenant) => tenant.subscriptionStatus === "cancelado");
 
   async function load() {
     setLoading(true);
@@ -209,7 +211,7 @@ export function PlatformAdminPanel() {
   }
 
   async function changeStatus(item: PlatformTenant, subscriptionStatus: SubscriptionStatus) {
-    const action = subscriptionStatus === "pausado" ? "pausar" : "cancelar";
+    const action = subscriptionStatus === "pausado" ? "pausar" : subscriptionStatus === "cancelado" ? "remover" : "reativar";
     if (!window.confirm(`Deseja ${action} o cliente ${item.name}? Os dados serao preservados.`)) return;
     const next = { ...item, subscriptionStatus };
     updateTenantLocal(item.id, { subscriptionStatus });
@@ -377,7 +379,7 @@ export function PlatformAdminPanel() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {tenants.map((item) => {
+            {activeTenants.map((item) => {
               const calculatedStatus = billingStatus(item);
               const online = isOnline(item.lastSeenAt);
               return [
@@ -413,7 +415,7 @@ export function PlatformAdminPanel() {
                     <button aria-label={`Confirmar pagamento de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition duration-150 hover:-translate-y-0.5 hover:bg-emerald-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Registrar pagamento e atualizar vencimento" type="button"><CircleDollarSign size={15} />Confirmar pagamento</button>
                     <div className="grid grid-cols-2 gap-2">
                       <button aria-label={`Pausar ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-2 text-xs font-semibold text-amber-800 transition duration-150 hover:-translate-y-0.5 hover:bg-amber-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => changeStatus(item, "pausado")} title="Pausar acesso preservando os dados" type="button"><Pause size={14} /><span className="truncate">Pausar</span></button>
-                      <button aria-label={`Excluir ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-2 text-xs font-semibold text-rose-700 transition duration-150 hover:-translate-y-0.5 hover:bg-rose-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Excluir acesso preservando os dados" type="button"><Trash2 size={14} /><span className="truncate">Excluir</span></button>
+                      <button aria-label={`Remover ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-2 text-xs font-semibold text-rose-700 transition duration-150 hover:-translate-y-0.5 hover:bg-rose-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Remover da lista ativa e preservar os dados" type="button"><Archive size={14} /><span className="truncate">Remover</span></button>
                     </div>
                   </div>
                 </td>
@@ -487,6 +489,27 @@ export function PlatformAdminPanel() {
           </tbody>
         </table>
       </div>
+
+      {inactiveTenants.length ? (
+        <details className="border-t border-slate-100">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <span>Clientes inativos</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">{inactiveTenants.length}</span>
+          </summary>
+          <div className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/60">
+            {inactiveTenants.map((item) => (
+              <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between" key={item.id}>
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-800">{item.name}</p>
+                  <p className="text-xs text-slate-500">{item.contactName || "Responsável não informado"} · {plans[item.planId].label}</p>
+                  <p className="text-xs text-slate-500">Dados preservados · status removido</p>
+                </div>
+                <button aria-label={`Reativar ${item.name}`} className="inline-flex min-h-9 items-center justify-center gap-2 self-start rounded-md border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-cyan-800 transition duration-150 hover:-translate-y-0.5 hover:bg-cyan-50 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 sm:self-auto" onClick={() => changeStatus(item, "ativo")} title="Voltar o cliente para a lista ativa" type="button"><RefreshCw size={14} />Reativar</button>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
       {message ? <p className="border-t border-slate-100 px-5 py-3 text-sm font-medium text-slate-700">{message}</p> : null}
     </section>
   );

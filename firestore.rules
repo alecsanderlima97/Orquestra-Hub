@@ -5,7 +5,7 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null;
     }
-    function isPlatformOwner() { return signedIn() && request.auth.token.email == 'limaalecsander@gmail.com'; }
+    function isPlatformOwner() { return signedIn() && request.auth.token.email == 'orquestracs@gmail.com'; }
 
     function belongsToTenant(tenantId) {
       return signedIn()
