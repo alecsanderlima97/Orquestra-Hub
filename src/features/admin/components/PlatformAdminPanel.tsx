@@ -351,12 +351,12 @@ export function PlatformAdminPanel() {
       <div className="overflow-x-auto">
         <table className="w-full table-fixed text-left text-xs sm:text-sm">
           <colgroup>
-            <col className="w-[29%] 2xl:w-[20%]" />
-            <col className="w-[13%] 2xl:w-[8%]" />
-            <col className="w-[10%] 2xl:w-[7%]" />
-            <col className="w-[13%] 2xl:w-[9%]" />
-            <col className="hidden w-[9%] 2xl:table-column 2xl:w-[9%]" />
-            <col className="w-[15%] 2xl:w-[12%]" />
+            <col className="w-[29%] xl:w-[25%] 2xl:w-[20%]" />
+            <col className="w-[13%] xl:w-[10%] 2xl:w-[8%]" />
+            <col className="w-[10%] xl:w-[8%] 2xl:w-[7%]" />
+            <col className="hidden w-[10%] xl:table-column xl:w-[10%] 2xl:w-[9%]" />
+            <col className="w-[13%] xl:w-[10%] 2xl:w-[9%]" />
+            <col className="w-[15%] xl:w-[17%] 2xl:w-[12%]" />
             <col className="hidden w-[10%] 2xl:table-column 2xl:w-[10%]" />
             <col className="hidden w-[7%] 2xl:table-column 2xl:w-[7%]" />
             <col className="hidden w-[7%] 2xl:table-column 2xl:w-[7%]" />
@@ -367,8 +367,8 @@ export function PlatformAdminPanel() {
               <th className="px-5 py-3">Cliente</th>
               <th className="px-5 py-3">Plano</th>
               <th className="px-5 py-3">Status</th>
+              <th className="hidden px-5 py-3 xl:table-cell">Inscricao</th>
               <th className="px-5 py-3">Vencimento</th>
-              <th className="hidden px-5 py-3 2xl:table-cell">Inscricao</th>
               <th className="px-5 py-3">Situacao calculada</th>
               <th className="hidden px-5 py-3 2xl:table-cell">Ultimo acesso</th>
               <th className="hidden px-5 py-3 2xl:table-cell">Online</th>
@@ -395,10 +395,10 @@ export function PlatformAdminPanel() {
                 <td className="px-5 py-3">
                   <span className="capitalize text-slate-700">{item.subscriptionStatus}</span>
                 </td>
+                <td className="hidden px-5 py-3 xl:table-cell">{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
                 <td className="px-5 py-3">
                   {item.nextBillingDate ? formatInputDateBR(item.nextBillingDate) : "Sem vencimento"}
                 </td>
-                <td className="hidden px-5 py-3 2xl:table-cell">{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
                 <td className="px-5 py-3">
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${calculatedStatus.tone}`}>{calculatedStatus.label}</span>
                 </td>
@@ -407,12 +407,14 @@ export function PlatformAdminPanel() {
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>{online ? "Online agora" : "Offline"}</span>
                 </td>
                 <td className="hidden px-5 py-3 2xl:table-cell">{item.aiBalance}/{item.aiIncluded}</td>
-                <td className="px-5 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    <button className="inline-flex h-10 items-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-3 text-xs font-semibold text-cyan-800 hover:bg-cyan-100" onClick={() => setEditingTenantId(item.id)} type="button"><Pencil size={15} />Abrir cadastro</button>
-                    <button className="inline-flex h-10 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800" onClick={() => openPayment(item)} type="button"><CircleDollarSign size={15} />Confirmar pg.</button>
-                    <button className="inline-flex h-10 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-800" onClick={() => changeStatus(item, "pausado")} type="button"><Pause size={15} />Pausar</button>
-                    <button className="inline-flex h-10 items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700" onClick={() => changeStatus(item, "cancelado")} type="button"><Trash2 size={15} />Excluir</button>
+                <td className="px-5 py-3 align-top">
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <button aria-label={`Abrir cadastro de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800 transition duration-150 hover:-translate-y-0.5 hover:bg-cyan-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={() => setEditingTenantId(item.id)} title="Abrir e editar cadastro" type="button"><Pencil size={15} />Abrir cadastro</button>
+                    <button aria-label={`Confirmar pagamento de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition duration-150 hover:-translate-y-0.5 hover:bg-emerald-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Registrar pagamento e atualizar vencimento" type="button"><CircleDollarSign size={15} />Confirmar pagamento</button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button aria-label={`Pausar ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-2 text-xs font-semibold text-amber-800 transition duration-150 hover:-translate-y-0.5 hover:bg-amber-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => changeStatus(item, "pausado")} title="Pausar acesso preservando os dados" type="button"><Pause size={14} /><span className="truncate">Pausar</span></button>
+                      <button aria-label={`Excluir ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-2 text-xs font-semibold text-rose-700 transition duration-150 hover:-translate-y-0.5 hover:bg-rose-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Excluir acesso preservando os dados" type="button"><Trash2 size={14} /><span className="truncate">Excluir</span></button>
+                    </div>
                   </div>
                 </td>
               </tr>,
