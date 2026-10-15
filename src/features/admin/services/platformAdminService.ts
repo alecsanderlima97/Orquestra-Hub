@@ -102,7 +102,7 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
   });
 }
 
-export async function updateTenantSubscription(tenantId: string, updates: Partial<Pick<PlatformTenant, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "legalName" | "mapUrl" | "monthlyFee" | "neighborhood" | "nextBillingDate" | "paymentMethod" | "planId" | "startDate" | "state" | "subscriptionStatus" | "tradeName">> & { planId: PlanId; subscriptionStatus: SubscriptionStatus }) {
+export async function updateTenantSubscription(tenantId: string, updates: Partial<Pick<PlatformTenant, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "legalName" | "mapUrl" | "monthlyFee" | "name" | "neighborhood" | "nextBillingDate" | "paymentMethod" | "planId" | "startDate" | "state" | "subscriptionStatus" | "tradeName">> & { planId: PlanId; subscriptionStatus: SubscriptionStatus }) {
   if (!firebaseReady || !db) return;
   await updateDoc(doc(db, tenantPath(tenantId)), { ...updates, updatedAt: serverTimestamp() });
 }

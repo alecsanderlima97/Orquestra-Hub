@@ -15,17 +15,17 @@ export type ReleaseNotes = {
 
 // Troque o id sempre que uma nova versão relevante for publicada.
 export const currentReleaseNotes: ReleaseNotes = {
-  id: "2026-10-15-cadastro-comercial-clientes",
-  intro: "O Orquestra Hub recebeu uma nova atualização para organizar melhor o cadastro das empresas e facilitar a localização dos clientes.",
+  id: "2026-10-15-controle-financeiro-organizado",
+  intro: "O Orquestra Hub recebeu melhorias para deixar o controle financeiro mais claro, organizado e rápido de consultar.",
   items: [
-    { description: "O cadastro comercial agora permite registrar CPF ou CNPJ, com máscara adequada para cada documento.", title: "Documentos da empresa" },
-    { description: "O CNPJ pode ser consultado e o CEP pode preencher o endereço automaticamente, sempre permitindo revisão antes de salvar.", title: "Consultas de cadastro" },
-    { description: "O endereço pode gerar um link direto para abrir a localização no Google Maps.", title: "Localização mais fácil" },
-    { description: "Os novos dados ficam vinculados à empresa no Hub e também podem ser editados pela Central Administrativa.", title: "Cadastro integrado" },
-    { description: "Os fluxos financeiros, planos, convites e permissões existentes continuam preservados.", title: "Operação mantida" },
+    { description: "A nova tela de detalhamento facilita a consulta por categoria, loja, fornecedor e período.", title: "Detalhamento financeiro" },
+    { description: "Novos cards organizam os principais valores e indicadores sem ocupar a tela inteira logo de início.", title: "Dashboard mais claro" },
+    { description: "As listas agora podem ser filtradas e ordenadas pelas colunas, como fornecedor, data e valor.", title: "Filtros nas listas" },
+    { description: "Listas extensas começam compactas e podem ser ampliadas pelo botão Ver mais ou ocultadas quando necessário.", title: "Mais organização" },
+    { description: "Os valores dos cards financeiros podem ser ocultados pelo botão de olho para mais privacidade.", title: "Privacidade dos valores" },
   ],
   publishedAt: "15/10/2026",
-  releaseLabel: "Cadastro comercial aprimorado",
+  releaseLabel: "Controle financeiro organizado",
   title: "Novidades do Orquestra Hub",
-  version: "0.2.4",
+  version: "0.2.5",
 };
