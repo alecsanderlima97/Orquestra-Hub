@@ -94,7 +94,7 @@ export function PlatformTenantEditForm({ onCancel, onChange, onSave, tenant }: P
 
         <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
           <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={onCancel} type="button"><X size={16} />Cancelar</button>
-          <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={onSave} type="button"><Save size={16} />Salvar cadastro</button>
+          <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={onSave} type="button"><Save size={16} />Salvar alterações</button>
         </footer>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDollarSign, Copy, Pause, Pencil, RefreshCw, Save, Trash2, TicketPlus } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleDollarSign, Copy, Pause, Pencil, RefreshCw, Save, Trash2, TicketPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { PlanId } from "@/features/plans/planRules";
 import { plans } from "@/features/plans/planRules";
@@ -119,6 +119,7 @@ export function PlatformAdminPanel() {
   const [invitePlan, setInvitePlan] = useState<PlanId>("medio");
   const [inviteStatus, setInviteStatus] = useState<SubscriptionStatus>("trial");
   const [editingTenantId, setEditingTenantId] = useState("");
+  const [commercialInviteOpen, setCommercialInviteOpen] = useState(false);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -280,10 +281,20 @@ export function PlatformAdminPanel() {
         </button>
       </header>
 
-      <div className="border-b border-slate-100 p-5">
-        <h4 className="font-semibold">Novo convite comercial</h4>
-        <p className="mt-1 text-sm text-slate-600">Use este convite para a cliente criar a própria empresa com o plano liberado por você.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <div className="border-b border-slate-100">
+        <button aria-expanded={commercialInviteOpen} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-cyan-50/40" onClick={() => setCommercialInviteOpen((open) => !open)} type="button">
+          <span className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-cyan-50 text-cyan-700"><TicketPlus size={17} /></span>
+            <span>
+              <span className="block font-semibold text-slate-950">Novo cliente e convite comercial</span>
+              <span className="mt-1 block text-sm text-slate-600">Abra para cadastrar os dados completos e gerar o convite de acesso.</span>
+            </span>
+          </span>
+          {commercialInviteOpen ? <ChevronUp className="shrink-0 text-cyan-700" size={19} /> : <ChevronDown className="shrink-0 text-cyan-700" size={19} />}
+        </button>
+
+        {commercialInviteOpen ? <div className="px-5 pb-5">
+        <div className="mt-1 grid gap-3 md:grid-cols-4">
           <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => {
             const nextPlan = event.target.value as PlanId;
             setInvitePlan(nextPlan);
@@ -324,6 +335,10 @@ export function PlatformAdminPanel() {
             </button>
           </div>
         ) : null}
+        <div className="mt-4 flex flex-col-reverse justify-end gap-2 sm:flex-row">
+          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setCommercialInviteOpen(false)} type="button">Cancelar</button>
+        </div>
+        </div> : null}
       </div>
 
       {editingTenant ? <PlatformTenantEditForm
