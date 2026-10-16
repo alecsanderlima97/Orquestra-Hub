@@ -439,11 +439,11 @@ export function PlatformAdminPanel() {
                   {(() => {
                     const syncStatus = portalSyncStatusLabel(item.portalSyncStatus);
                     return (
-                      <details className="mt-2 rounded-md border border-cyan-100 bg-cyan-50/40 text-[11px] text-slate-600">
-                        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2 font-semibold text-cyan-900">
+                      <div className="mt-2 rounded-md border border-cyan-100 bg-cyan-50/40 text-[11px] text-slate-600">
+                        <div className="flex items-center justify-between gap-2 px-2.5 py-2 font-semibold text-cyan-900">
                           <span>Sincronização com Portal</span>
                           <span className={`rounded-full px-2 py-0.5 ${syncStatus.tone}`}>{syncStatus.label}</span>
-                        </summary>
+                        </div>
                         <div className="grid gap-1 border-t border-cyan-100 px-2.5 py-2 leading-4">
                           <span>Identificador externo: <code className="break-all text-cyan-900">{item.externalCustomerId}</code></span>
                           <span>dataVersion: <strong>{item.dataVersion || 1}</strong></span>
@@ -451,7 +451,7 @@ export function PlatformAdminPanel() {
                           <span>Última sincronização: <strong>{formatDateTime(item.portalLastSyncedAt)}</strong></span>
                           {item.portalSyncError ? <span className="text-rose-700">Erro: {item.portalSyncError}</span> : null}
                         </div>
-                      </details>
+                      </div>
                     );
                   })()}
                 </td>
