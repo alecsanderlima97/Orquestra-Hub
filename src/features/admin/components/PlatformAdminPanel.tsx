@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ChevronDown, ChevronUp, CircleDollarSign, Copy, Pause, Pencil, RefreshCw, Save, TicketPlus } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Pause, Pencil, RefreshCw, Save, TicketPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { PlanId } from "@/features/plans/planRules";
 import { plans } from "@/features/plans/planRules";
@@ -9,7 +9,7 @@ import { formatBRL, formatPhone, parseBRL, toTitleCaseBR } from "@/lib/formatter
 import type { CommercialDocumentType } from "../types/commercialProfile";
 import { CommercialCustomerFields } from "./CommercialCustomerFields";
 import { PlatformTenantEditForm } from "./PlatformTenantEditForm";
-import { confirmTenantPayment, listPlatformTenants, listTenantPayments, type PlatformPayment, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
+import { confirmTenantPayment, listPlatformTenants, listTenantPayments, syncPortalSnapshot, type PlatformPayment, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
 const graceDays = 5;
@@ -92,6 +92,15 @@ function billingStatus(item: PlatformTenant) {
   return { label: `Em dia: vence em ${days} dia(s)`, tone: "bg-emerald-100 text-emerald-800" };
 }
 
+function paymentStatusLabel(status?: string) {
+  if (status === "paid") return "Pago automaticamente";
+  if (status === "pending") return "PIX aguardando";
+  if (status === "confirmed") return "PIX confirmado";
+  if (status === "overdue") return "Cobrança vencida";
+  if (status === "reversed") return "Pagamento estornado";
+  return "Sem cobrança PIX";
+}
+
 export function PlatformAdminPanel() {
   const [commercialForm, setCommercialForm] = useState({
     address: "",
@@ -122,7 +131,9 @@ export function PlatformAdminPanel() {
   const [commercialInviteOpen, setCommercialInviteOpen] = useState(false);
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [message, setMessage] = useState("");
+  const [syncingPortal, setSyncingPortal] = useState(false);
   const [paymentTenantId, setPaymentTenantId] = useState("");
   const [paymentForm, setPaymentForm] = useState({ amount: "", method: "PIX", nextBillingDate: "", notes: "", paidAt: todayInput(), referenceMonth: "" });
   const [paymentsByTenant, setPaymentsByTenant] = useState<Record<string, PlatformPayment[]>>({});
@@ -135,6 +146,7 @@ export function PlatformAdminPanel() {
     setMessage("");
     try {
       setTenants(await listPlatformTenants());
+      setLastUpdatedAt(Date.now());
     } catch {
       setMessage("Não foi possível carregar clientes.");
     } finally {
@@ -146,7 +158,10 @@ export function PlatformAdminPanel() {
     let alive = true;
     void listPlatformTenants()
       .then((items) => {
-        if (alive) setTenants(items);
+        if (alive) {
+          setTenants(items);
+          setLastUpdatedAt(Date.now());
+        }
       })
       .catch(() => {
         if (alive) setMessage("Não foi possível carregar clientes.");
@@ -167,6 +182,20 @@ export function PlatformAdminPanel() {
       setMessage("Convite comercial gerado. Envie o código para a cliente criar a empresa.");
     } catch {
       setMessage("Não foi possível gerar o convite comercial.");
+    }
+  }
+
+  async function synchronizePortal() {
+    setSyncingPortal(true);
+    setMessage("");
+    try {
+      const result = await syncPortalSnapshot();
+      const summary = result.summary;
+      setMessage(`Portal sincronizado: ${summary.clientCount} cliente(s), ${summary.userCount} usuário(s), ${summary.onlineUserCount} online. Snapshot ${summary.contractVersion}, dataVersion ${summary.dataVersion}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível sincronizar o Portal Orquestra.cs.");
+    } finally {
+      setSyncingPortal(false);
     }
   }
 
@@ -278,9 +307,17 @@ export function PlatformAdminPanel() {
           <h3 className="font-semibold text-slate-950">Admin Orquestra.cs</h3>
           <p className="mt-1 text-sm text-slate-600">Controle comercial dos clientes, convites, planos e status de assinatura.</p>
         </div>
-        <button className="inline-flex h-10 items-center gap-2 rounded-md border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-900" disabled={loading} onClick={load} type="button">
-          <RefreshCw size={16} />Atualizar
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {lastUpdatedAt ? <span aria-live="polite" className="text-xs text-slate-500">Atualizado às {formatDateTime(lastUpdatedAt)}</span> : null}
+          <button aria-label="Sincronizar dados com o Portal Orquestra.cs" className="inline-flex h-10 items-center gap-2 rounded-md border border-cyan-300 bg-cyan-50 px-4 text-sm font-semibold text-cyan-900 transition hover:border-cyan-400 hover:bg-cyan-100 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70" disabled={syncingPortal || loading} onClick={() => void synchronizePortal()} type="button">
+            <CloudUpload className={syncingPortal ? "animate-pulse" : ""} size={16} />
+            {syncingPortal ? "Sincronizando..." : "Sincronizar Portal"}
+          </button>
+          <button aria-label="Atualizar lista de clientes" className="inline-flex h-10 items-center gap-2 rounded-md border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-900 transition hover:border-amber-400 hover:bg-amber-50 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70" disabled={loading} onClick={load} type="button">
+            {loading ? <RefreshCw className="animate-spin" size={16} /> : lastUpdatedAt ? <Check size={16} /> : <RefreshCw size={16} />}
+            {loading ? "Atualizando..." : lastUpdatedAt ? "Atualizado" : "Atualizar"}
+          </button>
+        </div>
       </header>
 
       <div className="border-b border-slate-100">
@@ -390,6 +427,7 @@ export function PlatformAdminPanel() {
                   <p className="mt-1 text-xs text-slate-600">{item.contactName || "Responsável não informado"}</p>
                   <p className="text-xs text-slate-500">{item.contactPhone || item.contactEmail || "Contato não informado"}</p>
                   <p className="mt-1 text-[11px] leading-4 text-slate-500 2xl:hidden">Acesso: {formatDateTime(item.lastAccessAt)} · {online ? "Online" : "Offline"} · IA {item.aiBalance}/{item.aiIncluded}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-cyan-700">Pagamento: {paymentStatusLabel(item.billingStatus)}{item.lastPaymentAt ? ` · ${item.lastPaymentAt}` : ""}</p>
                 </td>
                 <td className="px-5 py-3">
                   <span className="font-medium text-slate-950">{plans[item.planId].label}</span>
@@ -412,7 +450,7 @@ export function PlatformAdminPanel() {
                 <td className="px-5 py-3 align-top">
                   <div className="flex min-w-0 flex-col gap-2">
                     <button aria-label={`Abrir cadastro de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800 transition duration-150 hover:-translate-y-0.5 hover:bg-cyan-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={() => setEditingTenantId(item.id)} title="Abrir e editar cadastro" type="button"><Pencil size={15} />Abrir cadastro</button>
-                    <button aria-label={`Confirmar pagamento de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition duration-150 hover:-translate-y-0.5 hover:bg-emerald-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Registrar pagamento e atualizar vencimento" type="button"><CircleDollarSign size={15} />Confirmar pagamento</button>
+                    <button aria-label={`Registrar pagamento manual de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition duration-150 hover:-translate-y-0.5 hover:bg-emerald-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Usar somente quando o pagamento não tiver sido conciliado automaticamente" type="button"><CircleDollarSign size={15} />Pagamento manual</button>
                     <div className="grid grid-cols-2 gap-2">
                       <button aria-label={`Pausar ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-2 text-xs font-semibold text-amber-800 transition duration-150 hover:-translate-y-0.5 hover:bg-amber-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => changeStatus(item, "pausado")} title="Pausar acesso preservando os dados" type="button"><Pause size={14} /><span className="truncate">Pausar</span></button>
                       <button aria-label={`Remover ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-2 text-xs font-semibold text-rose-700 transition duration-150 hover:-translate-y-0.5 hover:bg-rose-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Remover da lista ativa e preservar os dados" type="button"><Archive size={14} /><span className="truncate">Remover</span></button>
@@ -426,8 +464,8 @@ export function PlatformAdminPanel() {
                     <div className="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <h4 className="font-semibold text-slate-950">Confirmar pagamento mensal</h4>
-                          <p className="mt-1 text-sm text-slate-600">Registra o pagamento, libera o cliente e atualiza o próximo vencimento.</p>
+                          <h4 className="font-semibold text-slate-950">Registrar pagamento manual</h4>
+                          <p className="mt-1 text-sm text-slate-600">Use apenas como exceção. Os pagamentos PIX conciliados pelo provedor atualizam este cliente automaticamente.</p>
                         </div>
                         <button className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" onClick={() => setPaymentTenantId("")} type="button">Fechar</button>
                       </div>

@@ -25,6 +25,7 @@ import type { AccountPayable } from "@/features/accounts-payable/types/accountPa
 import { PlatformAdminPanel } from "@/features/admin/components/PlatformAdminPanel";
 import { isPlatformAdmin } from "@/features/admin/services/platformAdminService";
 import { FinancialAssistant } from "@/features/ai/components/FinancialAssistant";
+import { SubscriptionPaymentPanel } from "@/features/billing/components/SubscriptionPaymentPanel";
 import { LoginScreen } from "@/features/auth/components/LoginScreen";
 import { completeGoogleOnboarding, listenAuth, listUserCompanies, logoutUser, touchTenantPresence, verifyCurrentPassword } from "@/features/auth/services/authService";
 import type { AppUser } from "@/features/auth/types/authTypes";
@@ -205,11 +206,13 @@ function financialAuditDetails(account: Pick<AccountPayable, "amount" | "dueDate
 function SubscriptionBlocked({ user }: { user: AppUser }) {
   const status = user.subscriptionStatus || "ativo";
   const message = `Olá, preciso regularizar a assinatura do Orquestra Hub. Empresa: ${user.companyName}. Status: ${status}.`;
+  const plan = getPlanRules(user.planId);
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-5">
       <section className="w-full max-w-lg rounded-lg border border-amber-200 bg-white p-7 text-center shadow-xl">
         <h1 className="text-2xl font-bold text-slate-950">Acesso pendente</h1>
         <p className="mt-3 text-slate-600">Sua assinatura está com status <strong>{status}</strong>. Regularize para continuar usando o sistema.</p>
+        {canManageUsers(user.role) ? <div className="mt-5 text-left"><SubscriptionPaymentPanel amount={plan.price} nextBillingDate={user.nextBillingDate || ""} onPaid={() => window.location.reload()} planLabel={plan.label} tenantId={user.tenantId} /></div> : null}
         <a className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-slate-950 px-5 text-sm font-semibold text-white" href={`https://wa.me/${salesWhatsapp}?text=${encodeURIComponent(message)}`} target="_blank">Regularizar pelo WhatsApp</a>
       </section>
     </main>
@@ -264,6 +267,7 @@ export function OrquestraHubApp() {
   const [showAllStoreSummary, setShowAllStoreSummary] = useState(false);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
+  const [subscriptionPixOpen, setSubscriptionPixOpen] = useState(false);
   const [subscriptionPromptDismissedKey, setSubscriptionPromptDismissedKey] = useState("");
   const [newPurchaseCategoryName, setNewPurchaseCategoryName] = useState("");
   const [purchaseForm, setPurchaseForm] = useState<PurchaseFormState>({
@@ -306,8 +310,8 @@ export function OrquestraHubApp() {
 
   useEffect(() => {
     if (!user?.tenantId || user.id === demoUserId || isPlatformAdmin(user)) return;
-    void touchTenantPresence(user.tenantId);
-    const timer = window.setInterval(() => void touchTenantPresence(user.tenantId), 60_000);
+    void touchTenantPresence(user.tenantId, user.id);
+    const timer = window.setInterval(() => void touchTenantPresence(user.tenantId, user.id), 60_000);
     return () => window.clearInterval(timer);
   }, [user]);
 
@@ -1372,11 +1376,13 @@ export function OrquestraHubApp() {
                   <p className="mt-1 text-slate-600">{plan.label} · {plan.price} · vencimento {dateInputToBR(user.nextBillingDate || "")}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <button className="rounded-md bg-cyan-700 px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-800" onClick={() => setSubscriptionPixOpen((current) => !current)} type="button">{subscriptionPixOpen ? "Ocultar PIX" : "Pagar com PIX"}</button>
                   <button className="rounded-md bg-slate-950 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800" onClick={addSubscriptionAccount} type="button">Adicionar em contas a pagar</button>
                   <button className="rounded-md border border-cyan-300 bg-white px-3 py-2 text-xs font-semibold text-cyan-800 hover:bg-cyan-100" onClick={addSubscriptionFixedExpense} type="button">Adicionar como despesa fixa</button>
                   <button className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100" onClick={ignoreSubscriptionPrompt} type="button">Ignorar este mês</button>
                 </div>
               </div>
+              {subscriptionPixOpen ? <div className="mt-4"><SubscriptionPaymentPanel amount={plan.price} nextBillingDate={dateInputToBR(user.nextBillingDate || "")} onPaid={() => window.location.reload()} planLabel={plan.label} tenantId={user.tenantId} /></div> : null}
             </div>
           ) : null}
           <FinancialAlertsPanel alerts={financialAlerts} onWhatsApp={sendAlertWhatsApp} storageKey={`dashboard-financial-alerts-${user.id}-open`} />

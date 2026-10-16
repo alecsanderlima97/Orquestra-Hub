@@ -81,14 +81,28 @@ async function runFirebaseStep<T>(step: string, action: () => Promise<T>) {
   }
 }
 
-async function registerTenantAccess(tenantId: string) {
-  if (!db || !tenantId) return;
-  await updateDoc(doc(db, tenantPath(tenantId)), { lastAccessAt: serverTimestamp(), lastSeenAt: serverTimestamp() }).catch(() => undefined);
+function currentDevice() {
+  if (typeof navigator === "undefined") return "unknown";
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (/ipad|tablet|android(?!.*mobile)/i.test(userAgent)) return "tablet";
+  if (/mobi|iphone|android/i.test(userAgent)) return "mobile";
+  return "desktop";
 }
 
-export async function touchTenantPresence(tenantId: string) {
+async function registerTenantAccess(tenantId: string, userId: string) {
+  if (!db || !tenantId) return;
+  await Promise.all([
+    updateDoc(doc(db, tenantPath(tenantId)), { lastAccessAt: serverTimestamp(), lastSeenAt: serverTimestamp() }),
+    updateDoc(doc(db, `${tenantPath(tenantId)}/users/${userId}`), { lastAccessAt: serverTimestamp(), lastActivityAt: serverTimestamp(), lastSeenAt: serverTimestamp(), lastDevice: currentDevice() }),
+  ]).catch(() => undefined);
+}
+
+export async function touchTenantPresence(tenantId: string, userId: string) {
   if (!db || !tenantId || tenantId === defaultTenantId) return;
-  await updateDoc(doc(db, tenantPath(tenantId)), { lastSeenAt: serverTimestamp() }).catch(() => undefined);
+  await Promise.all([
+    updateDoc(doc(db, tenantPath(tenantId)), { lastSeenAt: serverTimestamp() }),
+    updateDoc(doc(db, `${tenantPath(tenantId)}/users/${userId}`), { lastActivityAt: serverTimestamp(), lastSeenAt: serverTimestamp(), lastDevice: currentDevice() }),
+  ]).catch(() => undefined);
 }
 
 export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate: unknown = ""): AppUser {
@@ -137,7 +151,7 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
       name: access.data()?.name || user.displayName || user.email || "Usuário",
       photoUrl: access.data()?.photoUrl || user.photoURL || "",
     };
-    await registerTenantAccess(membership.id);
+    await registerTenantAccess(membership.id, user.uid);
     return mapped;
   }
 

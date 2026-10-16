@@ -1,7 +1,8 @@
 import { collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import type { AppUser } from "@/features/auth/types/authTypes";
+import type { PortalSnapshotSyncResponse } from "@/features/connectors/types";
 import type { PlanId } from "@/features/plans/planRules";
-import { db, firebaseReady } from "@/lib/firebase/config";
+import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { tenantPath } from "@/lib/firebase/paths";
 
 export const platformAdminEmails = new Set(["orquestracs@gmail.com"]);
@@ -14,6 +15,7 @@ export type PlatformTenant = {
   addressNumber?: string;
   aiBalance: number;
   aiIncluded: number;
+  billingStatus?: string;
   billingDay?: string;
   cep?: string;
   city?: string;
@@ -32,6 +34,9 @@ export type PlatformTenant = {
   neighborhood?: string;
   name: string;
   nextBillingDate?: string;
+  lastPaymentAmount?: number;
+  lastPaymentAt?: string;
+  lastPaymentProviderId?: string;
   ownerId?: string;
   paymentMethod?: string;
   planId: PlanId;
@@ -70,6 +75,7 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
     return {
       aiBalance: Number(aiCredits.balance || 0),
       aiIncluded: Number(aiCredits.included || 0),
+      billingStatus: String(data.billingStatus || ""),
       address: data.address || "",
       addressComplement: data.addressComplement || "",
       addressNumber: data.addressNumber || "",
@@ -85,6 +91,9 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
       id: item.id,
       lastAccessAt: timestampToMillis(data.lastAccessAt),
       lastSeenAt: timestampToMillis(data.lastSeenAt),
+      lastPaymentAmount: Number(data.lastPaymentAmount || 0) || undefined,
+      lastPaymentAt: String(data.lastPaymentAt || ""),
+      lastPaymentProviderId: String(data.lastPaymentProviderId || ""),
       legalName: data.legalName || "",
       mapUrl: data.mapUrl || "",
       monthlyFee: data.monthlyFee || "",
@@ -133,12 +142,26 @@ export async function confirmTenantPayment(tenantId: string, payment: Omit<Platf
   const paymentRef = doc(collection(db, "platformPayments", tenantId, "payments"));
   batch.set(paymentRef, { ...payment, createdAt: serverTimestamp() });
   batch.update(tenantRef, {
+    billingStatus: "paid",
     lastPaymentAt: payment.paidAt,
     lastPaymentAmount: payment.amount,
+    lastPaymentProviderId: "manual",
     nextBillingDate: payment.nextBillingDate,
     planId: payment.planId,
     subscriptionStatus: "ativo",
     updatedAt: serverTimestamp(),
   });
   await batch.commit();
+}
+
+export async function syncPortalSnapshot(): Promise<PortalSnapshotSyncResponse> {
+  if (!auth?.currentUser) throw new Error("Sessão do Admin Orquestra.cs não encontrada.");
+  const token = await auth.currentUser.getIdToken();
+  const response = await fetch("/api/connectors/snapshot", {
+    headers: { Authorization: `Bearer ${token}` },
+    method: "POST",
+  });
+  const body = await response.json().catch(() => ({})) as Partial<PortalSnapshotSyncResponse> & { error?: string };
+  if (!response.ok || !body.ok || !body.summary) throw new Error(body.error || "Não foi possível sincronizar o Portal Orquestra.cs.");
+  return body as PortalSnapshotSyncResponse;
 }
