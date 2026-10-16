@@ -6,9 +6,69 @@ function digits(value: string) {
 }
 
 async function fetchJson(url: string) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8000) });
   if (!response.ok) throw new Error("lookup-unavailable");
   return response.json() as Promise<Record<string, unknown>>;
+}
+
+function isValidCnpj(value: string) {
+  if (value.length !== 14 || /^([0-9])\1+$/.test(value)) return false;
+  const calculateDigit = (source: string) => {
+    let factor = source.length - 7;
+    let total = 0;
+    for (const character of source) {
+      total += Number(character) * factor;
+      factor -= 1;
+      if (factor === 1) factor = 9;
+    }
+    const remainder = total % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+  return calculateDigit(value.slice(0, 12)) === Number(value[12])
+    && calculateDigit(value.slice(0, 13)) === Number(value[13]);
+}
+
+function normalizeCnpjData(data: Record<string, unknown>, source: "brasilapi" | "receitaws", document: string) {
+  if (source === "receitaws" && String(data.status || "").toUpperCase() === "ERROR") throw new Error("cnpj-not-found");
+  const legalName = source === "brasilapi" ? data.razao_social : data.nome;
+  const tradeName = source === "brasilapi" ? data.nome_fantasia : data.fantasia;
+  return {
+    address: String(data.logradouro || ""),
+    addressComplement: String(data.complemento || ""),
+    addressNumber: String(data.numero || ""),
+    cep: String(data.cep || ""),
+    city: String(data.municipio || ""),
+    document,
+    documentType: "CNPJ",
+    legalName: String(legalName || ""),
+    neighborhood: String(data.bairro || ""),
+    state: String(data.uf || ""),
+    tradeName: String(tradeName || ""),
+  };
+}
+
+async function fetchCnpj(document: string) {
+  const sources = [
+    {
+      name: "brasilapi" as const,
+      url: `https://brasilapi.com.br/api/cnpj/v1/${document}`,
+    },
+    {
+      name: "receitaws" as const,
+      url: `https://www.receitaws.com.br/v1/cnpj/${document}`,
+    },
+  ];
+  let lastError: unknown;
+  for (const source of sources) {
+    try {
+      const data = await fetchJson(source.url);
+      const normalized = normalizeCnpjData(data, source.name, document);
+      if (normalized.legalName || normalized.tradeName || normalized.address) return normalized;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("cnpj-not-found");
 }
 
 function isGoogleMapsHost(hostname: string) {
@@ -56,20 +116,15 @@ export async function GET(request: Request) {
 
     if (type === "cnpj") {
       if (value.length !== 14) return NextResponse.json({ error: "CNPJ inválido." }, { status: 400 });
-      const data = await fetchJson(`https://brasilapi.com.br/api/cnpj/v1/${value}`);
-      return NextResponse.json({
-        address: String(data.logradouro || ""),
-        addressComplement: String(data.complemento || ""),
-        addressNumber: String(data.numero || ""),
-        cep: String(data.cep || ""),
-        city: String(data.municipio || ""),
-        document: value,
-        documentType: "CNPJ",
-        legalName: String(data.razao_social || ""),
-        neighborhood: String(data.bairro || ""),
-        state: String(data.uf || ""),
-        tradeName: String(data.nome_fantasia || ""),
-      });
+      if (!isValidCnpj(value)) return NextResponse.json({ error: "CNPJ inválido. Confira os números informados." }, { status: 400 });
+      try {
+        return NextResponse.json(await fetchCnpj(value));
+      } catch (error) {
+        if (error instanceof Error && error.message === "cnpj-not-found") {
+          return NextResponse.json({ error: "CNPJ não encontrado nas bases públicas. Confira os números e preencha manualmente." }, { status: 404 });
+        }
+        throw error;
+      }
     }
 
     if (type === "maps") {
