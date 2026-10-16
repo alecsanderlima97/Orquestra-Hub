@@ -48,6 +48,10 @@ function planIdValue(value: unknown): PlanId {
   return normalizePlanId(String(value || "medio"));
 }
 
+function externalCustomerIdValue(data: FirestoreData, tenantId: string) {
+  return stringValue(data.externalCustomerId) || `orquestra_hub_${tenantId}`;
+}
+
 function latestPaymentData(data: FirestoreData[]) {
   return [...data].sort((left, right) => {
     const leftTime = Date.parse(String(left.paidAt || left.createdAt || "")) || 0;
@@ -89,13 +93,17 @@ export async function buildOrquestraPortalSnapshot() {
     const latestPayment = latestPaymentData(paymentsSnapshot.docs.map((paymentDoc) => paymentDoc.data() as FirestoreData));
     const planId = planIdValue(data.planId);
     const plan = getPlanRules(planId);
+    const externalCustomerId = externalCustomerIdValue(data, tenantId);
     const lastActivityAt = isoValue(data.lastActivityAt || data.lastSeenAt) || users.map((user) => user.lastActivityAt).filter(Boolean).sort().at(-1) || null;
     const updatedAt = isoValue(data.updatedAt) || lastActivityAt || generatedAt;
 
     return {
+      externalCustomerId,
       id: tenantId,
+      dataVersion: DATA_VERSION,
       client: {
         id: tenantId,
+        externalCustomerId,
         name: stringValue(data.name) || "Empresa",
         legalName: stringValue(data.legalName),
         tradeName: stringValue(data.tradeName),

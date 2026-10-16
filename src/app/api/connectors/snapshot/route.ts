@@ -6,6 +6,30 @@ export const runtime = "nodejs";
 
 const platformAdminEmail = "orquestracs@gmail.com";
 
+type SyncClient = {
+  externalCustomerId: string;
+  id: string;
+};
+
+type PortalSyncStatus = "success" | "error";
+
+async function persistPortalSyncMetadata(admin: NonNullable<ReturnType<typeof firebaseAdmin>>, clients: SyncClient[], status: PortalSyncStatus, error = "") {
+  const timestamp = new Date();
+  for (let index = 0; index < clients.length; index += 400) {
+    const batch = admin.db.batch();
+    clients.slice(index, index + 400).forEach((client) => {
+      batch.set(admin.db.doc(`tenants/${client.id}`), {
+        externalCustomerId: client.externalCustomerId,
+        portalDataVersion: 1,
+        portalLastSyncedAt: timestamp,
+        portalSyncError: error,
+        portalSyncStatus: status,
+      }, { merge: true });
+    });
+    await batch.commit();
+  }
+}
+
 async function authorizePlatformAdmin(request: Request) {
   const admin = firebaseAdmin();
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -16,6 +40,7 @@ async function authorizePlatformAdmin(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let syncClients: SyncClient[] = [];
   try {
     const admin = await authorizePlatformAdmin(request);
     if (!admin) return NextResponse.json({ error: "Acesso negado para sincronizar o Portal Orquestra.cs." }, { status: 403 });
@@ -26,7 +51,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Conector do Portal Orquestra.cs não configurado neste ambiente." }, { status: 503 });
     }
 
-    const { serializedPayload, summary } = await buildOrquestraPortalSnapshot();
+    const snapshot = await buildOrquestraPortalSnapshot();
+    const { serializedPayload, summary } = snapshot;
+    syncClients = snapshot.payload.clients.map((client) => ({ externalCustomerId: client.externalCustomerId, id: client.id }));
     const portalResponse = await fetch(endpoint, {
       body: serializedPayload,
       cache: "no-store",
@@ -40,12 +67,22 @@ export async function POST(request: Request) {
     });
 
     if (!portalResponse.ok) {
+      const errorMessage = `Portal recusou a sincronização (HTTP ${portalResponse.status}).`;
+      await persistPortalSyncMetadata(admin, syncClients, "error", errorMessage);
       console.error("orquestra_portal_connector_failed", { status: portalResponse.status, summary });
       return NextResponse.json({ error: "O Portal Orquestra.cs recusou a sincronização.", summary }, { status: 502 });
     }
 
+    await persistPortalSyncMetadata(admin, syncClients, "success");
     return NextResponse.json({ ok: true, summary });
   } catch (error) {
+    const errorMessage = "Falha de comunicação com o Portal Orquestra.cs.";
+    const admin = firebaseAdmin();
+    if (admin && syncClients.length) {
+      await persistPortalSyncMetadata(admin, syncClients, "error", errorMessage).catch((metadataError) => {
+        console.error("orquestra_portal_sync_metadata_failed", metadataError instanceof Error ? metadataError.message : "unknown-error");
+      });
+    }
     console.error("orquestra_portal_connector_error", error instanceof Error ? error.message : "unknown-error");
     return NextResponse.json({ error: "Não foi possível sincronizar o Portal Orquestra.cs agora." }, { status: 500 });
   }

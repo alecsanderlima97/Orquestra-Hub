@@ -23,11 +23,17 @@ export type PlatformTenant = {
   contactEmail?: string;
   contactName?: string;
   contactPhone?: string;
+  dataVersion?: number;
   document?: string;
   documentType?: "CPF" | "CNPJ";
+  externalCustomerId?: string;
   id: string;
   lastAccessAt?: number;
   lastSeenAt?: number;
+  portalLastSyncedAt?: number;
+  portalSyncError?: string;
+  portalSyncStatus?: "success" | "error";
+  updatedAt?: number;
   legalName?: string;
   mapUrl?: string;
   monthlyFee?: string;
@@ -86,8 +92,10 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
       contactEmail: data.contactEmail || "",
       contactName: data.contactName || "",
       contactPhone: data.contactPhone || "",
+      dataVersion: Number(data.portalDataVersion || 1),
       document: data.document || "",
       documentType: data.documentType || "",
+      externalCustomerId: String(data.externalCustomerId || `orquestra_hub_${item.id}`),
       id: item.id,
       lastAccessAt: timestampToMillis(data.lastAccessAt),
       lastSeenAt: timestampToMillis(data.lastSeenAt),
@@ -107,6 +115,10 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
       state: data.state || "",
       subscriptionStatus: data.subscriptionStatus || "ativo",
       tradeName: data.tradeName || "",
+      portalLastSyncedAt: timestampToMillis(data.portalLastSyncedAt),
+      portalSyncError: String(data.portalSyncError || ""),
+      portalSyncStatus: data.portalSyncStatus === "success" || data.portalSyncStatus === "error" ? data.portalSyncStatus : undefined,
+      updatedAt: timestampToMillis(data.updatedAt),
     } as PlatformTenant;
   });
 }
