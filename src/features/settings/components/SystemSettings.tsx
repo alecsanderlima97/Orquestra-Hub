@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Check, Clock3, Code2, Database, MessageCircle, Palette, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
+import { Bell, Check, ChevronDown, ChevronUp, Clock3, Code2, CreditCard, Database, MessageCircle, Palette, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { AiCreditsPanel } from "@/features/ai/components/AiCreditsPanel";
 import { getPlanRules, plans, type PlanId } from "@/features/plans/planRules";
@@ -15,50 +15,6 @@ const themes = [
 
 type ThemeId = typeof themes[number]["id"];
 
-const planPitch: Record<PlanId, string> = {
-  inicial: "Para negócios que estão saindo do controle por caderno, planilhas e anotações soltas.",
-  medio: "Para empresas em crescimento que precisam controlar unidades, vencimentos e rotina financeira.",
-  premium: "Para operações com várias unidades, equipe, maior volume financeiro e gestão mais completa.",
-};
-
-const planHighlights: Record<PlanId, string> = {
-  inicial: "Organização essencial para fornecedores, contas, compras e despesas fixas.",
-  medio: "Plano recomendado para rotina financeira organizada, alertas, WhatsApp assistido e apoio da IA.",
-  premium: "Operação premium com mais IA, permissões, relatórios, automações e suporte prioritário.",
-};
-
-const planFeatures: Record<PlanId, string[]> = {
-  inicial: [
-    "Cadastro de fornecedores",
-    "Compras e notas",
-    "Contas a pagar",
-    "Despesas fixas",
-    "Categorias financeiras",
-    "Relatórios básicos",
-    "Backup e exportação",
-  ],
-  medio: [
-    "Tudo do Plano Inicial",
-    "Controle financeiro por loja",
-    "Convite para colaboradores",
-    "Alertas financeiros",
-    "Assistente IA financeira",
-    "Relatórios por período",
-    "Compras com anexos e boletos",
-    "Auditoria de alterações principais",
-  ],
-  premium: [
-    "Tudo do Plano Profissional",
-    "Permissões avançadas",
-    "Relatórios detalhados",
-    "Backup e exportação completo",
-    "Gestão multiempresa",
-    "Controle de vencimento da assinatura",
-    "Automação por e-mail",
-    "Suporte prioritário Orquestra.cs",
-  ],
-};
-
 const supportWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
 
 function applyTheme(theme: ThemeId) {
@@ -68,6 +24,7 @@ function applyTheme(theme: ThemeId) {
 
 export function SystemSettings({ canManageCompanySettings, companyName, onReceiptRequiredChange, planId, receiptRequiredOnPayment, tenantId }: { canManageCompanySettings: boolean; companyName: string; onReceiptRequiredChange: (required: boolean) => Promise<void>; planId?: PlanId; receiptRequiredOnPayment: boolean; tenantId: string }) {
   const [savingReceiptSetting, setSavingReceiptSetting] = useState(false);
+  const [showOtherPlans, setShowOtherPlans] = useState(false);
   const [theme, setTheme] = useState<ThemeId>(() => {
     if (typeof window === "undefined") return "claro";
     const saved = (window.localStorage.getItem("orquestra-theme") || "claro") as ThemeId;
@@ -163,7 +120,8 @@ export function SystemSettings({ canManageCompanySettings, companyName, onReceip
 
       <section className="theme-surface overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <header className="border-b border-slate-200 bg-slate-950 px-5 py-5 text-white">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
             <span className="flex size-11 items-center justify-center rounded-md bg-cyan-400 text-slate-950">
               <Sparkles size={21} />
             </span>
@@ -171,34 +129,26 @@ export function SystemSettings({ canManageCompanySettings, companyName, onReceip
               <h3 className="font-semibold">Planos Orquestra Hub</h3>
               <p className="mt-1 text-sm text-slate-300">Plano atual: {activePlan.label} - {activePlan.price}/mês.</p>
             </div>
+            </div>
+            <button aria-expanded={showOtherPlans} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-cyan-300/50 px-3 text-sm font-semibold text-cyan-100 transition hover:bg-white/10" onClick={() => setShowOtherPlans((open) => !open)} type="button">
+              {showOtherPlans ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              {showOtherPlans ? "Ocultar outros planos" : "Ver outros planos"}
+            </button>
           </div>
         </header>
-        <div className="grid gap-4 p-5 lg:grid-cols-3">
-          {Object.values(plans).map((item) => (
-            <article className={`relative flex min-h-[520px] flex-col rounded-lg border p-5 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-[0_0_28px_rgba(34,211,238,0.22)] ${item.id === activePlan.id ? "border-amber-400 bg-amber-50 shadow-md hover:shadow-[0_0_30px_rgba(251,191,36,0.28)]" : "border-slate-200 bg-white"}`} key={item.id}>
+        <div className={`grid gap-4 p-5 ${showOtherPlans ? "lg:grid-cols-3" : "max-w-xl"}`}>
+          {(showOtherPlans ? Object.values(plans) : [activePlan]).map((item) => (
+            <article className={`relative flex flex-col rounded-lg border p-5 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-[0_0_28px_rgba(34,211,238,0.22)] ${item.id === activePlan.id ? "border-amber-400 bg-amber-50 shadow-md hover:shadow-[0_0_30px_rgba(251,191,36,0.28)]" : "border-slate-200 bg-white"}`} key={item.id}>
               {item.id === activePlan.id ? <span className="absolute right-4 top-4 rounded-md bg-amber-400 px-2 py-1 text-xs font-bold text-slate-950">ATUAL</span> : null}
               <strong className="block pr-16 text-lg text-slate-950">{item.label}</strong>
               <span className="mt-2 block text-2xl font-black text-slate-950">{item.price}</span>
-              <p className="mt-2 min-h-12 text-sm leading-6 text-slate-600">{planPitch[item.id]}</p>
-              <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium leading-6 text-slate-700">
-                {planHighlights[item.id]}
-              </div>
-              <div className="mt-4 grid gap-2 text-sm text-slate-700">
+              <div className="mt-4 grid gap-3 text-sm text-slate-700">
                 <p><strong>Até {item.storeLimit}</strong> loja(s)/unidade(s)</p>
-                <p>WhatsApp assistido: <strong>{item.whatsappEnabled ? "incluído" : "não incluído"}</strong></p>
+                <p><strong>Até {item.userLimit}</strong> usuário(s)</p>
                 <p>IA Financeira: <strong>{item.aiEnabled ? `${item.monthlyAiCredits} créditos/mês` : "não incluída"}</strong></p>
-                <p>Automação por e-mail: <strong>{item.emailAutomation ? "incluída" : "não incluída"}</strong></p>
+                <p>WhatsApp assistido: <strong>{item.whatsappEnabled ? "incluído" : "não incluído"}</strong></p>
               </div>
-              <div className="mt-4 border-t border-slate-200 pt-4">
-                <ul className="space-y-2 text-sm text-slate-700">
-                  {planFeatures[item.id].map((feature) => (
-                    <li className="flex gap-2 leading-5" key={feature}>
-                      <Check className="mt-0.5 shrink-0 text-emerald-600" size={15} />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {item.id === activePlan.id ? <button aria-label="Pagar mensalidade pelo Portal Orquestra.cs" className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-cyan-700 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-cyan-800 hover:shadow-[0_0_20px_rgba(14,116,144,0.28)] active:translate-y-0" onClick={() => window.alert("O pagamento pelo Portal Orquestra.cs será conectado em breve.")} type="button"><CreditCard size={17} />Pagar mensalidade</button> : null}
             </article>
           ))}
         </div>
