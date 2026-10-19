@@ -1,14 +1,29 @@
-import { collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, where, writeBatch } from "firebase/firestore";
 import type { AppUser } from "@/features/auth/types/authTypes";
 import { normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import type { PortalSnapshotSyncResponse } from "@/features/connectors/types";
 import type { PlanId } from "@/features/plans/planRules";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
-import { tenantPath } from "@/lib/firebase/paths";
+import { tenantCollectionPath, tenantPath } from "@/lib/firebase/paths";
 
 export const platformAdminEmails = new Set(["orquestracs@gmail.com"]);
 
 export type SubscriptionStatus = NonNullable<AppUser["subscriptionStatus"]>;
+
+export type PlatformUserType = "admin" | "end_user";
+
+export type PlatformTenantUser = {
+  email: string;
+  id: string;
+  isOwner: boolean;
+  lastAccessAt?: number;
+  lastActivityAt?: number;
+  lastDevice?: string;
+  lastSeenAt?: number;
+  name: string;
+  role: string;
+  userType: PlatformUserType;
+};
 
 export type PlatformTenant = {
   address?: string;
@@ -30,6 +45,10 @@ export type PlatformTenant = {
   externalCustomerId?: string;
   graceDays?: number;
   id: string;
+  users: PlatformTenantUser[];
+  adminUserCount: number;
+  endUserCount: number;
+  activeInviteCount: number;
   lastAccessAt?: number;
   lastSeenAt?: number;
   portalLastSyncedAt?: number;
@@ -74,12 +93,40 @@ function timestampToMillis(value: unknown) {
   return typeof (value as { toMillis?: () => number })?.toMillis === "function" ? (value as { toMillis: () => number }).toMillis() : undefined;
 }
 
+function userType(value: unknown): PlatformUserType {
+  return value === "end_user" ? "end_user" : "admin";
+}
+
 export async function listPlatformTenants(): Promise<PlatformTenant[]> {
   if (!firebaseReady || !db) return [];
-  const snapshot = await getDocs(query(collection(db, "tenants"), orderBy("name")));
-  return snapshot.docs.map((item) => {
+  const firestore = db;
+  const snapshot = await getDocs(query(collection(firestore, "tenants"), orderBy("name")));
+  return Promise.all(snapshot.docs.map(async (item) => {
     const data = item.data();
     const aiCredits = data.aiCredits || {};
+    const ownerId = String(data.ownerId || "");
+    const [usersSnapshot, invitesSnapshot] = await Promise.all([
+      getDocs(collection(firestore, tenantCollectionPath(item.id, "users"))).catch(() => null),
+      getDocs(query(collection(firestore, "invites"), where("tenantId", "==", item.id), where("status", "==", "Ativo"))).catch(() => null),
+    ]);
+    const rawUsers = usersSnapshot?.docs || [];
+    const fallbackOwnerId = ownerId || rawUsers.find((user) => ["Dono", "Proprietário"].includes(String(user.data().role || "")))?.id || "";
+    const users = rawUsers.map((user) => {
+      const userData = user.data();
+      return {
+        email: String(userData.email || ""),
+        id: user.id,
+        isOwner: user.id === fallbackOwnerId,
+        lastAccessAt: timestampToMillis(userData.lastAccessAt),
+        lastActivityAt: timestampToMillis(userData.lastActivityAt),
+        lastDevice: String(userData.lastDevice || ""),
+        lastSeenAt: timestampToMillis(userData.lastSeenAt),
+        name: String(userData.name || userData.email || "Usuário"),
+        role: String(userData.role || "Consulta"),
+        userType: userType(userData.userType),
+      } satisfies PlatformTenantUser;
+    });
+    const adminUserCount = users.filter((user) => user.userType === "admin").length;
     return {
       aiBalance: Number(aiCredits.balance || 0),
       aiIncluded: Number(aiCredits.included || 0),
@@ -100,6 +147,10 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
       externalCustomerId: String(data.externalCustomerId || `orquestra_hub_${item.id}`),
       graceDays: normalizeSubscriptionGraceDays(data.graceDays),
       id: item.id,
+      users,
+      adminUserCount,
+      endUserCount: users.length - adminUserCount,
+      activeInviteCount: invitesSnapshot?.size || 0,
       lastAccessAt: timestampToMillis(data.lastAccessAt),
       lastSeenAt: timestampToMillis(data.lastSeenAt),
       lastPaymentAmount: Number(data.lastPaymentAmount || 0) || undefined,
@@ -123,7 +174,7 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
       portalSyncStatus: data.portalSyncStatus === "success" || data.portalSyncStatus === "error" ? data.portalSyncStatus : undefined,
       updatedAt: timestampToMillis(data.updatedAt),
     } as PlatformTenant;
-  });
+  }));
 }
 
 export async function updateTenantSubscription(tenantId: string, updates: Partial<Pick<PlatformTenant, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "graceDays" | "legalName" | "mapUrl" | "monthlyFee" | "name" | "neighborhood" | "nextBillingDate" | "paymentMethod" | "planId" | "startDate" | "state" | "subscriptionStatus" | "tradeName">> & { planId: PlanId; subscriptionStatus: SubscriptionStatus }) {

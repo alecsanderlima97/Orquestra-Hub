@@ -122,6 +122,7 @@ export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", 
     role: effectiveRole,
     subscriptionStatus,
     tenantId,
+    userType: "admin",
   };
 }
 
@@ -149,10 +150,11 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
     const role = isPlatformOwnerEmail(user.email) || tenant.data()?.ownerId === user.uid
       ? ownerRole()
       : access.data()?.role || data.role || "Consulta";
-    const mapped = {
+    const mapped: AppUser = {
       ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo", tenant.data()?.nextBillingDate || "", tenant.data()?.graceDays),
       name: access.data()?.name || user.displayName || user.email || "Usuário",
       photoUrl: access.data()?.photoUrl || user.photoURL || "",
+      userType: access.data()?.userType === "end_user" ? "end_user" : "admin",
     };
     await registerTenantAccess(membership.id, user.uid);
     return mapped;
@@ -212,6 +214,7 @@ export async function registerWithEmail(name: string, companyName: string, email
         inviteCode: normalizedInviteCode,
         name: finalName,
         role,
+        userType: "admin",
         userId: credential.user.uid,
       }));
       await runFirebaseStep("Falha ao vincular usuário à empresa", () => setDoc(doc(firestore, `userTenants/${credential.user.uid}/memberships/${tenantId}`), { companyName: tenantName, createdAt: serverTimestamp(), inviteCode: normalizedInviteCode, role }));
@@ -263,7 +266,7 @@ export async function completeGoogleOnboarding(user: AppUser, companyName: strin
 
   await updateProfile(auth.currentUser, { displayName: finalUserName }).catch(() => undefined);
   if (createsCompany) await runFirebaseStep("Falha ao criar empresa", () => setDoc(doc(firestore, tenantPath(tenantId)), tenantPayload(tenantName, user.id, invite), { merge: true }));
-  await runFirebaseStep("Falha ao criar usuário da empresa", () => setDoc(doc(firestore, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, inviteCode: normalizedInviteCode, name: finalUserName, role, updatedAt: serverTimestamp(), userId: user.id }, { merge: true }));
+  await runFirebaseStep("Falha ao criar usuário da empresa", () => setDoc(doc(firestore, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, inviteCode: normalizedInviteCode, name: finalUserName, role, updatedAt: serverTimestamp(), userId: user.id, userType: "admin" }, { merge: true }));
   await runFirebaseStep("Falha ao vincular usuário à empresa", () => setDoc(doc(firestore, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: tenantName, inviteCode: normalizedInviteCode, role, updatedAt: serverTimestamp() }, { merge: true }));
   await runFirebaseStep("Falha ao marcar convite como usado", () => consumeInvite(normalizedInviteCode, user.id));
   return cacheUser({ ...user, companyName: tenantName, graceDays: normalizeSubscriptionGraceDays(invite.graceDays), name: finalUserName, needsOnboarding: false, nextBillingDate: invite.nextBillingDate || "", planId: plan.id, role, subscriptionStatus, tenantId });

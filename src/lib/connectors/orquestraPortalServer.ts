@@ -73,9 +73,10 @@ export async function buildOrquestraPortalSnapshot() {
   const clients = await Promise.all(tenantDocs.map(async (tenantDoc) => {
     const data = tenantDoc.data() as FirestoreData;
     const tenantId = tenantDoc.id;
-    const [usersSnapshot, paymentsSnapshot] = await Promise.all([
+    const [usersSnapshot, paymentsSnapshot, invitesSnapshot] = await Promise.all([
       admin.db.collection(`tenants/${tenantId}/users`).get(),
       admin.db.collection(`platformPayments/${tenantId}/payments`).get(),
+      admin.db.collection("invites").where("tenantId", "==", tenantId).where("status", "==", "Ativo").get(),
     ]);
     const users = usersSnapshot.docs.map((userDoc) => {
       const user = userDoc.data() as FirestoreData;
@@ -85,6 +86,8 @@ export async function buildOrquestraPortalSnapshot() {
         name: stringValue(user.name),
         email: stringValue(user.email),
         role: stringValue(user.role),
+        isOwner: userDoc.id === stringValue(data.ownerId),
+        userType: user.userType === "end_user" ? "end_user" : "admin",
         lastActivityAt,
         lastAccessAt: isoValue(user.lastAccessAt),
         device: deviceValue(user),
@@ -95,6 +98,9 @@ export async function buildOrquestraPortalSnapshot() {
     const planId = planIdValue(data.planId);
     const plan = getPlanRules(planId);
     const externalCustomerId = externalCustomerIdValue(data, tenantId);
+    const administrativeUsers = users.filter((user) => user.userType === "admin");
+    const endUsers = users.filter((user) => user.userType === "end_user");
+    const owner = administrativeUsers.find((user) => user.isOwner) || administrativeUsers.find((user) => ["Dono", "Proprietário"].includes(user.role || "")) || null;
     const lastActivityAt = isoValue(data.lastActivityAt || data.lastSeenAt) || users.map((user) => user.lastActivityAt).filter(Boolean).sort().at(-1) || null;
     const updatedAt = isoValue(data.updatedAt) || lastActivityAt || generatedAt;
 
@@ -126,13 +132,19 @@ export async function buildOrquestraPortalSnapshot() {
         },
       },
       responsible: {
-        name: stringValue(data.contactName),
-        email: stringValue(data.contactEmail),
+        name: owner?.name || stringValue(data.contactName),
+        email: owner?.email || stringValue(data.contactEmail),
         phone: stringValue(data.contactPhone),
       },
+      owner,
       subscription: {
         planId,
         planName: plan.label,
+        userLimit: plan.userLimit,
+        additionalUserLimit: plan.additionalUserLimit,
+        administrativeUserCount: administrativeUsers.length,
+        endUserCount: endUsers.length,
+        activeInviteCount: invitesSnapshot.size,
         monthlyFee: stringValue(data.monthlyFee) || plan.price,
         billingDay: stringValue(data.billingDay),
         graceDays: normalizeSubscriptionGraceDays(data.graceDays),

@@ -14,6 +14,7 @@ export async function listTenantUsers(tenantId: string, companyName = "Empresa")
     name: String(item.data().name || item.data().email || "Usuário"),
     photoUrl: String(item.data().photoUrl || ""),
     role: (item.data().role || "Consulta") as AppUser["role"],
+    userType: item.data().userType === "end_user" ? "end_user" : "admin",
   }));
 }
 

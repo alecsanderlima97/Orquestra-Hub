@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Pause, Pencil, RefreshCw, Save, TicketPlus } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Crown, Pause, Pencil, RefreshCw, Save, TicketPlus, UserRound, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DEFAULT_SUBSCRIPTION_GRACE_DAYS, normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import type { PlanId } from "@/features/plans/planRules";
@@ -10,7 +10,7 @@ import { formatBRL, formatPhone, parseBRL, toTitleCaseBR } from "@/lib/formatter
 import type { CommercialDocumentType } from "../types/commercialProfile";
 import { CommercialCustomerFields } from "./CommercialCustomerFields";
 import { PlatformTenantEditForm } from "./PlatformTenantEditForm";
-import { confirmTenantPayment, listPlatformTenants, listTenantPayments, syncPortalSnapshot, type PlatformPayment, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
+import { confirmTenantPayment, listPlatformTenants, listTenantPayments, syncPortalSnapshot, type PlatformPayment, type PlatformTenant, type PlatformTenantUser, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
 const onlineWindowMs = 2 * 60 * 1000;
@@ -106,6 +106,64 @@ function portalSyncStatusLabel(status?: PlatformTenant["portalSyncStatus"]) {
   if (status === "success") return { label: "Sincronizado", tone: "bg-emerald-100 text-emerald-800" };
   if (status === "error") return { label: "Erro na sincronização", tone: "bg-rose-100 text-rose-800" };
   return { label: "Ainda não sincronizado", tone: "bg-slate-100 text-slate-700" };
+}
+
+function PlatformUserRow({ user }: { user: PlatformTenantUser }) {
+  const online = isOnline(user.lastSeenAt || user.lastActivityAt);
+  return (
+    <div className="flex flex-col gap-2 border-t border-slate-100 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="font-semibold text-slate-900">{user.name}{user.isOwner ? " · Proprietário" : ""}</p>
+        <p className="truncate text-xs text-slate-600">{user.email || "Gmail não informado"} · {user.role}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 sm:justify-end">
+        <span className={`rounded-full px-2 py-1 font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{online ? "Online" : "Offline"}</span>
+        <span>Último acesso: {formatDateTime(user.lastAccessAt)}</span>
+        <span>{user.lastDevice || "Dispositivo não informado"}</span>
+      </div>
+    </div>
+  );
+}
+
+function PlatformTenantUsers({ tenant }: { tenant: PlatformTenant }) {
+  const administrativeUsers = tenant.users.filter((user) => user.userType === "admin");
+  const endUsers = tenant.users.filter((user) => user.userType === "end_user");
+  const owner = administrativeUsers.find((user) => user.isOwner);
+  const collaborators = administrativeUsers.filter((user) => !user.isOwner);
+  const userLimit = plans[tenant.planId].userLimit;
+  const usedAdministrativeUsers = administrativeUsers.length + tenant.activeInviteCount;
+
+  return (
+    <details className="mt-3 overflow-hidden rounded-md border border-cyan-100 bg-cyan-50/30">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-cyan-900 hover:bg-cyan-50">
+        <span className="inline-flex items-center gap-2"><UsersRound size={14} />Usuários e acessos</span>
+        <span className="rounded-full bg-white px-2 py-1 text-[11px]">Administrativos: {usedAdministrativeUsers}/{userLimit}</span>
+      </summary>
+      <div className="border-t border-cyan-100 bg-white px-3 py-2">
+        <div className="flex items-start gap-3 rounded-md border border-cyan-100 bg-cyan-50/50 p-3">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-cyan-100 text-cyan-800"><Crown size={15} /></span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-800">Responsável principal</p>
+            <p className="mt-1 font-semibold text-slate-950">{owner?.name || tenant.contactName || "Responsável não informado"}</p>
+            <p className="truncate text-xs text-slate-600">{owner?.email || tenant.contactEmail || "Gmail não informado"}</p>
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Colaboradores administrativos</p>
+            <span className="text-[11px] text-slate-500">{collaborators.length} cadastrado(s) · {tenant.activeInviteCount} convite(s) pendente(s)</span>
+          </div>
+          {collaborators.length ? collaborators.map((user) => <PlatformUserRow key={user.id} user={user} />) : <p className="py-3 text-xs text-slate-500">Nenhum colaborador administrativo cadastrado.</p>}
+        </div>
+
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><UserRound size={14} />Usuários finais</p>
+          {endUsers.length ? <div className="mt-1">{endUsers.slice(0, 8).map((user) => <PlatformUserRow key={user.id} user={user} />)}{endUsers.length > 8 ? <p className="pt-2 text-xs text-slate-500">Mais {endUsers.length - 8} usuário(s) final(is) sincronizado(s).</p> : null}</div> : <p className="mt-2 text-xs text-slate-500">Nenhum usuário final classificado neste sistema.</p>}
+        </div>
+      </div>
+    </details>
+  );
 }
 
 export function PlatformAdminPanel() {
@@ -461,6 +519,7 @@ export function PlatformAdminPanel() {
                       </div>
                     );
                   })()}
+                  <PlatformTenantUsers tenant={item} />
                 </td>
                 <td className="px-5 py-3">
                   <span className="font-medium text-slate-950">{plans[item.planId].label}</span>

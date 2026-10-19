@@ -4,6 +4,7 @@ export type AppUser = {
   id: string;
   name: string;
   role: "Proprietário" | "Dono" | "Financeiro" | "Consulta";
+  userType?: "admin" | "end_user";
   tenantId: string;
   companyName: string;
   authProvider?: "google" | "password";

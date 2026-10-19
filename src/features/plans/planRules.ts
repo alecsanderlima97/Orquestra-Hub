@@ -9,6 +9,7 @@ export type PlanRules = {
   monthlyAiCredits: number;
   price: string;
   storeLimit: number;
+  additionalUserLimit: number;
   userLimit: number;
   whatsappEnabled: boolean;
 };
@@ -25,6 +26,7 @@ export const plans: Record<PlanId, PlanRules> = {
     monthlyAiCredits: 0,
     price: "R$ 75,00",
     storeLimit: 1,
+    additionalUserLimit: 0,
     userLimit: 1,
     whatsappEnabled: false,
   },
@@ -37,7 +39,8 @@ export const plans: Record<PlanId, PlanRules> = {
     monthlyAiCredits: 15,
     price: "R$ 120,00",
     storeLimit: 3,
-    userLimit: 3,
+    additionalUserLimit: 3,
+    userLimit: 4,
     whatsappEnabled: true,
   },
   premium: {
@@ -49,6 +52,7 @@ export const plans: Record<PlanId, PlanRules> = {
     monthlyAiCredits: 100,
     price: "R$ 299,00",
     storeLimit: 5,
+    additionalUserLimit: 9,
     userLimit: 10,
     whatsappEnabled: true,
   },

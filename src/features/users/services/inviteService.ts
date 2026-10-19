@@ -49,7 +49,8 @@ export async function createInvite(tenantId: string, companyName: string, role: 
     getDocs(query(collection(db, "invites"), where("tenantId", "==", tenantId), where("status", "==", "Ativo"))),
   ]);
   const activeInviteCount = invitesSnapshot.docs.map((item) => item.data() as Invite).filter(isInviteAvailable).length;
-  if (usersSnapshot.size + activeInviteCount >= plan.userLimit) throw new Error(`Limite de usuarios do ${plan.label} atingido.`);
+  const administrativeUserCount = usersSnapshot.docs.filter((item) => item.data().userType !== "end_user").length;
+  if (administrativeUserCount + activeInviteCount >= plan.userLimit) throw new Error(`Limite de usuarios do ${plan.label} atingido.`);
   const code = crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
   const invite: Invite = { code, companyName, role, tenantId, status: "Ativo", expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) };
   await setDoc(doc(db, "invites", code), { ...invite, createdAt: serverTimestamp() });

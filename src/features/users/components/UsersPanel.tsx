@@ -22,10 +22,11 @@ export function UsersPanel({ currentUserId, invites, onCancelInvite, onCreateInv
   const [showAllInvites, setShowAllInvites] = useState(false);
   const [showAllUsers, setShowAllUsers] = useState(false);
   const activeInviteCount = invites.filter((invite) => invite.status === "Ativo").length;
-  const usedUsers = users.length + activeInviteCount;
+  const administrativeUsers = users.filter((user) => user.userType !== "end_user");
+  const usedUsers = administrativeUsers.length + activeInviteCount;
   const limitReached = usedUsers >= userLimit;
   const visibleInvites = showAllInvites ? invites : invites.slice(0, DEFAULT_LIST_LIMIT);
-  const visibleUsers = showAllUsers ? users : users.slice(0, DEFAULT_LIST_LIMIT);
+  const visibleUsers = showAllUsers ? administrativeUsers : administrativeUsers.slice(0, DEFAULT_LIST_LIMIT);
 
   async function generate() {
     if (limitReached) return;
@@ -100,7 +101,7 @@ export function UsersPanel({ currentUserId, invites, onCancelInvite, onCreateInv
         ))}
       </div>
       <div className="px-5 pb-4">
-        <ListVisibilityToggle expanded={showAllUsers} onToggle={() => setShowAllUsers((current) => !current)} total={users.length} />
+        <ListVisibilityToggle expanded={showAllUsers} onToggle={() => setShowAllUsers((current) => !current)} total={administrativeUsers.length} />
       </div>
     </div>
   );
