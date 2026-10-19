@@ -314,6 +314,9 @@ export function PlatformAdminPanel() {
         <div>
           <h3 className="font-semibold text-slate-950">Admin Orquestra.cs</h3>
           <p className="mt-1 text-sm text-slate-600">Controle comercial dos clientes, convites, planos e status de assinatura.</p>
+          <p className="mt-2 inline-flex w-fit rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+            Tolerância após vencimento: {graceDays} dias úteis
+          </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-3">
           {lastUpdatedAt ? <span aria-live="polite" className="text-xs text-slate-500">Atualizado às {formatDateTime(lastUpdatedAt)}</span> : null}
