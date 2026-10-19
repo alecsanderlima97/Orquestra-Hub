@@ -20,6 +20,7 @@ export type Invite = {
   contactPhone?: string;
   document?: string;
   documentType?: "CPF" | "CNPJ";
+  graceDays?: number;
   inviteType?: "commercial" | "user";
   monthlyFee?: string;
   legalName?: string;
@@ -55,7 +56,7 @@ export async function createInvite(tenantId: string, companyName: string, role: 
   return invite;
 }
 
-export type CommercialInviteData = Pick<Invite, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "legalName" | "mapUrl" | "monthlyFee" | "neighborhood" | "paymentMethod" | "startDate" | "state" | "tradeName">;
+export type CommercialInviteData = Pick<Invite, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "graceDays" | "legalName" | "mapUrl" | "monthlyFee" | "neighborhood" | "paymentMethod" | "startDate" | "state" | "tradeName">;
 
 export async function createCommercialInvite(planId: PlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "trial", nextBillingDate = "", commercialData: CommercialInviteData = {}) {
   if (!firebaseReady || !db) return { code: "DEMO1234", inviteType: "commercial" as const, planId, role: "Proprietário" as const, status: "Ativo" as const, subscriptionStatus };

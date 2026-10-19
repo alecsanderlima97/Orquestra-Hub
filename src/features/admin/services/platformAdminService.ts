@@ -1,5 +1,6 @@
 import { collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import type { AppUser } from "@/features/auth/types/authTypes";
+import { normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import type { PortalSnapshotSyncResponse } from "@/features/connectors/types";
 import type { PlanId } from "@/features/plans/planRules";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
@@ -27,6 +28,7 @@ export type PlatformTenant = {
   document?: string;
   documentType?: "CPF" | "CNPJ";
   externalCustomerId?: string;
+  graceDays?: number;
   id: string;
   lastAccessAt?: number;
   lastSeenAt?: number;
@@ -96,6 +98,7 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
       document: data.document || "",
       documentType: data.documentType || "",
       externalCustomerId: String(data.externalCustomerId || `orquestra_hub_${item.id}`),
+      graceDays: normalizeSubscriptionGraceDays(data.graceDays),
       id: item.id,
       lastAccessAt: timestampToMillis(data.lastAccessAt),
       lastSeenAt: timestampToMillis(data.lastSeenAt),
@@ -123,9 +126,9 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
   });
 }
 
-export async function updateTenantSubscription(tenantId: string, updates: Partial<Pick<PlatformTenant, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "legalName" | "mapUrl" | "monthlyFee" | "name" | "neighborhood" | "nextBillingDate" | "paymentMethod" | "planId" | "startDate" | "state" | "subscriptionStatus" | "tradeName">> & { planId: PlanId; subscriptionStatus: SubscriptionStatus }) {
+export async function updateTenantSubscription(tenantId: string, updates: Partial<Pick<PlatformTenant, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "graceDays" | "legalName" | "mapUrl" | "monthlyFee" | "name" | "neighborhood" | "nextBillingDate" | "paymentMethod" | "planId" | "startDate" | "state" | "subscriptionStatus" | "tradeName">> & { planId: PlanId; subscriptionStatus: SubscriptionStatus }) {
   if (!firebaseReady || !db) return;
-  await updateDoc(doc(db, tenantPath(tenantId)), { ...updates, updatedAt: serverTimestamp() });
+  await updateDoc(doc(db, tenantPath(tenantId)), { ...updates, ...(updates.graceDays === undefined ? {} : { graceDays: normalizeSubscriptionGraceDays(updates.graceDays) }), updatedAt: serverTimestamp() });
 }
 
 export async function listTenantPayments(tenantId: string): Promise<PlatformPayment[]> {

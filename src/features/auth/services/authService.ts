@@ -1,6 +1,7 @@
 import { browserLocalPersistence, createUserWithEmailAndPassword, deleteUser, EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, type User } from "firebase/auth";
 import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { defaultPlanId, getPlanRules, normalizePlanId } from "@/features/plans/planRules";
+import { DEFAULT_SUBSCRIPTION_GRACE_DAYS, normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import { consumeInvite, getInvite, type Invite } from "@/features/users/services/inviteService";
 import { auth, db, firebaseReady } from "@/lib/firebase/config";
 import { normalizeDateInput } from "@/lib/formatters/br";
@@ -50,6 +51,7 @@ function tenantPayload(name: string, ownerId: string, invite: Invite) {
     document: invite.document || "",
     documentType: invite.documentType || "",
     firstBillingDate: invite.nextBillingDate || "",
+    graceDays: normalizeSubscriptionGraceDays(invite.graceDays),
     legalName: invite.legalName || "",
     mapUrl: invite.mapUrl || "",
     monthlyFee: invite.monthlyFee || plan.price,
@@ -105,12 +107,13 @@ export async function touchTenantPresence(tenantId: string, userId: string) {
   ]).catch(() => undefined);
 }
 
-export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate: unknown = ""): AppUser {
+export function mapFirebaseUser(user: User, role: AppUser["role"] = "Consulta", tenantId = defaultTenantId, companyName = "Orquestra Hub", planId = defaultPlanId, subscriptionStatus: AppUser["subscriptionStatus"] = "ativo", nextBillingDate: unknown = "", graceDays: unknown = DEFAULT_SUBSCRIPTION_GRACE_DAYS): AppUser {
   const effectiveRole = isPlatformOwnerEmail(user.email) || role === "Dono" ? ownerRole() : role;
   return {
     authProvider: user.providerData.some((item) => item.providerId === "google.com") ? "google" : "password",
     companyName,
     email: user.email || "",
+    graceDays: normalizeSubscriptionGraceDays(graceDays),
     id: user.uid,
     name: user.displayName || user.email || "Usuário",
     nextBillingDate: normalizeDateInput(nextBillingDate),
@@ -147,7 +150,7 @@ async function mapUserWithRole(user: User, allowOnboarding = false) {
       ? ownerRole()
       : access.data()?.role || data.role || "Consulta";
     const mapped = {
-      ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo", tenant.data()?.nextBillingDate || ""),
+      ...mapFirebaseUser(user, role, membership.id, data.companyName || tenant.data()?.name || "Empresa", tenant.data()?.planId, tenant.data()?.subscriptionStatus || "ativo", tenant.data()?.nextBillingDate || "", tenant.data()?.graceDays),
       name: access.data()?.name || user.displayName || user.email || "Usuário",
       photoUrl: access.data()?.photoUrl || user.photoURL || "",
     };
@@ -217,7 +220,7 @@ export async function registerWithEmail(name: string, companyName: string, email
       if (createsCompany) await deleteDoc(doc(firestore, tenantPath(tenantId))).catch(() => undefined);
       throw error;
     }
-    return cacheUser(mapFirebaseUser(credential.user, role, tenantId, tenantName, plan.id, subscriptionStatus, invite.nextBillingDate || ""));
+    return cacheUser(mapFirebaseUser(credential.user, role, tenantId, tenantName, plan.id, subscriptionStatus, invite.nextBillingDate || "", invite.graceDays));
   } catch (error) {
     await deleteUser(credential.user).catch(() => undefined);
     throw error;
@@ -263,7 +266,7 @@ export async function completeGoogleOnboarding(user: AppUser, companyName: strin
   await runFirebaseStep("Falha ao criar usuário da empresa", () => setDoc(doc(firestore, `${tenantPath(tenantId)}/users/${user.id}`), { consent: { acceptedAt: serverTimestamp(), privacyVersion: "2026-06-15", termsVersion: "2026-06-15" }, email: user.email, inviteCode: normalizedInviteCode, name: finalUserName, role, updatedAt: serverTimestamp(), userId: user.id }, { merge: true }));
   await runFirebaseStep("Falha ao vincular usuário à empresa", () => setDoc(doc(firestore, `userTenants/${user.id}/memberships/${tenantId}`), { companyName: tenantName, inviteCode: normalizedInviteCode, role, updatedAt: serverTimestamp() }, { merge: true }));
   await runFirebaseStep("Falha ao marcar convite como usado", () => consumeInvite(normalizedInviteCode, user.id));
-  return cacheUser({ ...user, companyName: tenantName, name: finalUserName, needsOnboarding: false, nextBillingDate: invite.nextBillingDate || "", planId: plan.id, role, subscriptionStatus, tenantId });
+  return cacheUser({ ...user, companyName: tenantName, graceDays: normalizeSubscriptionGraceDays(invite.graceDays), name: finalUserName, needsOnboarding: false, nextBillingDate: invite.nextBillingDate || "", planId: plan.id, role, subscriptionStatus, tenantId });
 }
 
 export async function resetPassword(email: string) {
@@ -313,6 +316,6 @@ export async function listUserCompanies(userId: string): Promise<CompanyMembersh
       getDoc(doc(firestore, tenantPath(membership.id))),
     ]);
     const role = isPlatformOwnerEmail(currentEmail) || tenant.data()?.ownerId === userId ? ownerRole() : access.data()?.role || membership.data().role || "Consulta";
-    return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", nextBillingDate: normalizeDateInput(tenant.data()?.nextBillingDate), planId: normalizePlanId(tenant.data()?.planId), role: role === "Dono" ? ownerRole() : role, subscriptionStatus: tenant.data()?.subscriptionStatus || "ativo", tenantId: membership.id };
+    return { companyName: membership.data().companyName || tenant.data()?.name || "Empresa", graceDays: normalizeSubscriptionGraceDays(tenant.data()?.graceDays), nextBillingDate: normalizeDateInput(tenant.data()?.nextBillingDate), planId: normalizePlanId(tenant.data()?.planId), role: role === "Dono" ? ownerRole() : role, subscriptionStatus: tenant.data()?.subscriptionStatus || "ativo", tenantId: membership.id };
   }));
 }

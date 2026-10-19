@@ -2,6 +2,7 @@
 
 import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Pause, Pencil, RefreshCw, Save, TicketPlus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { DEFAULT_SUBSCRIPTION_GRACE_DAYS, normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import type { PlanId } from "@/features/plans/planRules";
 import { plans } from "@/features/plans/planRules";
 import { createCommercialInvite } from "@/features/users/services/inviteService";
@@ -12,7 +13,6 @@ import { PlatformTenantEditForm } from "./PlatformTenantEditForm";
 import { confirmTenantPayment, listPlatformTenants, listTenantPayments, syncPortalSnapshot, type PlatformPayment, type PlatformTenant, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
-const graceDays = 5;
 const onlineWindowMs = 2 * 60 * 1000;
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
 
@@ -82,6 +82,7 @@ function referenceFromBilling(date: string) {
 }
 
 function billingStatus(item: PlatformTenant) {
+  const graceDays = normalizeSubscriptionGraceDays(item.graceDays);
   if (["pausado", "bloqueado", "cancelado"].includes(item.subscriptionStatus)) return { label: item.subscriptionStatus === "pausado" ? "Pausado" : "Bloqueio manual", tone: "bg-rose-100 text-rose-800" };
   const days = daysUntilBilling(item.nextBillingDate || "");
   if (days === null) return { label: "Sem vencimento", tone: "bg-slate-100 text-slate-700" };
@@ -123,6 +124,7 @@ export function PlatformAdminPanel() {
     legalName: "",
     mapUrl: "",
     monthlyFee: plans.medio.price,
+    graceDays: DEFAULT_SUBSCRIPTION_GRACE_DAYS,
     neighborhood: "",
     paymentMethod: "PIX",
     startDate: todayInput(),
@@ -223,6 +225,7 @@ export function PlatformAdminPanel() {
         contactPhone: item.contactPhone,
         document: item.document,
         documentType: item.documentType,
+        graceDays: normalizeSubscriptionGraceDays(item.graceDays),
         legalName: item.legalName,
         mapUrl: item.mapUrl,
         monthlyFee: item.monthlyFee,
@@ -315,7 +318,7 @@ export function PlatformAdminPanel() {
           <h3 className="font-semibold text-slate-950">Admin Orquestra.cs</h3>
           <p className="mt-1 text-sm text-slate-600">Controle comercial dos clientes, convites, planos e status de assinatura.</p>
           <p className="mt-2 inline-flex w-fit rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
-            Tolerância após vencimento: {graceDays} dias úteis
+            Clientes sem configuração usam tolerância de {DEFAULT_SUBSCRIPTION_GRACE_DAYS} dias úteis
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-3">
@@ -365,6 +368,7 @@ export function PlatformAdminPanel() {
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, contactPhone: formatPhone(event.target.value) }))} placeholder="WhatsApp" value={commercialForm.contactPhone} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, contactEmail: event.target.value.toLowerCase() }))} placeholder="E-mail comercial" type="email" value={commercialForm.contactEmail} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" onBlur={() => setCommercialForm((form) => ({ ...form, monthlyFee: formatBRL(form.monthlyFee) }))} onChange={(event) => setCommercialForm((form) => ({ ...form, monthlyFee: event.target.value }))} placeholder="Mensalidade" value={commercialForm.monthlyFee} />
+          <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" inputMode="numeric" max="60" min="0" onChange={(event) => setCommercialForm((form) => ({ ...form, graceDays: Number(event.target.value) }))} placeholder="Tolerância (dias úteis)" title="Dias úteis após o vencimento antes do bloqueio automático" type="number" value={commercialForm.graceDays} />
           <input className="h-10 rounded-md border border-slate-300 px-3 text-sm" maxLength={2} onChange={(event) => setCommercialForm((form) => ({ ...form, billingDay: event.target.value.replace(/\D/g, "").slice(0, 2) }))} placeholder="Dia venc." value={commercialForm.billingDay} />
           <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" onChange={(event) => setCommercialForm((form) => ({ ...form, paymentMethod: event.target.value }))} value={commercialForm.paymentMethod}>
             <option>PIX</option>

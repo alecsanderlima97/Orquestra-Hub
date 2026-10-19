@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronDown, Plus, X } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import { EditModal, type EditField } from "@/components/ui/EditModal";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { ReasonModal } from "@/components/ui/ReasonModal";
@@ -86,7 +87,6 @@ import { defaultTenantId as legacyTenantId } from "@/lib/tenant/tenant";
 const money = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 const demoUserId = "demo-user";
 const salesWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
-const subscriptionGraceDays = 5;
 type EditTarget = { kind: "store"; item: Store } | { kind: "supplier"; item: Supplier } | { kind: "purchase"; item: Purchase } | { kind: "account"; item: AccountPayable } | { kind: "fixedExpense"; item: FixedExpense };
 
 function CollapsibleSettingsBlock({ children, defaultOpen = false, description, storageKey, title }: { children: ReactNode; defaultOpen?: boolean; description: string; storageKey: string; title: string }) {
@@ -165,7 +165,7 @@ function businessDaysAfterInputDate(date: string) {
 }
 
 function isBlockedByBillingDate(user: AppUser) {
-  return businessDaysAfterInputDate(user.nextBillingDate || "") > subscriptionGraceDays;
+  return businessDaysAfterInputDate(user.nextBillingDate || "") > normalizeSubscriptionGraceDays(user.graceDays);
 }
 
 function fixedExpenseAccountForMonth(expense: FixedExpense, referenceDate = todaySaoPaulo()): Omit<AccountPayable, "id"> {
@@ -1280,7 +1280,7 @@ export function OrquestraHubApp() {
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
-  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName, inviteCode) => { const completed = await completeGoogleOnboarding(user, companyName, userName, inviteCode); setUser(completed); setCompanies([{ companyName: completed.companyName, nextBillingDate: completed.nextBillingDate, planId: completed.planId, role: completed.role, subscriptionStatus: completed.subscriptionStatus, tenantId: completed.tenantId }]); }} onLogout={handleLogout} user={user} />;
+  if (user.needsOnboarding) return <FirstAccessOnboarding onComplete={async (companyName, userName, inviteCode) => { const completed = await completeGoogleOnboarding(user, companyName, userName, inviteCode); setUser(completed); setCompanies([{ companyName: completed.companyName, graceDays: completed.graceDays, nextBillingDate: completed.nextBillingDate, planId: completed.planId, role: completed.role, subscriptionStatus: completed.subscriptionStatus, tenantId: completed.tenantId }]); }} onLogout={handleLogout} user={user} />;
 
   const blockedByStatus = ["pausado", "vencido", "bloqueado", "cancelado"].includes(user.subscriptionStatus || "");
   const blockedByBillingDate = isBlockedByBillingDate(user);
@@ -1288,6 +1288,7 @@ export function OrquestraHubApp() {
 
   const canWrite = roleCanWrite(user.role);
   const plan = getPlanRules(user.planId);
+  const subscriptionGraceDays = normalizeSubscriptionGraceDays(user.graceDays);
   const subscriptionDays = daysUntilInputDate(user.nextBillingDate || "");
   const subscriptionReference = user.nextBillingDate?.slice(0, 7) || "";
   const subscriptionPromptKey = user.tenantId && user.nextBillingDate ? `orquestra-subscription-prompt-${user.tenantId}-${user.nextBillingDate}` : "";

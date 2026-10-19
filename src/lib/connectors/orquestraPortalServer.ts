@@ -1,4 +1,5 @@
 import { getPlanRules, normalizePlanId, type PlanId } from "@/features/plans/planRules";
+import { normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import { firebaseAdmin } from "@/lib/firebase/admin";
 import type { PortalSnapshotSyncSummary } from "@/features/connectors/types";
 
@@ -134,6 +135,7 @@ export async function buildOrquestraPortalSnapshot() {
         planName: plan.label,
         monthlyFee: stringValue(data.monthlyFee) || plan.price,
         billingDay: stringValue(data.billingDay),
+        graceDays: normalizeSubscriptionGraceDays(data.graceDays),
         renewalDate: dateValue(data.nextBillingDate),
         paymentMethod: stringValue(data.paymentMethod),
         billingStatus: stringValue(data.billingStatus),

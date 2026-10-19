@@ -1,5 +1,6 @@
 export type AppUser = {
   email: string;
+  graceDays?: number;
   id: string;
   name: string;
   role: "Proprietário" | "Dono" | "Financeiro" | "Consulta";
@@ -13,4 +14,4 @@ export type AppUser = {
   needsOnboarding?: boolean;
 };
 
-export type CompanyMembership = { companyName: string; nextBillingDate?: string; planId?: AppUser["planId"]; role: AppUser["role"]; subscriptionStatus?: AppUser["subscriptionStatus"]; tenantId: string };
+export type CompanyMembership = { companyName: string; graceDays?: number; nextBillingDate?: string; planId?: AppUser["planId"]; role: AppUser["role"]; subscriptionStatus?: AppUser["subscriptionStatus"]; tenantId: string };

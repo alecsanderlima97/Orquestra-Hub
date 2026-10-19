@@ -1,6 +1,7 @@
 "use client";
 
 import { Save, X } from "lucide-react";
+import { DEFAULT_SUBSCRIPTION_GRACE_DAYS } from "@/features/billing/subscriptionRules";
 import { plans } from "@/features/plans/planRules";
 import { formatBRL, formatPhone, toTitleCaseBR } from "@/lib/formatters/br";
 import { CommercialCustomerFields } from "./CommercialCustomerFields";
@@ -61,6 +62,11 @@ export function PlatformTenantEditForm({ onCancel, onChange, onSave, tenant }: P
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Mensalidade</span>
               <input className="mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950" onBlur={() => onChange({ monthlyFee: formatBRL(tenant.monthlyFee || plans[tenant.planId].price) })} onChange={(event) => onChange({ monthlyFee: event.target.value })} value={tenant.monthlyFee || ""} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Tolerância após vencimento</span>
+              <input aria-describedby="grace-days-help" className="mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950" inputMode="numeric" max="60" min="0" onChange={(event) => onChange({ graceDays: Number(event.target.value) })} type="number" value={tenant.graceDays ?? DEFAULT_SUBSCRIPTION_GRACE_DAYS} />
+              <span className="mt-1 block text-xs text-slate-500" id="grace-days-help">Dias úteis antes do bloqueio automático.</span>
             </label>
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Dia de vencimento</span>
