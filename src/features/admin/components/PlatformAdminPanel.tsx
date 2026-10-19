@@ -166,6 +166,71 @@ function PlatformTenantUsers({ tenant }: { tenant: PlatformTenant }) {
   );
 }
 
+function PlatformTenantDetails({ tenant }: { tenant: PlatformTenant }) {
+  const syncStatus = portalSyncStatusLabel(tenant.portalSyncStatus);
+  const administrativeLimit = plans[tenant.planId].userLimit;
+  const administrativeUsed = tenant.adminUserCount + tenant.activeInviteCount;
+
+  return (
+    <details className="overflow-hidden rounded-lg border border-cyan-100 bg-white shadow-sm">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-cyan-50/50 px-4 py-3 text-sm font-semibold text-cyan-950 transition hover:bg-cyan-50">
+        <span className="min-w-0">
+          <span className="block truncate">Detalhes operacionais</span>
+          <span className="mt-0.5 block truncate text-xs font-normal text-slate-600">{tenant.name} · atualização {formatDateTime(tenant.updatedAt)}</span>
+        </span>
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-cyan-800">Abrir detalhes</span>
+      </summary>
+      <div className="grid gap-4 border-t border-cyan-100 bg-slate-50/40 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <section className="min-w-0 overflow-hidden rounded-lg border border-cyan-100 bg-white" aria-label={`Sincronização do ${tenant.name}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cyan-100 bg-cyan-50/60 px-3 py-3">
+            <h4 className="text-xs font-bold uppercase tracking-wide text-cyan-950">Sincronização com Portal</h4>
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${syncStatus.tone}`}>{syncStatus.label}</span>
+          </div>
+          <dl className="grid gap-3 p-3 text-xs sm:grid-cols-2">
+            <div className="min-w-0 sm:col-span-2">
+              <dt className="font-semibold text-slate-500">Identificador externo</dt>
+              <dd className="mt-1 break-all rounded-md bg-slate-50 px-2 py-1 font-mono text-[11px] text-cyan-900">{tenant.externalCustomerId}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="font-semibold text-slate-500">ID interno</dt>
+              <dd className="mt-1 break-all text-slate-700">{tenant.id}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-500">dataVersion</dt>
+              <dd className="mt-1 font-semibold text-slate-800">{tenant.dataVersion || 1}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-500">Última atualização</dt>
+              <dd className="mt-1 text-slate-700">{formatDateTime(tenant.updatedAt)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-500">Última sincronização</dt>
+              <dd className="mt-1 text-slate-700">{formatDateTime(tenant.portalLastSyncedAt)}</dd>
+            </div>
+            {tenant.portalSyncError ? (
+              <div className="rounded-md border border-rose-100 bg-rose-50 p-2 text-rose-800 sm:col-span-2">
+                <dt className="font-semibold">Erro da última sincronização</dt>
+                <dd className="mt-1 break-words">{tenant.portalSyncError}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </section>
+
+        <div className="min-w-0">
+          <PlatformTenantUsers tenant={tenant} />
+          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-semibold text-slate-700">Limite administrativo do plano</span>
+              <span className="rounded-full bg-cyan-50 px-2.5 py-1 font-semibold text-cyan-800">{administrativeUsed}/{administrativeLimit} usados</span>
+            </div>
+            <p className="mt-2 break-words">Usuários finais ficam vinculados ao cliente, mas não consomem as vagas de colaboradores administrativos.</p>
+          </div>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 export function PlatformAdminPanel() {
   const [commercialForm, setCommercialForm] = useState({
     address: "",
@@ -493,61 +558,50 @@ export function PlatformAdminPanel() {
               const calculatedStatus = billingStatus(item);
               const online = isOnline(item.lastSeenAt);
               return [
-              <tr key={item.id}>
-                <td className="px-5 py-3">
-                  <button className="text-left font-semibold text-cyan-800 underline-offset-2 hover:text-cyan-950 hover:underline" onClick={() => setEditingTenantId(item.id)} type="button">{item.name}</button>
-                  <p className="text-xs text-slate-500">{item.id}</p>
-                  <p className="mt-1 text-xs text-slate-600">{item.contactName || "Responsável não informado"}</p>
-                  <p className="text-xs text-slate-500">{item.contactPhone || item.contactEmail || "Contato não informado"}</p>
-                  <p className="mt-1 text-[11px] leading-4 text-slate-500 2xl:hidden">Acesso: {formatDateTime(item.lastAccessAt)} · {online ? "Online" : "Offline"} · IA {item.aiBalance}/{item.aiIncluded}</p>
-                  <p className="mt-1 text-[11px] leading-4 text-cyan-700">Pagamento: {paymentStatusLabel(item.billingStatus)}{item.lastPaymentAt ? ` · ${item.lastPaymentAt}` : ""}</p>
-                  {(() => {
-                    const syncStatus = portalSyncStatusLabel(item.portalSyncStatus);
-                    return (
-                      <div className="mt-2 rounded-md border border-cyan-100 bg-cyan-50/40 text-[11px] text-slate-600">
-                        <div className="flex items-center justify-between gap-2 px-2.5 py-2 font-semibold text-cyan-900">
-                          <span>Sincronização com Portal</span>
-                          <span className={`rounded-full px-2 py-0.5 ${syncStatus.tone}`}>{syncStatus.label}</span>
-                        </div>
-                        <div className="grid gap-1 border-t border-cyan-100 px-2.5 py-2 leading-4">
-                          <span>Identificador externo: <code className="break-all text-cyan-900">{item.externalCustomerId}</code></span>
-                          <span>dataVersion: <strong>{item.dataVersion || 1}</strong></span>
-                          <span>Última atualização: <strong>{formatDateTime(item.updatedAt)}</strong></span>
-                          <span>Última sincronização: <strong>{formatDateTime(item.portalLastSyncedAt)}</strong></span>
-                          {item.portalSyncError ? <span className="text-rose-700">Erro: {item.portalSyncError}</span> : null}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  <PlatformTenantUsers tenant={item} />
-                </td>
-                <td className="px-5 py-3">
-                  <span className="font-medium text-slate-950">{plans[item.planId].label}</span>
-                </td>
-                <td className="px-5 py-3">
-                  <span className="capitalize text-slate-700">{item.subscriptionStatus}</span>
-                </td>
-                <td className="hidden px-5 py-3 xl:table-cell">{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
-                <td className="px-5 py-3">
-                  {item.nextBillingDate ? formatInputDateBR(item.nextBillingDate) : "Sem vencimento"}
-                </td>
-                <td className="px-5 py-3">
-                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${calculatedStatus.tone}`}>{calculatedStatus.label}</span>
-                </td>
-                <td className="hidden px-5 py-3 2xl:table-cell">{formatDateTime(item.lastAccessAt)}</td>
-                <td className="hidden px-5 py-3 2xl:table-cell">
-                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>{online ? "Online agora" : "Offline"}</span>
-                </td>
-                <td className="hidden px-5 py-3 2xl:table-cell">{item.aiBalance}/{item.aiIncluded}</td>
-                <td className="px-5 py-3 align-top">
-                  <div className="flex min-w-0 flex-col gap-2">
-                    <button aria-label={`Abrir cadastro de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800 transition duration-150 hover:-translate-y-0.5 hover:bg-cyan-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={() => setEditingTenantId(item.id)} title="Abrir e editar cadastro" type="button"><Pencil size={15} />Abrir cadastro</button>
-                    <button aria-label={`Confirmar pagamento de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition duration-150 hover:-translate-y-0.5 hover:bg-emerald-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Registrar pagamento e atualizar vencimento" type="button"><CircleDollarSign size={15} />Confirmar pagamento</button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button aria-label={`Pausar ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-2 text-xs font-semibold text-amber-800 transition duration-150 hover:-translate-y-0.5 hover:bg-amber-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => changeStatus(item, "pausado")} title="Pausar acesso preservando os dados" type="button"><Pause size={14} /><span className="truncate">Pausar</span></button>
-                      <button aria-label={`Remover ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-2 text-xs font-semibold text-rose-700 transition duration-150 hover:-translate-y-0.5 hover:bg-rose-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Remover da lista ativa e preservar os dados" type="button"><Archive size={14} /><span className="truncate">Remover</span></button>
+              <tr className="align-top" key={item.id}>
+                <td className="min-w-0 px-4 py-3 sm:px-5">
+                  <div className="min-w-0 space-y-1">
+                    <button className="block max-w-full truncate text-left font-semibold text-cyan-800 underline-offset-2 hover:text-cyan-950 hover:underline" onClick={() => setEditingTenantId(item.id)} title={item.name} type="button">{item.name}</button>
+                    <p className="max-w-full truncate text-xs text-slate-600" title={item.contactName || "Responsável não informado"}>{item.contactName || "Responsável não informado"}</p>
+                    <p className="max-w-full truncate text-xs text-slate-500" title={item.contactPhone || item.contactEmail || "Contato não informado"}>{item.contactPhone || item.contactEmail || "Contato não informado"}</p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-800">{paymentStatusLabel(item.billingStatus)}</span>
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{online ? "Online" : "Offline"}</span>
                     </div>
                   </div>
+                </td>
+                <td className="break-words px-4 py-3 sm:px-5">
+                  <span className="font-medium text-slate-950">{plans[item.planId].label}</span>
+                </td>
+                <td className="px-4 py-3 sm:px-5">
+                  <span className="capitalize text-slate-700">{item.subscriptionStatus}</span>
+                </td>
+                <td className="hidden px-4 py-3 xl:table-cell sm:px-5">{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
+                <td className="px-4 py-3 sm:px-5">
+                  {item.nextBillingDate ? formatInputDateBR(item.nextBillingDate) : "Sem vencimento"}
+                </td>
+                <td className="px-4 py-3 sm:px-5">
+                  <span className={`inline-flex max-w-full rounded-full px-3 py-1 text-xs font-semibold leading-4 ${calculatedStatus.tone}`}>{calculatedStatus.label}</span>
+                </td>
+                <td className="hidden px-4 py-3 2xl:table-cell sm:px-5">{formatDateTime(item.lastAccessAt)}</td>
+                <td className="hidden px-4 py-3 2xl:table-cell sm:px-5">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>{online ? "Online agora" : "Offline"}</span>
+                </td>
+                <td className="hidden px-4 py-3 2xl:table-cell sm:px-5">{item.aiBalance}/{item.aiIncluded}</td>
+                <td className="min-w-[148px] px-3 py-3 align-top sm:px-4">
+                  <div className="mx-auto flex max-w-[176px] min-w-0 flex-col gap-2">
+                    <button aria-label={`Abrir cadastro de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-2 text-xs font-semibold leading-tight text-cyan-800 transition duration-150 hover:-translate-y-0.5 hover:bg-cyan-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={() => setEditingTenantId(item.id)} title="Abrir e editar cadastro" type="button"><Pencil size={15} /><span className="text-center">Abrir cadastro</span></button>
+                    <button aria-label={`Confirmar pagamento de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-semibold leading-tight text-emerald-800 transition duration-150 hover:-translate-y-0.5 hover:bg-emerald-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Registrar pagamento e atualizar vencimento" type="button"><CircleDollarSign size={15} /><span className="text-center">Confirmar pagamento</span></button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button aria-label={`Pausar ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-2 text-[11px] font-semibold leading-tight text-amber-800 transition duration-150 hover:-translate-y-0.5 hover:bg-amber-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => changeStatus(item, "pausado")} title="Pausar acesso preservando os dados" type="button"><Pause size={13} /><span className="text-center">Pausar</span></button>
+                      <button aria-label={`Remover ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-1.5 py-2 text-[11px] font-semibold leading-tight text-rose-700 transition duration-150 hover:-translate-y-0.5 hover:bg-rose-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Remover da lista ativa e preservar os dados" type="button"><Archive size={13} /><span className="text-center">Remover</span></button>
+                    </div>
+                  </div>
+                </td>
+              </tr>,
+              <tr key={`${item.id}-details`}>
+                <td className="px-4 pb-4 sm:px-5" colSpan={10}>
+                  <PlatformTenantDetails tenant={item} />
                 </td>
               </tr>,
               paymentTenantId === item.id ? (
