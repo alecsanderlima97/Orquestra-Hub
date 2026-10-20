@@ -17,6 +17,7 @@ export async function createCompany(user: AppUser, name: string): Promise<Compan
   await setDoc(doc(db, tenantPath(tenantId)), {
     aiCredits: {
       balance: defaultPlan.initialAiCredits,
+      bonus: 0,
       included: defaultPlan.initialAiCredits,
       renewalMonth: new Date().toISOString().slice(0, 7),
       status: "Ativo",

@@ -1,32 +1,17 @@
 "use client";
 
-import { Bot, CreditCard, Sparkles, Zap } from "lucide-react";
+import { Bot, CreditCard, LoaderCircle, Sparkles, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { auth } from "@/lib/firebase/config";
+import { AI_CREDIT_PACKAGES, type AiCreditPackageId } from "../aiCreditPackages";
 import { getPlanRules, type PlanId } from "@/features/plans/planRules";
 import { getAiCreditBalance, type AiCreditBalance } from "../services/aiCreditService";
-
-const portalPaymentsUrl = process.env.NEXT_PUBLIC_ORQUESTRA_PORTAL_PAYMENTS_URL || "https://portal.orquestracs.com/pagamentos";
-
-const packages = [
-  { credits: 100, helper: "Para uso leve e validações rápidas.", label: "Essencial", price: "R$ 29,90" },
-  { credits: 300, helper: "Boa margem para rotina financeira semanal.", label: "Mais escolhido", price: "R$ 69,90" },
-  { credits: 1000, helper: "Para equipes que usam IA no dia a dia.", label: "Performance", price: "R$ 189,90" },
-];
-
-function openPortalPurchase(tenantId: string, item: { credits: number; price: string }) {
-  const url = new URL(portalPaymentsUrl);
-  url.searchParams.set("sourceSystem", "orquestra_hub");
-  url.searchParams.set("product", "ai_credits");
-  url.searchParams.set("packageId", `ai-${item.credits}`);
-  url.searchParams.set("credits", String(item.credits));
-  url.searchParams.set("externalCustomerId", `orquestra_hub_${tenantId}`);
-  url.searchParams.set("returnUrl", `${window.location.origin}${window.location.pathname}`);
-  window.open(url.toString(), "_blank", "noopener,noreferrer");
-}
 
 export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName: string; planId?: PlanId; tenantId: string }) {
   const plan = getPlanRules(planId);
   const [credits, setCredits] = useState<AiCreditBalance>({ balance: plan.initialAiCredits, bonus: 0, included: plan.initialAiCredits, status: "Ativo", used: 0 });
+  const [pendingPackage, setPendingPackage] = useState<AiCreditPackageId | null>(null);
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -47,6 +32,26 @@ export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName:
 
   const total = Math.max(credits.balance + credits.used, credits.included, 1);
   const percent = Math.min(100, Math.round((credits.balance / total) * 100));
+
+  async function openPayment(packageId: AiCreditPackageId) {
+    const user = auth?.currentUser;
+    if (!user) {
+      setPaymentError("Entre no sistema para abrir o pagamento.");
+      return;
+    }
+    setPendingPackage(packageId);
+    setPaymentError("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/ai/credits/payment-link", { body: JSON.stringify({ packageId, tenantId }), headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, method: "POST" });
+      const data = await response.json().catch(() => ({})) as { error?: string; url?: string };
+      if (!response.ok || !data.url) throw new Error(data.error || "Não foi possível abrir o pagamento.");
+      window.location.assign(data.url);
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : "Não foi possível abrir o pagamento.");
+      setPendingPackage(null);
+    }
+  }
 
   return (
     <section className="theme-surface overflow-hidden rounded-lg border border-cyan-200 bg-white shadow-sm">
@@ -90,8 +95,8 @@ export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName:
         <div>
           {plan.aiEnabled ? (
             <div className="grid gap-3 md:grid-cols-3">
-              {packages.map((item) => (
-                <article className="rounded-lg border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-md" key={item.credits}>
+              {Object.entries(AI_CREDIT_PACKAGES).map(([packageId, item]) => (
+                <article className="rounded-lg border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-md" key={packageId}>
                   <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-1 text-xs font-bold uppercase text-cyan-800">
                     <Zap size={13} />{item.label}
                   </span>
@@ -100,9 +105,9 @@ export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName:
                   <p className="mt-3 min-h-10 text-xs leading-5 text-slate-500">{item.helper}</p>
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <span className="font-bold text-slate-950">{item.price}</span>
-                    <button className="inline-flex items-center gap-2 rounded-md border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-900 hover:bg-cyan-100" onClick={() => openPortalPurchase(tenantId, item)} title="Abrir pagamento seguro no Portal Orquestra.cs" type="button">
-                      <CreditCard size={15} />
-                      Comprar no Portal
+                    <button className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60" disabled={pendingPackage === packageId} onClick={() => void openPayment(packageId as AiCreditPackageId)} title="Abrir pagamento no Portal" type="button">
+                      {pendingPackage === packageId ? <LoaderCircle className="animate-spin" size={15} /> : <CreditCard size={15} />}
+                      {pendingPackage === packageId ? "Abrindo" : "Comprar"}
                     </button>
                   </div>
                 </article>
@@ -111,7 +116,8 @@ export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName:
           ) : (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Faça upgrade para liberar a IA Financeira e receber créditos mensais no plano.</div>
           )}
-          <p className="mt-3 text-xs text-slate-500">O pagamento abre no Portal Orquestra.cs. Após a confirmação, os créditos serão vinculados à carteira deste cliente.</p>
+          {paymentError ? <p className="mt-3 text-xs font-medium text-red-700">{paymentError}</p> : null}
+          <p className="mt-3 text-xs text-slate-500">O pagamento abre no Portal, sem criar uma segunda carteira. O crédito entra somente após a confirmação do provedor.</p>
         </div>
       </div>
     </section>
