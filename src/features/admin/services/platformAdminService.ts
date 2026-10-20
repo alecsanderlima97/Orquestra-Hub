@@ -30,6 +30,7 @@ export type PlatformTenant = {
   addressComplement?: string;
   addressNumber?: string;
   aiBalance: number;
+  aiBonus: number;
   aiIncluded: number;
   billingStatus?: string;
   billingDay?: string;
@@ -129,6 +130,7 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
     const adminUserCount = users.filter((user) => user.userType === "admin").length;
     return {
       aiBalance: Number(aiCredits.balance || 0),
+      aiBonus: Math.max(Number(aiCredits.bonus || 0), 0),
       aiIncluded: Number(aiCredits.included || 0),
       billingStatus: String(data.billingStatus || ""),
       address: data.address || "",
@@ -180,6 +182,29 @@ export async function listPlatformTenants(): Promise<PlatformTenant[]> {
 export async function updateTenantSubscription(tenantId: string, updates: Partial<Pick<PlatformTenant, "address" | "addressComplement" | "addressNumber" | "billingDay" | "cep" | "city" | "commercialNotes" | "contactEmail" | "contactName" | "contactPhone" | "document" | "documentType" | "graceDays" | "legalName" | "mapUrl" | "monthlyFee" | "name" | "neighborhood" | "nextBillingDate" | "paymentMethod" | "planId" | "startDate" | "state" | "subscriptionStatus" | "tradeName">> & { planId: PlanId; subscriptionStatus: SubscriptionStatus }) {
   if (!firebaseReady || !db) return;
   await updateDoc(doc(db, tenantPath(tenantId)), { ...updates, ...(updates.graceDays === undefined ? {} : { graceDays: normalizeSubscriptionGraceDays(updates.graceDays) }), updatedAt: serverTimestamp() });
+}
+
+export type AddAiCreditsResponse = {
+  adjustmentId: string;
+  balance: number;
+  bonus: number;
+  included: number;
+  used: number;
+};
+
+export async function addAiCredits(tenantId: string, credits: number, reason: string): Promise<AddAiCreditsResponse> {
+  if (!auth?.currentUser) throw new Error("Sessão do Admin Orquestra.cs não encontrada.");
+  const token = await auth.currentUser.getIdToken();
+  const response = await fetch("/api/admin/ai-credits", {
+    body: JSON.stringify({ credits, reason, tenantId }),
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    method: "POST",
+  });
+  const body = await response.json().catch(() => ({})) as Partial<AddAiCreditsResponse> & { error?: string };
+  if (!response.ok || typeof body.balance !== "number" || typeof body.bonus !== "number") {
+    throw new Error(body.error || "Não foi possível adicionar os créditos IA.");
+  }
+  return body as AddAiCreditsResponse;
 }
 
 export async function listTenantPayments(tenantId: string): Promise<PlatformPayment[]> {

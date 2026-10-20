@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { getPlanRules, type PlanId } from "@/features/plans/planRules";
 import { getAiCreditBalance, type AiCreditBalance } from "../services/aiCreditService";
 
-const salesWhatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || "5515998478705").replace(/\D/g, "");
+const portalPaymentsUrl = process.env.NEXT_PUBLIC_ORQUESTRA_PORTAL_PAYMENTS_URL || "https://portal.orquestracs.com/pagamentos";
 
 const packages = [
   { credits: 100, helper: "Para uso leve e validações rápidas.", label: "Essencial", price: "R$ 29,90" },
@@ -13,21 +13,20 @@ const packages = [
   { credits: 1000, helper: "Para equipes que usam IA no dia a dia.", label: "Performance", price: "R$ 189,90" },
 ];
 
-function requestPackage(companyName: string, item: { credits: number; price: string }) {
-  const message = [
-    "Olá, quero contratar créditos para a IA Financeira do Orquestra Hub.",
-    "",
-    `Empresa: ${companyName}`,
-    `Pacote: ${item.credits} créditos - ${item.price}`,
-    "",
-    "Pode me enviar as informações para pagamento?",
-  ].join("\n");
-  window.open(`https://wa.me/${salesWhatsapp}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+function openPortalPurchase(tenantId: string, item: { credits: number; price: string }) {
+  const url = new URL(portalPaymentsUrl);
+  url.searchParams.set("sourceSystem", "orquestra_hub");
+  url.searchParams.set("product", "ai_credits");
+  url.searchParams.set("packageId", `ai-${item.credits}`);
+  url.searchParams.set("credits", String(item.credits));
+  url.searchParams.set("externalCustomerId", `orquestra_hub_${tenantId}`);
+  url.searchParams.set("returnUrl", `${window.location.origin}${window.location.pathname}`);
+  window.open(url.toString(), "_blank", "noopener,noreferrer");
 }
 
 export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName: string; planId?: PlanId; tenantId: string }) {
   const plan = getPlanRules(planId);
-  const [credits, setCredits] = useState<AiCreditBalance>({ balance: plan.initialAiCredits, included: plan.initialAiCredits, status: "Ativo", used: 0 });
+  const [credits, setCredits] = useState<AiCreditBalance>({ balance: plan.initialAiCredits, bonus: 0, included: plan.initialAiCredits, status: "Ativo", used: 0 });
 
   useEffect(() => {
     let alive = true;
@@ -85,6 +84,7 @@ export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName:
           <p className="mt-3 text-xs leading-5 text-slate-500">
             {plan.aiEnabled ? `Seu plano renova ${plan.monthlyAiCredits} crédito(s) por mês. Cada pergunta consome 1 crédito.` : "Seu plano atual não inclui assistente IA."}
           </p>
+          {credits.bonus > 0 ? <p className="mt-2 text-xs font-semibold text-cyan-800">Créditos extras disponíveis: {credits.bonus}</p> : null}
         </div>
 
         <div>
@@ -100,9 +100,9 @@ export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName:
                   <p className="mt-3 min-h-10 text-xs leading-5 text-slate-500">{item.helper}</p>
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <span className="font-bold text-slate-950">{item.price}</span>
-                    <button className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" onClick={() => requestPackage(companyName, item)} title="Solicitar recarga pelo WhatsApp" type="button">
+                    <button className="inline-flex items-center gap-2 rounded-md border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-900 hover:bg-cyan-100" onClick={() => openPortalPurchase(tenantId, item)} title="Abrir pagamento seguro no Portal Orquestra.cs" type="button">
                       <CreditCard size={15} />
-                      WhatsApp
+                      Comprar no Portal
                     </button>
                   </div>
                 </article>
@@ -111,7 +111,7 @@ export function AiCreditsPanel({ companyName, planId, tenantId }: { companyName:
           ) : (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Faça upgrade para liberar a IA Financeira e receber créditos mensais no plano.</div>
           )}
-          <p className="mt-3 text-xs text-slate-500">A solicitação abre no WhatsApp para aprovação manual, evitando consumo sem pagamento confirmado.</p>
+          <p className="mt-3 text-xs text-slate-500">O pagamento abre no Portal Orquestra.cs. Após a confirmação, os créditos serão vinculados à carteira deste cliente.</p>
         </div>
       </div>
     </section>

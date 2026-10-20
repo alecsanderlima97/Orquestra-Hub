@@ -39,7 +39,7 @@ function tenantPayload(name: string, ownerId: string, invite: Invite) {
     address: invite.address || "",
     addressComplement: invite.addressComplement || "",
     addressNumber: invite.addressNumber || "",
-    aiCredits: { balance: plan.initialAiCredits, included: plan.initialAiCredits, renewalMonth: renewalMonth(), status: "Ativo", used: 0 },
+    aiCredits: { balance: plan.initialAiCredits, bonus: 0, included: plan.initialAiCredits, renewalMonth: renewalMonth(), status: "Ativo", used: 0 },
     billingDay: invite.billingDay || "",
     cep: invite.cep || "",
     city: invite.city || "",

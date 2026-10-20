@@ -49,13 +49,15 @@ async function reserveCredit(db: Firestore, tenantId: string) {
     if (!plan.aiEnabled) throw new Error("Assistente IA não está disponível no plano atual.");
     const aiCredits = tenant.data()?.aiCredits || {};
     const month = currentRenewalMonth();
+    const bonus = Math.max(Number(aiCredits.bonus || 0), 0);
     const shouldRenew = aiCredits.renewalMonth !== month;
-    const currentBalance = shouldRenew ? plan.monthlyAiCredits : Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : plan.initialAiCredits;
+    const currentBalance = shouldRenew ? plan.monthlyAiCredits + bonus : Number.isFinite(Number(aiCredits.balance)) ? Number(aiCredits.balance) : plan.initialAiCredits + bonus;
     const currentUsed = shouldRenew ? 0 : Number(aiCredits.used || 0);
     if (currentBalance < 1) throw new Error("IA sem créditos disponíveis. Contrate uma recarga para continuar usando.");
     const nextBalance = currentBalance - 1;
     transaction.update(tenantRef, {
       "aiCredits.balance": nextBalance,
+      "aiCredits.bonus": bonus,
       "aiCredits.included": plan.monthlyAiCredits,
       "aiCredits.lastUsedAt": new Date().toISOString(),
       "aiCredits.renewalMonth": month,

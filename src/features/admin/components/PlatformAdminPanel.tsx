@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Crown, GripVertical, Pause, Pencil, RefreshCw, RotateCcw, Save, TicketPlus, UserRound, UsersRound } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Crown, GripVertical, Pause, Pencil, RefreshCw, RotateCcw, Save, Sparkles, TicketPlus, UserRound, UsersRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DEFAULT_SUBSCRIPTION_GRACE_DAYS, normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import type { PlanId } from "@/features/plans/planRules";
@@ -10,7 +10,7 @@ import { formatBRL, formatPhone, parseBRL, toTitleCaseBR } from "@/lib/formatter
 import type { CommercialDocumentType } from "../types/commercialProfile";
 import { CommercialCustomerFields } from "./CommercialCustomerFields";
 import { PlatformTenantEditForm } from "./PlatformTenantEditForm";
-import { confirmTenantPayment, listPlatformTenants, listTenantPayments, syncPortalSnapshot, type PlatformPayment, type PlatformTenant, type PlatformTenantUser, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
+import { addAiCredits, confirmTenantPayment, listPlatformTenants, listTenantPayments, syncPortalSnapshot, type PlatformPayment, type PlatformTenant, type PlatformTenantUser, type SubscriptionStatus, updateTenantSubscription } from "../services/platformAdminService";
 
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
 const onlineWindowMs = 2 * 60 * 1000;
@@ -298,6 +298,9 @@ export function PlatformAdminPanel() {
   const [paymentTenantId, setPaymentTenantId] = useState("");
   const [paymentForm, setPaymentForm] = useState({ amount: "", method: "PIX", nextBillingDate: "", notes: "", paidAt: todayInput(), referenceMonth: "" });
   const [paymentsByTenant, setPaymentsByTenant] = useState<Record<string, PlatformPayment[]>>({});
+  const [creditTenantId, setCreditTenantId] = useState("");
+  const [creditForm, setCreditForm] = useState({ credits: "100", reason: "" });
+  const [creditSaving, setCreditSaving] = useState(false);
   const [adminColumnOrder, setAdminColumnOrder] = useState<AdminColumnId[]>(readAdminColumnOrder);
   const [draggedColumnId, setDraggedColumnId] = useState<AdminColumnId | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<AdminColumnId | null>(null);
@@ -370,6 +373,7 @@ export function PlatformAdminPanel() {
             <div className="mx-auto flex max-w-[168px] flex-wrap items-center justify-center gap-2">
               <button aria-label={`Abrir cadastro de ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-cyan-200 bg-cyan-50 text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={() => setEditingTenantId(item.id)} title="Abrir e editar cadastro" type="button"><Pencil size={16} /></button>
               <button aria-label={`Confirmar pagamento de ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Registrar pagamento e atualizar vencimento" type="button"><CircleDollarSign size={16} /></button>
+              <button aria-label={`Adicionar créditos IA para ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-violet-200 bg-violet-50 text-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400" onClick={() => openAiCredits(item)} title="Adicionar créditos extras da IA" type="button"><Sparkles size={16} /></button>
               <button aria-label={`Pausar ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => changeStatus(item, "pausado")} title="Pausar acesso preservando os dados" type="button"><Pause size={16} /></button>
               <button aria-label={`Remover ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Remover da lista ativa e preservar os dados" type="button"><Archive size={16} /></button>
             </div>
@@ -540,6 +544,38 @@ export function PlatformAdminPanel() {
     }
   }
 
+  function openAiCredits(item: PlatformTenant) {
+    setCreditTenantId(item.id);
+    setCreditForm({ credits: "100", reason: "" });
+    setMessage("");
+  }
+
+  async function confirmAddAiCredits(item: PlatformTenant) {
+    const credits = Number(creditForm.credits);
+    const reason = creditForm.reason.trim();
+    if (!Number.isInteger(credits) || credits < 1 || credits > 100000) {
+      setMessage("Informe uma quantidade inteira entre 1 e 100.000 créditos.");
+      return;
+    }
+    if (reason.length < 5) {
+      setMessage("Informe o motivo da liberação de créditos.");
+      return;
+    }
+    if (!window.confirm(`Adicionar ${credits} crédito(s) IA para ${item.name}?`)) return;
+    setCreditSaving(true);
+    setMessage("");
+    try {
+      const result = await addAiCredits(item.id, credits, reason);
+      updateTenantLocal(item.id, { aiBalance: result.balance, aiBonus: result.bonus, aiIncluded: result.included });
+      setCreditTenantId("");
+      setMessage(`${credits} crédito(s) IA adicionados para ${item.name}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível adicionar os créditos IA.");
+    } finally {
+      setCreditSaving(false);
+    }
+  }
+
   return (
     <section className="rounded-lg border border-amber-200 bg-white shadow-sm">
       <header className="flex flex-col gap-3 border-b border-amber-100 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -630,6 +666,41 @@ export function PlatformAdminPanel() {
         onSave={() => void save(editingTenant)}
         tenant={editingTenant}
       /> : null}
+
+      {creditTenantId ? (() => {
+        const tenant = tenants.find((item) => item.id === creditTenantId);
+        if (!tenant) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="presentation">
+            <section aria-labelledby="ai-credit-dialog-title" aria-modal="true" className="w-full max-w-md rounded-lg border border-violet-200 bg-white p-5 shadow-2xl" role="dialog">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Créditos IA</p>
+                  <h3 className="mt-1 text-lg font-semibold text-slate-950" id="ai-credit-dialog-title">Adicionar créditos extras</h3>
+                  <p className="mt-1 text-sm text-slate-600">{tenant.name}</p>
+                </div>
+                <button aria-label="Fechar ajuste de créditos" className="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-50" onClick={() => setCreditTenantId("")} title="Fechar" type="button"><X size={17} /></button>
+              </div>
+              <div className="mt-4 rounded-md border border-violet-100 bg-violet-50/60 p-3 text-sm text-violet-950">
+                <p>Saldo atual: <strong>{tenant.aiBalance}</strong> crédito(s)</p>
+                <p className="mt-1 text-xs">Mensais: {tenant.aiIncluded} · Extras acumulados: {tenant.aiBonus}</p>
+              </div>
+              <label className="mt-4 block">
+                <span className="text-sm font-semibold text-slate-700">Quantidade de créditos</span>
+                <input autoFocus className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-950" inputMode="numeric" max="100000" min="1" onChange={(event) => setCreditForm((form) => ({ ...form, credits: event.target.value.replace(/\D/g, "") }))} type="number" value={creditForm.credits} />
+              </label>
+              <label className="mt-4 block">
+                <span className="text-sm font-semibold text-slate-700">Motivo obrigatório</span>
+                <textarea className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950" maxLength={300} onChange={(event) => setCreditForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Ex.: compra do pacote de 300 créditos" value={creditForm.reason} />
+              </label>
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" disabled={creditSaving} onClick={() => setCreditTenantId("")} type="button">Cancelar</button>
+                <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-violet-700 px-4 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-wait disabled:opacity-70" disabled={creditSaving} onClick={() => void confirmAddAiCredits(tenant)} type="button"><Sparkles size={16} />{creditSaving ? "Adicionando..." : "Adicionar créditos"}</button>
+              </div>
+            </section>
+          </div>
+        );
+      })() : null}
 
       <div className="flex justify-end border-t border-slate-100 px-4 py-2 sm:px-5">
         <button aria-label="Restaurar ordem original das colunas" className="inline-flex size-8 items-center justify-center rounded-full border border-cyan-200 bg-white text-cyan-800 transition hover:-translate-y-0.5 hover:bg-cyan-50 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={resetAdminColumnOrder} title="Restaurar ordem original das colunas" type="button"><RotateCcw size={15} /></button>
