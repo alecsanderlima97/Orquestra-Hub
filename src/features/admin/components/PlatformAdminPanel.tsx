@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Crown, Pause, Pencil, RefreshCw, Save, TicketPlus, UserRound, UsersRound } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Crown, GripVertical, Pause, Pencil, RefreshCw, RotateCcw, Save, TicketPlus, UserRound, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DEFAULT_SUBSCRIPTION_GRACE_DAYS, normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import type { PlanId } from "@/features/plans/planRules";
@@ -15,6 +15,36 @@ import { confirmTenantPayment, listPlatformTenants, listTenantPayments, syncPort
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
 const onlineWindowMs = 2 * 60 * 1000;
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+
+type AdminColumnId = "client" | "plan" | "status" | "registration" | "billing" | "calculatedStatus" | "lastAccess" | "online" | "aiCredits" | "actions";
+
+const defaultAdminColumnOrder: AdminColumnId[] = ["client", "plan", "status", "registration", "billing", "calculatedStatus", "lastAccess", "online", "aiCredits", "actions"];
+const adminColumnOrderStorageKey = "orquestra-hub-admin-column-order";
+
+const adminColumnDefinitions: Record<AdminColumnId, { label: string; colClass: string; cellClass: string }> = {
+  client: { label: "Cliente", colClass: "w-[29%] xl:w-[25%] 2xl:w-[20%]", cellClass: "min-w-0 px-4 py-3 sm:px-5" },
+  plan: { label: "Plano", colClass: "w-[13%] xl:w-[10%] 2xl:w-[8%]", cellClass: "break-words px-4 py-3 sm:px-5" },
+  status: { label: "Status", colClass: "w-[10%] xl:w-[8%] 2xl:w-[7%]", cellClass: "px-4 py-3 sm:px-5" },
+  registration: { label: "Inscricao", colClass: "hidden w-[10%] xl:table-column xl:w-[10%] 2xl:w-[9%]", cellClass: "hidden px-4 py-3 xl:table-cell sm:px-5" },
+  billing: { label: "Vencimento", colClass: "w-[13%] xl:w-[10%] 2xl:w-[9%]", cellClass: "px-4 py-3 sm:px-5" },
+  calculatedStatus: { label: "Situacao calculada", colClass: "w-[15%] xl:w-[17%] 2xl:w-[12%]", cellClass: "px-4 py-3 sm:px-5" },
+  lastAccess: { label: "Ultimo acesso", colClass: "hidden w-[10%] 2xl:table-column 2xl:w-[10%]", cellClass: "hidden px-4 py-3 2xl:table-cell sm:px-5" },
+  online: { label: "Online", colClass: "hidden w-[7%] 2xl:table-column 2xl:w-[7%]", cellClass: "hidden px-4 py-3 2xl:table-cell sm:px-5" },
+  aiCredits: { label: "Créditos IA", colClass: "hidden w-[7%] 2xl:table-column 2xl:w-[7%]", cellClass: "hidden px-4 py-3 2xl:table-cell sm:px-5" },
+  actions: { label: "Ação", colClass: "w-[20%] 2xl:w-[11%]", cellClass: "min-w-[112px] px-2 py-3 align-top sm:px-3" },
+};
+
+function readAdminColumnOrder(): AdminColumnId[] {
+  if (typeof window === "undefined") return defaultAdminColumnOrder;
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(adminColumnOrderStorageKey) || "null") as unknown;
+    if (!Array.isArray(stored)) return defaultAdminColumnOrder;
+    const valid = stored.filter((value): value is AdminColumnId => typeof value === "string" && defaultAdminColumnOrder.includes(value as AdminColumnId));
+    return [...valid, ...defaultAdminColumnOrder.filter((column) => !valid.includes(column))];
+  } catch {
+    return defaultAdminColumnOrder;
+  }
+}
 
 function formatDateTime(ms?: number) {
   return ms ? dateFormatter.format(new Date(ms)) : "Sem registro";
@@ -268,9 +298,85 @@ export function PlatformAdminPanel() {
   const [paymentTenantId, setPaymentTenantId] = useState("");
   const [paymentForm, setPaymentForm] = useState({ amount: "", method: "PIX", nextBillingDate: "", notes: "", paidAt: todayInput(), referenceMonth: "" });
   const [paymentsByTenant, setPaymentsByTenant] = useState<Record<string, PlatformPayment[]>>({});
+  const [adminColumnOrder, setAdminColumnOrder] = useState<AdminColumnId[]>(readAdminColumnOrder);
+  const [draggedColumnId, setDraggedColumnId] = useState<AdminColumnId | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<AdminColumnId | null>(null);
   const editingTenant = editingTenantId ? tenants.find((tenant) => tenant.id === editingTenantId) : undefined;
   const activeTenants = tenants.filter((tenant) => tenant.subscriptionStatus !== "cancelado");
   const inactiveTenants = tenants.filter((tenant) => tenant.subscriptionStatus === "cancelado");
+
+  useEffect(() => {
+    window.localStorage.setItem(adminColumnOrderStorageKey, JSON.stringify(adminColumnOrder));
+  }, [adminColumnOrder]);
+
+  function moveAdminColumn(source: AdminColumnId, target: AdminColumnId) {
+    if (source === target) return;
+    setAdminColumnOrder((current) => {
+      const next = [...current];
+      const sourceIndex = next.indexOf(source);
+      const targetIndex = next.indexOf(target);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, source);
+      return next;
+    });
+  }
+
+  function resetAdminColumnOrder() {
+    setAdminColumnOrder(defaultAdminColumnOrder);
+  }
+
+  function clearColumnDragState() {
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  }
+
+  function renderAdminColumnCell(columnId: AdminColumnId, item: PlatformTenant, calculatedStatus: ReturnType<typeof billingStatus>, online: boolean) {
+    const column = adminColumnDefinitions[columnId];
+    switch (columnId) {
+      case "client":
+        return (
+          <td className={column.cellClass} key={columnId}>
+            <div className="min-w-0 space-y-1">
+              <button className="block max-w-full truncate text-left font-semibold text-cyan-800 underline-offset-2 hover:text-cyan-950 hover:underline" onClick={() => setEditingTenantId(item.id)} title={item.name} type="button">{item.name}</button>
+              <p className="max-w-full truncate text-xs text-slate-600" title={item.contactName || "Responsável não informado"}>{item.contactName || "Responsável não informado"}</p>
+              <p className="max-w-full truncate text-xs text-slate-500" title={item.contactPhone || item.contactEmail || "Contato não informado"}>{item.contactPhone || item.contactEmail || "Contato não informado"}</p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <span className="rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-800">{paymentStatusLabel(item.billingStatus)}</span>
+                <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{online ? "Online" : "Offline"}</span>
+              </div>
+            </div>
+          </td>
+        );
+      case "plan":
+        return <td className={column.cellClass} key={columnId}><span className="font-medium text-slate-950">{plans[item.planId].label}</span></td>;
+      case "status":
+        return <td className={column.cellClass} key={columnId}><span className="capitalize text-slate-700">{item.subscriptionStatus}</span></td>;
+      case "registration":
+        return <td className={column.cellClass} key={columnId}>{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>;
+      case "billing":
+        return <td className={column.cellClass} key={columnId}>{item.nextBillingDate ? formatInputDateBR(item.nextBillingDate) : "Sem vencimento"}</td>;
+      case "calculatedStatus":
+        return <td className={column.cellClass} key={columnId}><span className={`inline-flex max-w-full rounded-full px-3 py-1 text-xs font-semibold leading-4 ${calculatedStatus.tone}`}>{calculatedStatus.label}</span></td>;
+      case "lastAccess":
+        return <td className={column.cellClass} key={columnId}>{formatDateTime(item.lastAccessAt)}</td>;
+      case "online":
+        return <td className={column.cellClass} key={columnId}><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>{online ? "Online agora" : "Offline"}</span></td>;
+      case "aiCredits":
+        return <td className={column.cellClass} key={columnId}>{item.aiBalance}/{item.aiIncluded}</td>;
+      case "actions":
+        return (
+          <td className={column.cellClass} key={columnId}>
+            <div className="mx-auto flex max-w-[168px] flex-wrap items-center justify-center gap-2">
+              <button aria-label={`Abrir cadastro de ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-cyan-200 bg-cyan-50 text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={() => setEditingTenantId(item.id)} title="Abrir e editar cadastro" type="button"><Pencil size={16} /></button>
+              <button aria-label={`Confirmar pagamento de ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Registrar pagamento e atualizar vencimento" type="button"><CircleDollarSign size={16} /></button>
+              <button aria-label={`Pausar ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => changeStatus(item, "pausado")} title="Pausar acesso preservando os dados" type="button"><Pause size={16} /></button>
+              <button aria-label={`Remover ${item.name}`} className="motion-button inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Remover da lista ativa e preservar os dados" type="button"><Archive size={16} /></button>
+            </div>
+          </td>
+        );
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -525,32 +631,26 @@ export function PlatformAdminPanel() {
         tenant={editingTenant}
       /> : null}
 
+      <div className="flex justify-end border-t border-slate-100 px-4 py-2 sm:px-5">
+        <button aria-label="Restaurar ordem original das colunas" className="inline-flex size-8 items-center justify-center rounded-full border border-cyan-200 bg-white text-cyan-800 transition hover:-translate-y-0.5 hover:bg-cyan-50 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={resetAdminColumnOrder} title="Restaurar ordem original das colunas" type="button"><RotateCcw size={15} /></button>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full table-fixed text-left text-xs sm:text-sm">
           <colgroup>
-            <col className="w-[29%] xl:w-[25%] 2xl:w-[20%]" />
-            <col className="w-[13%] xl:w-[10%] 2xl:w-[8%]" />
-            <col className="w-[10%] xl:w-[8%] 2xl:w-[7%]" />
-            <col className="hidden w-[10%] xl:table-column xl:w-[10%] 2xl:w-[9%]" />
-            <col className="w-[13%] xl:w-[10%] 2xl:w-[9%]" />
-            <col className="w-[15%] xl:w-[17%] 2xl:w-[12%]" />
-            <col className="hidden w-[10%] 2xl:table-column 2xl:w-[10%]" />
-            <col className="hidden w-[7%] 2xl:table-column 2xl:w-[7%]" />
-            <col className="hidden w-[7%] 2xl:table-column 2xl:w-[7%]" />
-            <col className="w-[20%] 2xl:w-[11%]" />
+            {adminColumnOrder.map((columnId) => <col className={adminColumnDefinitions[columnId].colClass} key={columnId} />)}
           </colgroup>
           <thead className="bg-slate-50 text-slate-600">
             <tr>
-              <th className="px-5 py-3">Cliente</th>
-              <th className="px-5 py-3">Plano</th>
-              <th className="px-5 py-3">Status</th>
-              <th className="hidden px-5 py-3 xl:table-cell">Inscricao</th>
-              <th className="px-5 py-3">Vencimento</th>
-              <th className="px-5 py-3">Situacao calculada</th>
-              <th className="hidden px-5 py-3 2xl:table-cell">Ultimo acesso</th>
-              <th className="hidden px-5 py-3 2xl:table-cell">Online</th>
-              <th className="hidden px-5 py-3 2xl:table-cell">Créditos IA</th>
-              <th className="px-5 py-3">Ação</th>
+              {adminColumnOrder.map((columnId) => {
+                const column = adminColumnDefinitions[columnId];
+                const isDragOver = dragOverColumnId === columnId && draggedColumnId !== columnId;
+                return (
+                  <th aria-label={`Arraste para mover a coluna ${column.label}`} className={`${column.cellClass} cursor-grab select-none transition-colors active:cursor-grabbing ${isDragOver ? "bg-cyan-100 text-cyan-950" : ""}`} draggable onDragEnd={clearColumnDragState} onDragOver={(event) => { event.preventDefault(); setDragOverColumnId(columnId); }} onDragStart={(event) => { setDraggedColumnId(columnId); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", columnId); }} onDrop={(event) => { event.preventDefault(); const source = draggedColumnId || event.dataTransfer.getData("text/plain") as AdminColumnId; if (source) moveAdminColumn(source, columnId); clearColumnDragState(); }} key={columnId} scope="col" title="Arraste para reorganizar">
+                    <span className="inline-flex items-center gap-1.5"><GripVertical aria-hidden="true" className="shrink-0 text-cyan-600" size={14} /><span>{column.label}</span></span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -559,54 +659,16 @@ export function PlatformAdminPanel() {
               const online = isOnline(item.lastSeenAt);
               return [
               <tr className="align-top" key={item.id}>
-                <td className="min-w-0 px-4 py-3 sm:px-5">
-                  <div className="min-w-0 space-y-1">
-                    <button className="block max-w-full truncate text-left font-semibold text-cyan-800 underline-offset-2 hover:text-cyan-950 hover:underline" onClick={() => setEditingTenantId(item.id)} title={item.name} type="button">{item.name}</button>
-                    <p className="max-w-full truncate text-xs text-slate-600" title={item.contactName || "Responsável não informado"}>{item.contactName || "Responsável não informado"}</p>
-                    <p className="max-w-full truncate text-xs text-slate-500" title={item.contactPhone || item.contactEmail || "Contato não informado"}>{item.contactPhone || item.contactEmail || "Contato não informado"}</p>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      <span className="rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-800">{paymentStatusLabel(item.billingStatus)}</span>
-                      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{online ? "Online" : "Offline"}</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="break-words px-4 py-3 sm:px-5">
-                  <span className="font-medium text-slate-950">{plans[item.planId].label}</span>
-                </td>
-                <td className="px-4 py-3 sm:px-5">
-                  <span className="capitalize text-slate-700">{item.subscriptionStatus}</span>
-                </td>
-                <td className="hidden px-4 py-3 xl:table-cell sm:px-5">{item.startDate ? formatInputDateBR(item.startDate) : subscriptionStartFromNextBilling(item.nextBillingDate || "")}</td>
-                <td className="px-4 py-3 sm:px-5">
-                  {item.nextBillingDate ? formatInputDateBR(item.nextBillingDate) : "Sem vencimento"}
-                </td>
-                <td className="px-4 py-3 sm:px-5">
-                  <span className={`inline-flex max-w-full rounded-full px-3 py-1 text-xs font-semibold leading-4 ${calculatedStatus.tone}`}>{calculatedStatus.label}</span>
-                </td>
-                <td className="hidden px-4 py-3 2xl:table-cell sm:px-5">{formatDateTime(item.lastAccessAt)}</td>
-                <td className="hidden px-4 py-3 2xl:table-cell sm:px-5">
-                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>{online ? "Online agora" : "Offline"}</span>
-                </td>
-                <td className="hidden px-4 py-3 2xl:table-cell sm:px-5">{item.aiBalance}/{item.aiIncluded}</td>
-                <td className="min-w-[148px] px-3 py-3 align-top sm:px-4">
-                  <div className="mx-auto flex max-w-[176px] min-w-0 flex-col gap-2">
-                    <button aria-label={`Abrir cadastro de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-2 text-xs font-semibold leading-tight text-cyan-800 transition duration-150 hover:-translate-y-0.5 hover:bg-cyan-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400" onClick={() => setEditingTenantId(item.id)} title="Abrir e editar cadastro" type="button"><Pencil size={15} /><span className="text-center">Abrir cadastro</span></button>
-                    <button aria-label={`Confirmar pagamento de ${item.name}`} className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-semibold leading-tight text-emerald-800 transition duration-150 hover:-translate-y-0.5 hover:bg-emerald-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" onClick={() => openPayment(item)} title="Registrar pagamento e atualizar vencimento" type="button"><CircleDollarSign size={15} /><span className="text-center">Confirmar pagamento</span></button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button aria-label={`Pausar ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-2 text-[11px] font-semibold leading-tight text-amber-800 transition duration-150 hover:-translate-y-0.5 hover:bg-amber-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => changeStatus(item, "pausado")} title="Pausar acesso preservando os dados" type="button"><Pause size={13} /><span className="text-center">Pausar</span></button>
-                      <button aria-label={`Remover ${item.name}`} className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-1.5 py-2 text-[11px] font-semibold leading-tight text-rose-700 transition duration-150 hover:-translate-y-0.5 hover:bg-rose-100 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" onClick={() => changeStatus(item, "cancelado")} title="Remover da lista ativa e preservar os dados" type="button"><Archive size={13} /><span className="text-center">Remover</span></button>
-                    </div>
-                  </div>
-                </td>
+                {adminColumnOrder.map((columnId) => renderAdminColumnCell(columnId, item, calculatedStatus, online))}
               </tr>,
               <tr key={`${item.id}-details`}>
-                <td className="px-4 pb-4 sm:px-5" colSpan={10}>
+                <td className="px-4 pb-4 sm:px-5" colSpan={adminColumnOrder.length}>
                   <PlatformTenantDetails tenant={item} />
                 </td>
               </tr>,
               paymentTenantId === item.id ? (
                 <tr key={`${item.id}-payment`}>
-                  <td className="bg-emerald-50/60 px-5 py-4" colSpan={10}>
+                  <td className="bg-emerald-50/60 px-5 py-4" colSpan={adminColumnOrder.length}>
                     <div className="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
@@ -669,7 +731,7 @@ export function PlatformAdminPanel() {
               ) : null,
               ];
             })}
-            {!tenants.length ? <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={10}>{loading ? "Carregando clientes..." : "Nenhum cliente encontrado."}</td></tr> : null}
+            {!tenants.length ? <tr><td className="px-5 py-8 text-center text-slate-500" colSpan={adminColumnOrder.length}>{loading ? "Carregando clientes..." : "Nenhum cliente encontrado."}</td></tr> : null}
           </tbody>
         </table>
       </div>
