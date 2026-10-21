@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { buildOrquestraPortalSnapshot, connectorEndpointIsValid } from "@/lib/connectors/orquestraPortalServer";
 import { firebaseAdmin } from "@/lib/firebase/admin";
@@ -39,10 +40,21 @@ async function authorizePlatformAdmin(request: Request) {
   return admin;
 }
 
-export async function POST(request: Request) {
+async function authorizeSyncRequest(request: Request) {
+  const cronSecret = process.env.CRON_SECRET?.trim() || "";
+  const authorization = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
+  const receivedBuffer = Buffer.from(authorization);
+  const expectedBuffer = Buffer.from(cronSecret);
+  if (cronSecret && receivedBuffer.length === expectedBuffer.length && timingSafeEqual(receivedBuffer, expectedBuffer)) {
+    return firebaseAdmin();
+  }
+  return authorizePlatformAdmin(request);
+}
+
+async function runSync(request: Request) {
   let syncClients: SyncClient[] = [];
   try {
-    const admin = await authorizePlatformAdmin(request);
+    const admin = await authorizeSyncRequest(request);
     if (!admin) return NextResponse.json({ error: "Acesso negado para sincronizar o Portal Orquestra.cs." }, { status: 403 });
 
     const endpoint = String(process.env.ORQUESTRA_PORTAL_CONNECTOR_URL || "").trim();
@@ -86,4 +98,12 @@ export async function POST(request: Request) {
     console.error("orquestra_portal_connector_error", error instanceof Error ? error.message : "unknown-error");
     return NextResponse.json({ error: "Não foi possível sincronizar o Portal Orquestra.cs agora." }, { status: 500 });
   }
+}
+
+export async function GET(request: Request) {
+  return runSync(request);
+}
+
+export async function POST(request: Request) {
+  return runSync(request);
 }
