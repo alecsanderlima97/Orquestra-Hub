@@ -36,7 +36,7 @@ service cloud.firestore {
       allow delete: if false;
 
       match /users/{userId} {
-        allow read: if isPlatformOwner() || belongsToTenant(tenantId);
+        allow read: if belongsToTenant(tenantId);
         allow create: if signedIn() && request.auth.uid == userId
           && (isPlatformOwner()
             || get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
