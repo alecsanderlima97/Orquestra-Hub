@@ -7,6 +7,7 @@ const SOURCE_SYSTEM = "orquestra_hub" as const;
 const CONTRACT_VERSION = "v1" as const;
 const DATA_VERSION = 1;
 const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+const PLATFORM_ADMIN_EMAIL = "orquestracs@gmail.com";
 
 type FirestoreData = Record<string, unknown>;
 
@@ -39,6 +40,10 @@ function dateValue(value: unknown) {
 
 function deviceValue(data: FirestoreData) {
   return stringValue(data.lastDevice || data.device || data.deviceType);
+}
+
+function isPlatformAdmin(data: FirestoreData) {
+  return stringValue(data.email)?.toLowerCase() === PLATFORM_ADMIN_EMAIL;
 }
 
 function isOnline(value: string | null, now: number) {
@@ -78,7 +83,7 @@ export async function buildOrquestraPortalSnapshot() {
       admin.db.collection(`platformPayments/${tenantId}/payments`).get(),
       admin.db.collection("invites").where("tenantId", "==", tenantId).where("status", "==", "Ativo").get(),
     ]);
-    const users = usersSnapshot.docs.map((userDoc) => {
+    const users = usersSnapshot.docs.filter((userDoc) => !isPlatformAdmin(userDoc.data() as FirestoreData)).map((userDoc) => {
       const user = userDoc.data() as FirestoreData;
       const lastActivityAt = isoValue(user.lastActivityAt || user.lastSeenAt);
       return {
