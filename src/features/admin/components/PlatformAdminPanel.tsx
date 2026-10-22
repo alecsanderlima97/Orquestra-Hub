@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Crown, GripVertical, Pause, Pencil, RefreshCw, RotateCcw, Save, Sparkles, TicketPlus, UserRound, UsersRound, X } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronUp, CircleDollarSign, CloudUpload, Copy, Crown, ExternalLink, GripVertical, Pause, Pencil, RefreshCw, RotateCcw, Save, Sparkles, TicketPlus, UserRound, UsersRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DEFAULT_SUBSCRIPTION_GRACE_DAYS, normalizeSubscriptionGraceDays } from "@/features/billing/subscriptionRules";
 import type { PlanId } from "@/features/plans/planRules";
@@ -15,6 +15,7 @@ import { addAiCredits, confirmTenantPayment, listPlatformTenants, listTenantPaym
 const statuses: SubscriptionStatus[] = ["trial", "ativo", "pausado", "vencido", "bloqueado", "cancelado"];
 const onlineWindowMs = 2 * 60 * 1000;
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+const portalAdminUrl = process.env.NEXT_PUBLIC_ORQUESTRA_PORTAL_ADMIN_URL?.trim() || "https://portal.orquestracs.com/central-admin";
 
 type AdminColumnId = "client" | "plan" | "status" | "registration" | "billing" | "calculatedStatus" | "lastAccess" | "online" | "aiCredits" | "actions";
 
@@ -596,6 +597,10 @@ export function PlatformAdminPanel() {
             {loading ? <RefreshCw className="animate-spin" size={16} /> : lastUpdatedAt ? <Check size={16} /> : <RefreshCw size={16} />}
             {loading ? "Atualizando..." : lastUpdatedAt ? "Atualizado" : "Atualizar"}
           </button>
+          <a aria-label="Abrir Central Admin do Portal Orquestra.cs" className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-900 active:scale-[0.98]" href={portalAdminUrl} rel="noreferrer" target="_blank">
+            <ExternalLink size={16} />
+            Central Admin Portal
+          </a>
         </div>
       </header>
 
