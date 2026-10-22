@@ -126,8 +126,7 @@ export function AppShell({
         <header className="app-header px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
-              <OrquestraBrand compact tone="dark" />
-              <div className="hidden border-l border-white/25 pl-4 sm:block">
+              <div className="hidden sm:block">
                 <p className="app-header-muted text-xs font-semibold uppercase tracking-[0.14em]">Ambiente da empresa</p>
                 <p className="mt-1 text-sm font-semibold text-white">{user?.companyName || "Plataforma modular de gestão empresarial"}</p>
               </div>
