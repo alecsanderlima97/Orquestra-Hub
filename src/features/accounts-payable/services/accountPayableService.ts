@@ -6,6 +6,15 @@ import type { AccountPayable } from "../types/accountPayableTypes";
 
 const collectionName = "accountsPayable";
 
+function paymentUpdateError(error: unknown) {
+  const code = (error as { code?: string })?.code || "erro-desconhecido";
+  if (code === "permission-denied") return new Error("Permissão negada para registrar a baixa. O usuário precisa ter perfil Proprietário, Dono ou Financeiro. Detalhe: permission-denied.");
+  if (code === "unauthenticated") return new Error("A sessão expirou. Entre novamente para registrar a baixa. Detalhe: unauthenticated.");
+  if (code === "not-found") return new Error("Esta conta não foi encontrada no banco de dados. Atualize a tela antes de tentar novamente. Detalhe: not-found.");
+  if (code === "unavailable" || code === "deadline-exceeded") return new Error(`Não foi possível conectar ao banco de dados agora. Verifique a internet e tente novamente. Detalhe: ${code}.`);
+  return new Error(`Não foi possível registrar a baixa. Verifique a conexão e tente novamente. Detalhe: ${code}.`);
+}
+
 export async function listAccountsPayable(tenantId: string): Promise<AccountPayable[]> {
   if (!firebaseReady || !db) return [];
   const snapshot = await getDocs(query(collection(db, tenantCollectionPath(tenantId, collectionName)), orderBy("dueDate")));
@@ -17,11 +26,15 @@ export async function listAccountsPayable(tenantId: string): Promise<AccountPaya
 
 export async function markAccountAsPaid(tenantId: string, accountId: string) {
   if (!firebaseReady || !db) throw new Error("Firebase não está pronto para salvar a baixa.");
-  await updateDoc(doc(db, tenantCollectionPath(tenantId, collectionName), accountId), {
-    paidAt: serverTimestamp(),
-    status: "Pago",
-    updatedAt: serverTimestamp(),
-  });
+  try {
+    await updateDoc(doc(db, tenantCollectionPath(tenantId, collectionName), accountId), {
+      paidAt: serverTimestamp(),
+      status: "Pago",
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    throw paymentUpdateError(error);
+  }
 }
 
 export async function updateAccountPayable(tenantId: string, accountId: string, account: Partial<AccountPayable>) {

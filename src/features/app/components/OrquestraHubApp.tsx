@@ -238,6 +238,8 @@ export function OrquestraHubApp() {
   const [accountFilters, setAccountFilters] = useState<AccountFilters>({ status: "Todos", store: "Todas", supplier: "Todos" });
   const [paymentToConfirm, setPaymentToConfirm] = useState<AccountPayable | null>(null);
   const [paymentDateTime, setPaymentDateTime] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentSaving, setPaymentSaving] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AccountPayable | null>(null);
   const [formErrors, setFormErrors] = useState({ category: "", fixedExpense: "", purchase: "", store: "", supplier: "" });
@@ -954,6 +956,7 @@ export function OrquestraHubApp() {
     }
     setPaymentToConfirm(account);
     setPaymentDateTime(nowDateTimeBR());
+    setPaymentError("");
   }
 
   function requestDeleteAccountPayable(account: AccountPayable) {
@@ -978,19 +981,25 @@ export function OrquestraHubApp() {
   }
 
   async function confirmMarkPaid() {
-    if (!paymentToConfirm) return;
-    if (firebaseReady && user?.id !== demoUserId) await markAccountAsPaid(defaultTenantId, paymentToConfirm.id);
-    setAccountList((current) =>
-      current.map((account) =>
-        account.id === paymentToConfirm.id ? { ...account, paidAt: paymentDateTime, status: "Pago" } : account,
-      ),
-    );
-    setPaymentToConfirm(null);
-    setPaymentDateTime("");
-    await recordChange(defaultTenantId, user, "pagou", "conta", paymentToConfirm.id, {
-      details: financialAuditDetails(paymentToConfirm, `Baixa registrada em ${paymentDateTime}`),
-      metadata: { module: "financeiro" },
-    });
+    if (!paymentToConfirm || paymentSaving) return;
+    const account = paymentToConfirm;
+    const paidAt = paymentDateTime;
+    setPaymentSaving(true);
+    setPaymentError("");
+    try {
+      if (firebaseReady && user?.id !== demoUserId) await markAccountAsPaid(defaultTenantId, account.id);
+      setAccountList((current) => current.map((item) => item.id === account.id ? { ...item, paidAt, status: "Pago" } : item));
+      setPaymentToConfirm(null);
+      setPaymentDateTime("");
+      await recordChange(defaultTenantId, user, "pagou", "conta", account.id, {
+        details: financialAuditDetails(account, `Baixa registrada em ${paidAt}`),
+        metadata: { module: "financeiro" },
+      });
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : "Não foi possível registrar a baixa. Tente novamente.");
+    } finally {
+      setPaymentSaving(false);
+    }
   }
 
   async function saveReceiptRequirement(required: boolean) {
@@ -1573,9 +1582,11 @@ export function OrquestraHubApp() {
       ) : null}
       <PaymentConfirmModal
         account={paymentToConfirm}
-        onCancel={() => setPaymentToConfirm(null)}
+        error={paymentError}
+        onCancel={() => { if (!paymentSaving) { setPaymentError(""); setPaymentToConfirm(null); } }}
         onConfirm={confirmMarkPaid}
         paidAt={paymentDateTime}
+        saving={paymentSaving}
         supplier={supplierList.find((item) => item.name === paymentToConfirm?.supplier)}
       />
       {editTarget ? <EditModal fields={editFields(editTarget)} onClose={() => setEditTarget(null)} onSave={saveEdit} passwordRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} reasonRequired={editTarget.kind === "account" && editTarget.item.status === "Pago"} title={`Editar ${editTarget.kind === "store" ? "loja" : editTarget.kind === "supplier" ? "fornecedor" : editTarget.kind === "purchase" ? "nota" : editTarget.kind === "fixedExpense" ? "despesa fixa" : "conta a pagar"}`} /> : null}

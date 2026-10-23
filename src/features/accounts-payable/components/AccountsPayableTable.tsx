@@ -107,7 +107,7 @@ export function AccountsPayableTable({
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                 <button aria-label="Editar conta" className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-amber-50 hover:text-amber-800" onClick={() => onEdit?.(account)} title="Editar esta conta a pagar" type="button"><Pencil size={16} /></button>
                 <button aria-label="Excluir lançamento" className="rounded-md border border-slate-200 bg-white p-2 text-rose-600 hover:bg-rose-50" onClick={() => onDelete?.(account)} title="Excluir somente este lançamento de conta a pagar" type="button"><Trash2 size={16} /></button>
-                <button aria-label="Dar baixa" className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" disabled={account.status === "Pago"} onClick={() => onMarkPaid?.(account.id)} title={receiptRequiredOnPayment && !account.receiptName && !account.receiptPath ? "Anexe o comprovante antes de registrar a baixa." : "Confirmar que este boleto foi pago e registrar a baixa."} type="button"><CheckCircle2 size={16} /></button>
+                <button aria-label="Dar baixa" className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" disabled={account.status === "Pago" || !onMarkPaid} onClick={() => onMarkPaid?.(account.id)} title={!onMarkPaid ? "Seu perfil não tem permissão para registrar a baixa." : receiptRequiredOnPayment && !account.receiptName && !account.receiptPath ? "Anexe o comprovante antes de registrar a baixa." : "Confirmar que este boleto foi pago e registrar a baixa."} type="button"><CheckCircle2 size={16} /></button>
                 <button aria-label="Enviar pelo WhatsApp" className="rounded-md border border-slate-200 bg-white p-2 text-emerald-700 hover:bg-emerald-50" onClick={() => onWhatsApp?.(account)} title="Abrir alerta ou confirmação no WhatsApp" type="button"><MessageCircle size={16} /></button>
                 <label aria-label="Anexar comprovante" className="cursor-pointer rounded-md border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-100" title="Anexar o comprovante de pagamento desta conta."><Paperclip size={16} /><input className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) onReceiptSelected?.(account.id, file); event.target.value = ""; }} type="file" /></label>
                 {account.receiptUrl ? <a className="rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700" href={account.receiptUrl} rel="noreferrer" target="_blank">Comprovante</a> : account.receiptName ? <span className="rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">Comprovante</span> : null}
@@ -183,9 +183,9 @@ export function AccountsPayableTable({
                       <button
                         aria-label="Dar baixa"
                         className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={account.status === "Pago"}
+                        disabled={account.status === "Pago" || !onMarkPaid}
                         onClick={() => onMarkPaid?.(account.id)}
-                        title={receiptRequiredOnPayment && !account.receiptName && !account.receiptPath ? "Anexe o comprovante antes de registrar a baixa." : "Confirmar que este boleto foi pago e registrar a baixa."}
+                        title={!onMarkPaid ? "Seu perfil não tem permissão para registrar a baixa." : receiptRequiredOnPayment && !account.receiptName && !account.receiptPath ? "Anexe o comprovante antes de registrar a baixa." : "Confirmar que este boleto foi pago e registrar a baixa."}
                         type="button"
                       >
                         <CheckCircle2 size={16} />

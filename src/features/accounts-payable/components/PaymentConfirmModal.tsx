@@ -7,12 +7,16 @@ export function PaymentConfirmModal({
   onConfirm,
   paidAt,
   supplier,
+  error,
+  saving = false,
 }: {
   account: AccountPayable | null;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void>;
   paidAt: string;
   supplier?: Supplier;
+  error?: string;
+  saving?: boolean;
 }) {
   if (!account) return null;
 
@@ -43,12 +47,13 @@ export function PaymentConfirmModal({
             {supplier?.paymentTerms ? <p className="mt-1">Condição: {supplier.paymentTerms}</p> : null}
           </div>
         </div>
+        {error ? <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800" role="alert">{error}</p> : null}
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onCancel} title="Cancelar a baixa e manter a conta em aberto." type="button">
+          <button className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={saving} onClick={onCancel} title="Cancelar a baixa e manter a conta em aberto." type="button">
             Cancelar
           </button>
-          <button className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800" onClick={onConfirm} title="Registrar esta conta como paga." type="button">
-            Confirmar pagamento
+          <button className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={saving} onClick={() => void onConfirm()} title="Registrar esta conta como paga." type="button">
+            {saving ? "Salvando baixa..." : "Confirmar pagamento"}
           </button>
         </div>
       </div>
