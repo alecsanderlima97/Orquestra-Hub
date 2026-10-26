@@ -36,7 +36,9 @@ service cloud.firestore {
       allow delete: if false;
 
       match /users/{userId} {
-        allow read: if belongsToTenant(tenantId);
+        // A Central Admin precisa consultar os acessos reais do cliente para
+        // identificar o responsavel e corrigir permissoes sem tocar nos dados financeiros.
+        allow read: if isPlatformOwner() || belongsToTenant(tenantId);
         allow create: if signedIn() && request.auth.uid == userId
           && (isPlatformOwner()
             || get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid
