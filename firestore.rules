@@ -16,6 +16,11 @@ service cloud.firestore {
       return signedIn()
         && get(/databases/$(database)/documents/tenants/$(tenantId)).data.ownerId == request.auth.uid;
     }
+    function isTenantPrimaryContact(tenantId) {
+      return belongsToTenant(tenantId)
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == get(/databases/$(database)/documents/tenants/$(tenantId)).data.contactEmail;
+    }
     function hasActiveInvite(code, tenantId) {
       return exists(/databases/$(database)/documents/invites/$(code))
         && get(/databases/$(database)/documents/invites/$(code)).data.status == 'Ativo'
@@ -23,8 +28,8 @@ service cloud.firestore {
         && (get(/databases/$(database)/documents/invites/$(code)).data.inviteType == 'commercial'
           || get(/databases/$(database)/documents/invites/$(code)).data.tenantId == tenantId);
     }
-    function canWrite(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono', 'Financeiro']); }
-    function isOwner(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono']); }
+    function canWrite(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || isTenantPrimaryContact(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono', 'Financeiro']); }
+    function isOwner(tenantId) { return isPlatformOwner() || isTenantOwner(tenantId) || isTenantPrimaryContact(tenantId) || (belongsToTenant(tenantId) && role(tenantId) in ['Proprietário', 'Dono']); }
 
     match /tenants/{tenantId} {
       allow read: if isPlatformOwner() || belongsToTenant(tenantId);
