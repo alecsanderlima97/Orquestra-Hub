@@ -7,6 +7,7 @@ import { DEFAULT_LIST_LIMIT, ListVisibilityToggle } from "@/components/ui/ListVi
 import { SensitiveValue } from "@/components/ui/PrivacyContext";
 import { SortableHeader, type SortDirection } from "@/components/ui/SortableHeader";
 import type { AccountPayable } from "@/features/accounts-payable/types/accountPayableTypes";
+import type { FixedExpense } from "@/features/fixed-expenses/types/fixedExpenseTypes";
 import type { Purchase } from "@/features/purchases/types/purchaseTypes";
 import { compareDateBR, parseBRL, parseDateBR } from "@/lib/formatters/br";
 
@@ -60,7 +61,7 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
   URL.revokeObjectURL(url);
 }
 
-export function FinancialReports({ accounts, purchases }: { accounts: AccountPayable[]; purchases: Purchase[] }) {
+export function FinancialReports({ accounts, fixedExpenses, purchases }: { accounts: AccountPayable[]; fixedExpenses: FixedExpense[]; purchases: Purchase[] }) {
   const [filters, setFilters] = useState({ category: all, end: "", invoice: "", start: "", status: all, store: all, supplier: all });
   const [showReportForm, setShowReportForm] = useState(false);
   const stores = options([...accounts.map((item) => item.store), ...purchases.map((item) => item.store)]);
@@ -93,6 +94,26 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
   const byStore = group(filteredAccounts, "store");
   const bySupplier = group(filteredAccounts, "supplier");
   const orderedAccounts = filteredAccounts.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate));
+  const nextMonth = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth() === 11 ? 0 : now.getMonth() + 1;
+    const year = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+    const activeFixedExpenses = fixedExpenses.filter((item) => item.active !== false);
+    const otherAccounts = accounts.filter((item) => {
+      const dueDate = parseDateBR(item.dueDate);
+      return item.status !== "Pago" && !item.fixedExpenseId && dueDate.getMonth() === month && dueDate.getFullYear() === year;
+    });
+    const fixedTotal = activeFixedExpenses.reduce((sum, item) => sum + parseBRL(item.amount), 0);
+    const accountsTotal = total(otherAccounts);
+    return {
+      accounts: otherAccounts.toSorted((a, b) => compareDateBR(a.dueDate, b.dueDate)),
+      accountsTotal,
+      fixedExpenses: activeFixedExpenses.toSorted((a, b) => a.dueDay - b.dueDay),
+      fixedTotal,
+      label: new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(year, month, 1)),
+      total: fixedTotal + accountsTotal,
+    };
+  }, [accounts, fixedExpenses]);
   const clear = () => setFilters({ category: all, end: "", invoice: "", start: "", status: all, store: all, supplier: all });
   const filterLine = `Período: ${filters.start || "Início"} até ${filters.end || "Atual"} · Nota: ${filters.invoice || "Todas"} · Loja: ${filters.store} · Fornecedor: ${filters.supplier} · Categoria: ${filters.category} · Status: ${filters.status}`;
   const exportExcel = () => downloadCsv(`relatorio-financeiro-${new Date().toISOString().slice(0, 10)}.csv`, [
@@ -106,12 +127,25 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
     ["Compras e notas"],
     ["Nota", "Data", "Fornecedor", "Loja", "Descrição", "Total"],
     ...filteredPurchases.map((item) => [item.invoiceNumber, item.issueDate, item.supplier, item.store, item.description || "Não informado", item.total]),
+    [],
+    [`Previsão do próximo mês - ${nextMonth.label}`],
+    ["Tipo", "Descrição", "Favorecido/Fornecedor", "Loja", "Vencimento", "Valor"],
+    ...nextMonth.fixedExpenses.map((item) => ["Despesa fixa", item.name, item.payee, item.store, `Dia ${item.dueDay}`, item.amount]),
+    ...nextMonth.accounts.map((item) => ["Conta lançada", item.invoiceNumber || item.categoryName || "Sem nota", item.supplier, item.store, item.dueDate, item.amount]),
+    [],
+    ["Total despesas fixas", nextMonth.fixedTotal],
+    ["Total outras contas", nextMonth.accountsTotal],
+    ["Total previsto", nextMonth.total],
   ]);
   const printReport = () => {
     const reportWindow = window.open("", "_blank", "width=1100,height=800");
     if (!reportWindow) return;
     const accountRows = orderedAccounts.length ? orderedAccounts.map((item) => `<tr><td>${escapeHtml(item.invoiceNumber || "Sem nota")}</td><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(item.categoryName || "Sem categoria")}</td><td>${escapeHtml(item.store)}</td><td>${escapeHtml(item.installment)}</td><td>${escapeHtml(item.dueDate)}</td><td>${escapeHtml(item.amount)}</td><td>${escapeHtml(item.status)}</td></tr>`).join("") : `<tr><td colspan="8" class="empty">Nenhuma conta encontrada.</td></tr>`;
     const purchaseRows = filteredPurchases.length ? filteredPurchases.map((item) => `<tr><td>${escapeHtml(item.invoiceNumber)}</td><td>${escapeHtml(item.issueDate)}</td><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(item.store)}</td><td>${escapeHtml(item.description || "Não informado")}</td><td>${escapeHtml(item.total)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty">Nenhuma compra encontrada.</td></tr>`;
+    const forecastRows = [
+      ...nextMonth.fixedExpenses.map((item) => `<tr><td>Despesa fixa</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.payee)}</td><td>${escapeHtml(item.store)}</td><td>Dia ${item.dueDay}</td><td>${escapeHtml(item.amount)}</td></tr>`),
+      ...nextMonth.accounts.map((item) => `<tr><td>Conta lançada</td><td>${escapeHtml(item.invoiceNumber || item.categoryName || "Sem nota")}</td><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(item.store)}</td><td>${escapeHtml(item.dueDate)}</td><td>${escapeHtml(item.amount)}</td></tr>`),
+    ].join("") || `<tr><td colspan="6" class="empty">Nenhum compromisso previsto para o próximo mês.</td></tr>`;
     const breakdownRows = (items: typeof byCategory) => items.length ? items.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.count}</td><td>${money.format(item.open)}</td><td>${money.format(item.paid)}</td><td>${money.format(item.overdue)}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">Nenhum dado no período.</td></tr>`;
     reportWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Relatório financeiro</title><style>
       * { box-sizing: border-box; } body { margin: 0; padding: 28px; color: #0f172a; font-family: Arial, sans-serif; background: #fff; }
@@ -126,6 +160,7 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
       <section class="grid"><div><h2>Por categoria</h2><table><thead><tr><th>Categoria</th><th>Qtd.</th><th>Aberto</th><th>Pago</th><th>Atrasado</th></tr></thead><tbody>${breakdownRows(byCategory)}</tbody></table></div><div><h2>Por loja</h2><table><thead><tr><th>Loja</th><th>Qtd.</th><th>Aberto</th><th>Pago</th><th>Atrasado</th></tr></thead><tbody>${breakdownRows(byStore)}</tbody></table></div><div><h2>Por fornecedor</h2><table><thead><tr><th>Fornecedor</th><th>Qtd.</th><th>Aberto</th><th>Pago</th><th>Atrasado</th></tr></thead><tbody>${breakdownRows(bySupplier)}</tbody></table></div></section>
       <h2>Pagamentos do período</h2><table><thead><tr><th>Nota</th><th>Fornecedor</th><th>Categoria</th><th>Loja</th><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead><tbody>${accountRows}</tbody></table>
       <h2>Compras/notas lançadas no período</h2><table><thead><tr><th>Nota</th><th>Data</th><th>Fornecedor</th><th>Loja</th><th>Descrição</th><th>Total</th></tr></thead><tbody>${purchaseRows}</tbody></table>
+      <h2>Previsão do próximo mês - ${escapeHtml(nextMonth.label)}</h2><div class="cards"><div class="card"><small>Despesas fixas</small><strong>${money.format(nextMonth.fixedTotal)}</strong></div><div class="card"><small>Outras contas lançadas</small><strong>${money.format(nextMonth.accountsTotal)}</strong></div><div class="card"><small>Total previsto</small><strong>${money.format(nextMonth.total)}</strong></div></div><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Favorecido/Fornecedor</th><th>Loja</th><th>Vencimento</th><th>Valor</th></tr></thead><tbody>${forecastRows}</tbody></table>
     </body></html>`);
     reportWindow.document.close();
     reportWindow.focus();
@@ -169,6 +204,7 @@ export function FinancialReports({ accounts, purchases }: { accounts: AccountPay
       </div> : null}
       <div className="hidden print:block"><h2 className="text-xl font-bold">Orquestra Hub - Relatório financeiro</h2><p className="mt-1 text-sm">{filterLine}</p></div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><ReportCard label="Compras lançadas" tone="neutral" value={String(filteredPurchases.length)} helper={money.format(filteredPurchases.reduce((sum, item) => sum + parseBRL(item.total), 0))} /><ReportCard label="Total em aberto" tone="warning" value={money.format(total(open))} helper={`${open.length} conta(s)`} /><ReportCard label="Total pago" tone="success" value={money.format(total(paid))} helper={`${paid.length} baixa(s)`} /><ReportCard label="Total atrasado" tone="danger" value={money.format(total(overdue))} helper={`${overdue.length} vencida(s)`} /><ReportCard label="Com comprovante" tone="neutral" value={String(filteredAccounts.filter((item) => item.receiptName).length)} helper="Pagamentos documentados" /></div>
+      <NextMonthForecast forecast={nextMonth} />
       <div className="grid gap-5 xl:grid-cols-3"><Breakdown storageKey="reports-breakdown-category" title="Detalhamento por categoria" items={byCategory} /><Breakdown storageKey="reports-breakdown-store" title="Detalhamento por loja" items={byStore} /><Breakdown storageKey="reports-breakdown-supplier" title="Detalhamento por fornecedor" items={bySupplier} /></div>
       <ReportTable accounts={orderedAccounts} />
       <PurchasesReportTable purchases={filteredPurchases} />
@@ -185,6 +221,25 @@ function ReportCard({ helper, label, tone, value }: { helper: string; label: str
     warning: "dashboard-card-warning border-amber-200 bg-amber-50 text-amber-950",
   };
   return <article className={`motion-card min-w-0 rounded-lg border p-5 shadow-sm ${toneStyles[tone]}`}><p className="break-words text-sm font-medium text-slate-600">{label}</p><strong className="mt-2 block text-xl"><SensitiveValue className="whitespace-nowrap" value={value} /></strong><span className="mt-1 block text-xs text-slate-600"><SensitiveValue showToggle={false} value={helper} /></span></article>;
+}
+function NextMonthForecast({ forecast }: { forecast: { accounts: AccountPayable[]; accountsTotal: number; fixedExpenses: FixedExpense[]; fixedTotal: number; label: string; total: number } }) {
+  return <CollapsiblePanel defaultOpen description="Despesas fixas ativas e contas já lançadas, sem duplicar recorrências." eyebrow="Planejamento" storageKey="reports-next-month-forecast-open" title={`Previsão do próximo mês - ${forecast.label}`}>
+    <div className="grid gap-3 border-b border-slate-200 pb-5 sm:grid-cols-3">
+      <ReportCard helper={`${forecast.fixedExpenses.length} despesa(s) fixa(s)`} label="Despesas fixas" tone="neutral" value={money.format(forecast.fixedTotal)} />
+      <ReportCard helper={`${forecast.accounts.length} outra(s) conta(s)`} label="Outras contas lançadas" tone="warning" value={money.format(forecast.accountsTotal)} />
+      <ReportCard helper="Compromisso estimado do mês" label="Total previsto" tone="success" value={money.format(forecast.total)} />
+    </div>
+    <div className="mt-5 overflow-x-auto">
+      <table className="w-full min-w-[760px] text-left text-sm">
+        <thead className="bg-slate-50 text-slate-600"><tr><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Descrição</th><th className="px-4 py-3">Favorecido/Fornecedor</th><th className="px-4 py-3">Loja</th><th className="px-4 py-3">Vencimento</th><th className="px-4 py-3">Valor</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">
+          {forecast.fixedExpenses.map((item) => <tr key={`fixed-${item.id}`}><td className="px-4 py-3"><span className="rounded-full bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-800">Despesa fixa</span></td><td className="px-4 py-3 font-medium">{item.name}</td><td className="px-4 py-3">{item.payee}</td><td className="px-4 py-3">{item.store}</td><td className="px-4 py-3">Dia {item.dueDay}</td><td className="px-4 py-3 font-semibold"><SensitiveValue value={item.amount} /></td></tr>)}
+          {forecast.accounts.map((item) => <tr key={`account-${item.id}`}><td className="px-4 py-3"><span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">Conta lançada</span></td><td className="px-4 py-3 font-medium">{item.invoiceNumber || item.categoryName || "Sem nota"}</td><td className="px-4 py-3">{item.supplier}</td><td className="px-4 py-3">{item.store}</td><td className="px-4 py-3">{item.dueDate}</td><td className="px-4 py-3 font-semibold"><SensitiveValue value={item.amount} /></td></tr>)}
+          {!forecast.fixedExpenses.length && !forecast.accounts.length ? <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={6}>Nenhum compromisso previsto para o próximo mês.</td></tr> : null}
+        </tbody>
+      </table>
+    </div>
+  </CollapsiblePanel>;
 }
 function Breakdown({ items, storageKey, title }: { items: { name: string; open: number; overdue: number; paid: number; count: number }[]; storageKey: string; title: string }) {
   const [showAll, setShowAll] = useState(false);

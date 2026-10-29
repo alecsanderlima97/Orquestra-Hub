@@ -1539,7 +1539,7 @@ export function OrquestraHubApp() {
         </Section>
 
         <Section description="Indicadores para decisão financeira." id="relatorios" title="Relatórios">
-          <FinancialReports accounts={accountList} purchases={purchaseList} />
+          <FinancialReports accounts={accountList} fixedExpenses={fixedExpenses} purchases={purchaseList} />
         </Section>
         <Section description="Acompanhe quem lançou, editou, pagou ou alterou informações financeiras." id="auditoria" title="Auditoria e histórico financeiro">
           <div className="space-y-5">

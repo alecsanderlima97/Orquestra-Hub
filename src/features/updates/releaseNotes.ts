@@ -15,17 +15,16 @@ export type ReleaseNotes = {
 
 // Troque o id sempre que uma nova versão relevante for publicada.
 export const currentReleaseNotes: ReleaseNotes = {
-  id: "2026-10-15-controle-financeiro-organizado",
-  intro: "O Orquestra Hub recebeu melhorias para deixar o controle financeiro mais claro, organizado e rápido de consultar.",
+  id: "2026-10-29-previsao-proximo-mes",
+  intro: "O relatório financeiro agora ajuda a planejar o próximo mês reunindo despesas fixas e outras contas previstas.",
   items: [
-    { description: "A nova tela de detalhamento facilita a consulta por categoria, loja, fornecedor e período.", title: "Detalhamento financeiro" },
-    { description: "Novos cards organizam os principais valores e indicadores sem ocupar a tela inteira logo de início.", title: "Dashboard mais claro" },
-    { description: "As listas agora podem ser filtradas e ordenadas pelas colunas, como fornecedor, data e valor.", title: "Filtros nas listas" },
-    { description: "Listas extensas começam compactas e podem ser ampliadas pelo botão Ver mais ou ocultadas quando necessário.", title: "Mais organização" },
-    { description: "Os valores dos cards financeiros podem ser ocultados pelo botão de olho para mais privacidade.", title: "Privacidade dos valores" },
+    { description: "Consulte as despesas fixas ativas que deverão ser pagas no próximo mês.", title: "Despesas fixas no relatório" },
+    { description: "Veja separadamente outras contas já lançadas para o mês seguinte.", title: "Contas previstas" },
+    { description: "O sistema soma os compromissos sem duplicar despesas recorrentes já lançadas.", title: "Total previsto do mês" },
+    { description: "A previsão também acompanha a exportação para Excel e a impressão em PDF.", title: "Exportação completa" },
   ],
-  publishedAt: "15/10/2026",
-  releaseLabel: "Controle financeiro organizado",
+  publishedAt: "29/10/2026",
+  releaseLabel: "Previsão financeira mensal",
   title: "Novidades do Orquestra Hub",
-  version: "0.2.5",
+  version: "0.2.6",
 };
